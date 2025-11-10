@@ -3,10 +3,10 @@ module github.com/goliatone/go-users
 go 1.23.4
 
 require (
-	github.com/goliatone/go-auth v0.0.0-00010101000000-000000000000
-	github.com/goliatone/go-command v0.0.0-00010101000000-000000000000
+	github.com/goliatone/go-auth v0.13.0
+	github.com/goliatone/go-command v0.1.0
+	github.com/goliatone/go-options v0.4.0
 	github.com/goliatone/go-repository-bun v0.5.2
-	github.com/goliatone/opts v0.0.0-00010101000000-000000000000
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-sqlite3 v1.14.28
 	github.com/stretchr/testify v1.10.0
@@ -14,18 +14,11 @@ require (
 	github.com/uptrace/bun/dialect/sqlitedialect v1.2.14
 )
 
-replace github.com/goliatone/go-auth => ../go-auth
-
-replace github.com/goliatone/go-command => ../go-command
-
-replace github.com/goliatone/opts => ../go-options
-
 require (
 	cel.dev/expr v0.24.0 // indirect
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/MicahParks/keyfunc/v2 v2.1.0 // indirect
 	github.com/alecthomas/chroma/v2 v2.16.0 // indirect
-	github.com/alecthomas/kong v1.11.0 // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
@@ -64,6 +57,7 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
+	github.com/nyaruka/phonenumbers v1.5.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/puzpuzpuz/xsync/v3 v3.5.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
