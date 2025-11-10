@@ -22,6 +22,8 @@ PATH=$(pwd)/node_modules/.bin:$PATH
 # This will make all scripts available in the ./src/bin directory
 PATH=$(pwd)/src/bin:$PATH
 
+GO_BIN=${GO_BIN:-/Users/goliatone/.g/go/bin/go}
+
 
 #################################################
 # Development dependencies
@@ -95,6 +97,23 @@ function dev:test {
 
 function dev:cover {
     go test -coverprofile=coverage.out ./... && go tool cover -func coverage.out
+}
+
+function lint {
+    "${GO_BIN}" vet ./...
+}
+
+function test {
+    "${GO_BIN}" test ./...
+}
+
+function migrate {
+    "${GO_BIN}" test ./migrations -run TestMigrationsApplyToSQLite -count=1
+}
+
+function example {
+    "${GO_BIN}" run ./examples/commands
+    "${GO_BIN}" run ./examples/admin
 }
 
 ##
