@@ -32,11 +32,11 @@ func TestMigrationsApplyToSQLite(t *testing.T) {
 	}
 
 	var tableName string
-	if err := db.QueryRowContext(ctx, "SELECT name FROM sqlite_master WHERE type='table' AND name='user_migration_bootstrap'").Scan(&tableName); err != nil {
-		t.Fatalf("failed to verify bootstrap table: %v", err)
+	if err := db.QueryRowContext(ctx, "SELECT name FROM sqlite_master WHERE type='table' AND name='custom_roles'").Scan(&tableName); err != nil {
+		t.Fatalf("failed to verify custom_roles table: %v", err)
 	}
-	if tableName != "user_migration_bootstrap" {
-		t.Fatalf("expected user_migration_bootstrap table, got %q", tableName)
+	if tableName != "custom_roles" {
+		t.Fatalf("expected custom_roles table, got %q", tableName)
 	}
 }
 
