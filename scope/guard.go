@@ -44,13 +44,13 @@ func NopGuard() Guard {
 
 // Enforce resolves and authorizes the requested scope for the action.
 func (g guard) Enforce(ctx context.Context, actor types.ActorRef, requested types.ScopeFilter, action types.PolicyAction, target uuid.UUID) (types.ScopeFilter, error) {
-	scope := requested
+	scope := requested.Clone()
 	if g.resolver != nil {
 		resolved, err := g.resolver.ResolveScope(ctx, actor, requested)
 		if err != nil {
 			return types.ScopeFilter{}, err
 		}
-		scope = resolved
+		scope = resolved.Clone()
 	}
 	if g.policy != nil && action != "" {
 		check := types.PolicyCheck{
