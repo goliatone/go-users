@@ -19,10 +19,14 @@ type RepositoryConfig struct {
 	IDGen      types.IDGenerator
 }
 
+type activityStore interface {
+	repository.Repository[*LogEntry]
+}
+
 // Repository persists activity logs and exposes query helpers.
 type Repository struct {
+	activityStore
 	db    *bun.DB
-	repo  repository.Repository[*LogEntry]
 	clock types.Clock
 	idGen types.IDGenerator
 }
@@ -60,16 +64,17 @@ func NewRepository(cfg RepositoryConfig) (*Repository, error) {
 	}
 
 	return &Repository{
-		db:    cfg.DB,
-		repo:  repo,
-		clock: clock,
-		idGen: idGen,
+		activityStore: repo,
+		db:            cfg.DB,
+		clock:         clock,
+		idGen:         idGen,
 	}, nil
 }
 
 var (
-	_ types.ActivitySink       = (*Repository)(nil)
-	_ types.ActivityRepository = (*Repository)(nil)
+	_ repository.Repository[*LogEntry] = (*Repository)(nil)
+	_ types.ActivitySink               = (*Repository)(nil)
+	_ types.ActivityRepository         = (*Repository)(nil)
 )
 
 // Log persists an activity record into the database.
@@ -81,7 +86,7 @@ func (r *Repository) Log(ctx context.Context, record types.ActivityRecord) error
 	if entry.CreatedAt.IsZero() {
 		entry.CreatedAt = r.clock.Now()
 	}
-	_, err := r.repo.Create(ctx, entry)
+	_, err := r.Create(ctx, entry)
 	return err
 }
 
@@ -97,7 +102,7 @@ func (r *Repository) ListActivity(ctx context.Context, filter types.ActivityFilt
 		},
 	}
 
-	rows, total, err := r.repo.List(ctx, criteria...)
+	rows, total, err := r.List(ctx, criteria...)
 	if err != nil {
 		return types.ActivityPage{}, err
 	}
