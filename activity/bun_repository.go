@@ -1,0 +1,264 @@
+package activity
+
+import (
+	"context"
+	"errors"
+	"strings"
+
+	repository "github.com/goliatone/go-repository-bun"
+	"github.com/goliatone/go-users/pkg/types"
+	"github.com/google/uuid"
+	"github.com/uptrace/bun"
+)
+
+// RepositoryConfig wires the Bun-backed activity repository.
+type RepositoryConfig struct {
+	DB         *bun.DB
+	Repository repository.Repository[*LogEntry]
+	Clock      types.Clock
+	IDGen      types.IDGenerator
+}
+
+// Repository persists activity logs and exposes query helpers.
+type Repository struct {
+	db    *bun.DB
+	repo  repository.Repository[*LogEntry]
+	clock types.Clock
+	idGen types.IDGenerator
+}
+
+// NewRepository constructs a repository that implements both ActivitySink
+// and ActivityRepository interfaces.
+func NewRepository(cfg RepositoryConfig) (*Repository, error) {
+	if cfg.Repository == nil && cfg.DB == nil {
+		return nil, errors.New("activity: db or repository required")
+	}
+	repo := cfg.Repository
+	if repo == nil {
+		repo = repository.NewRepository(cfg.DB, repository.ModelHandlers[*LogEntry]{
+			NewRecord: func() *LogEntry { return &LogEntry{} },
+			GetID: func(entry *LogEntry) uuid.UUID {
+				if entry == nil {
+					return uuid.Nil
+				}
+				return entry.ID
+			},
+			SetID: func(entry *LogEntry, id uuid.UUID) {
+				if entry != nil {
+					entry.ID = id
+				}
+			},
+		})
+	}
+	clock := cfg.Clock
+	if clock == nil {
+		clock = types.SystemClock{}
+	}
+	idGen := cfg.IDGen
+	if idGen == nil {
+		idGen = types.UUIDGenerator{}
+	}
+
+	return &Repository{
+		db:    cfg.DB,
+		repo:  repo,
+		clock: clock,
+		idGen: idGen,
+	}, nil
+}
+
+var (
+	_ types.ActivitySink       = (*Repository)(nil)
+	_ types.ActivityRepository = (*Repository)(nil)
+)
+
+// Log persists an activity record into the database.
+func (r *Repository) Log(ctx context.Context, record types.ActivityRecord) error {
+	entry := toLogEntry(record)
+	if entry.ID == uuid.Nil {
+		entry.ID = r.idGen.UUID()
+	}
+	if entry.CreatedAt.IsZero() {
+		entry.CreatedAt = r.clock.Now()
+	}
+	_, err := r.repo.Create(ctx, entry)
+	return err
+}
+
+// ListActivity returns a paginated feed filtered by the supplied criteria.
+func (r *Repository) ListActivity(ctx context.Context, filter types.ActivityFilter) (types.ActivityPage, error) {
+	pagination := normalizePagination(filter.Pagination, 50, 200)
+	criteria := []repository.SelectCriteria{
+		func(q *bun.SelectQuery) *bun.SelectQuery {
+			q = q.OrderExpr("created_at DESC").
+				Limit(pagination.Limit).
+				Offset(pagination.Offset)
+			return applyActivityFilter(q, filter)
+		},
+	}
+
+	rows, total, err := r.repo.List(ctx, criteria...)
+	if err != nil {
+		return types.ActivityPage{}, err
+	}
+	records := make([]types.ActivityRecord, 0, len(rows))
+	for _, row := range rows {
+		records = append(records, toActivityRecord(row))
+	}
+	return types.ActivityPage{
+		Records:    records,
+		Total:      total,
+		NextOffset: pagination.Offset + pagination.Limit,
+		HasMore:    pagination.Offset+pagination.Limit < total,
+	}, nil
+}
+
+// ActivityStats aggregates counts grouped by verb.
+func (r *Repository) ActivityStats(ctx context.Context, filter types.ActivityStatsFilter) (types.ActivityStats, error) {
+	stats := types.ActivityStats{
+		ByVerb: make(map[string]int),
+	}
+	if r.db == nil {
+		return stats, errors.New("activity: stats requires bun DB")
+	}
+	query := r.db.NewSelect().
+		Table("user_activity").
+		ColumnExpr("COUNT(*) AS total").
+		ColumnExpr("verb").
+		Group("verb")
+	query = applyActivityStatsFilter(query, filter)
+
+	type row struct {
+		Verb  string `bun:"verb"`
+		Total int    `bun:"total"`
+	}
+	var rows []row
+	if err := query.Scan(ctx, &rows); err != nil {
+		return stats, err
+	}
+	total := 0
+	for _, rec := range rows {
+		stats.ByVerb[rec.Verb] = rec.Total
+		total += rec.Total
+	}
+	stats.Total = total
+	return stats, nil
+}
+
+func applyActivityFilter(q *bun.SelectQuery, filter types.ActivityFilter) *bun.SelectQuery {
+	if filter.Scope.TenantID != uuid.Nil {
+		q = q.Where("tenant_id = ?", filter.Scope.TenantID)
+	}
+	if filter.Scope.OrgID != uuid.Nil {
+		q = q.Where("org_id = ?", filter.Scope.OrgID)
+	}
+	if filter.UserID != uuid.Nil {
+		q = q.Where("user_id = ?", filter.UserID)
+	}
+	if filter.ActorID != uuid.Nil {
+		q = q.Where("actor_id = ?", filter.ActorID)
+	}
+	if len(filter.Verbs) > 0 {
+		q = q.Where("verb IN (?)", bun.In(filter.Verbs))
+	}
+	if filter.ObjectType != "" {
+		q = q.Where("object_type = ?", filter.ObjectType)
+	}
+	if filter.ObjectID != "" {
+		q = q.Where("object_id = ?", filter.ObjectID)
+	}
+	if filter.Channel != "" {
+		q = q.Where("channel = ?", filter.Channel)
+	}
+	if filter.Since != nil && !filter.Since.IsZero() {
+		q = q.Where("created_at >= ?", filter.Since)
+	}
+	if filter.Until != nil && !filter.Until.IsZero() {
+		q = q.Where("created_at <= ?", filter.Until)
+	}
+	if strings.TrimSpace(filter.Keyword) != "" {
+		keyword := "%" + strings.ToLower(strings.TrimSpace(filter.Keyword)) + "%"
+		q = q.Where("LOWER(verb) LIKE ? OR LOWER(object_type) LIKE ? OR LOWER(object_id) LIKE ?", keyword, keyword, keyword)
+	}
+	return q
+}
+
+func applyActivityStatsFilter(q *bun.SelectQuery, filter types.ActivityStatsFilter) *bun.SelectQuery {
+	if filter.Scope.TenantID != uuid.Nil {
+		q = q.Where("tenant_id = ?", filter.Scope.TenantID)
+	}
+	if filter.Scope.OrgID != uuid.Nil {
+		q = q.Where("org_id = ?", filter.Scope.OrgID)
+	}
+	if filter.Since != nil && !filter.Since.IsZero() {
+		q = q.Where("created_at >= ?", filter.Since)
+	}
+	if filter.Until != nil && !filter.Until.IsZero() {
+		q = q.Where("created_at <= ?", filter.Until)
+	}
+	if len(filter.Verbs) > 0 {
+		q = q.Where("verb IN (?)", bun.In(filter.Verbs))
+	}
+	return q
+}
+
+func toLogEntry(record types.ActivityRecord) *LogEntry {
+	return &LogEntry{
+		ID:         record.ID,
+		UserID:     record.UserID,
+		ActorID:    record.ActorID,
+		TenantID:   record.TenantID,
+		OrgID:      record.OrgID,
+		Verb:       record.Verb,
+		ObjectType: record.ObjectType,
+		ObjectID:   record.ObjectID,
+		Channel:    record.Channel,
+		IP:         record.IP,
+		Data:       cloneMap(record.Data),
+		CreatedAt:  record.OccurredAt,
+	}
+}
+
+func toActivityRecord(entry *LogEntry) types.ActivityRecord {
+	if entry == nil {
+		return types.ActivityRecord{}
+	}
+	return types.ActivityRecord{
+		ID:         entry.ID,
+		UserID:     entry.UserID,
+		ActorID:    entry.ActorID,
+		TenantID:   entry.TenantID,
+		OrgID:      entry.OrgID,
+		Verb:       entry.Verb,
+		ObjectType: entry.ObjectType,
+		ObjectID:   entry.ObjectID,
+		Channel:    entry.Channel,
+		IP:         entry.IP,
+		Data:       cloneMap(entry.Data),
+		OccurredAt: entry.CreatedAt,
+	}
+}
+
+func cloneMap(src map[string]any) map[string]any {
+	if len(src) == 0 {
+		return map[string]any{}
+	}
+	out := make(map[string]any, len(src))
+	for k, v := range src {
+		out[k] = v
+	}
+	return out
+}
+
+func normalizePagination(p types.Pagination, def, max int) types.Pagination {
+	if p.Limit <= 0 {
+		p.Limit = def
+	}
+	if p.Limit > max {
+		p.Limit = max
+	}
+	if p.Offset < 0 {
+		p.Offset = 0
+	}
+	return p
+}
