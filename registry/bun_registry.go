@@ -22,8 +22,8 @@ type RoleRegistryConfig struct {
 	IDGenerator types.IDGenerator
 }
 
-// BunRoleRegistry persists custom roles and assignments using Bun repositories.
-type BunRoleRegistry struct {
+// RoleRegistry persists custom roles and assignments using Bun repositories.
+type RoleRegistry struct {
 	db          *bun.DB
 	roles       repository.Repository[*CustomRole]
 	assignments repository.Repository[*RoleAssignment]
@@ -35,7 +35,7 @@ type BunRoleRegistry struct {
 
 // NewRoleRegistry constructs the default registry. Either DB or both repositories
 // must be provided; when DB is supplied the repositories are created automatically.
-func NewRoleRegistry(cfg RoleRegistryConfig) (*BunRoleRegistry, error) {
+func NewRoleRegistry(cfg RoleRegistryConfig) (*RoleRegistry, error) {
 	clock := cfg.Clock
 	if clock == nil {
 		clock = types.SystemClock{}
@@ -83,7 +83,7 @@ func NewRoleRegistry(cfg RoleRegistryConfig) (*BunRoleRegistry, error) {
 		}
 	}
 
-	return &BunRoleRegistry{
+	return &RoleRegistry{
 		db:          cfg.DB,
 		roles:       rolesRepo,
 		assignments: assignRepo,
@@ -95,7 +95,7 @@ func NewRoleRegistry(cfg RoleRegistryConfig) (*BunRoleRegistry, error) {
 }
 
 // CreateRole inserts a custom role scoped to the provided tenant/org.
-func (r *BunRoleRegistry) CreateRole(ctx context.Context, input types.RoleMutation) (*types.RoleDefinition, error) {
+func (r *RoleRegistry) CreateRole(ctx context.Context, input types.RoleMutation) (*types.RoleDefinition, error) {
 	name := normalizeRoleName(input.Name)
 	if name == "" {
 		return nil, errors.New("role name required")
@@ -131,7 +131,7 @@ func (r *BunRoleRegistry) CreateRole(ctx context.Context, input types.RoleMutati
 }
 
 // UpdateRole updates mutable fields on a custom role.
-func (r *BunRoleRegistry) UpdateRole(ctx context.Context, id uuid.UUID, input types.RoleMutation) (*types.RoleDefinition, error) {
+func (r *RoleRegistry) UpdateRole(ctx context.Context, id uuid.UUID, input types.RoleMutation) (*types.RoleDefinition, error) {
 	role, err := r.roles.GetByID(ctx, id.String(), scopeSelectCriteria(input.Scope))
 	if err != nil {
 		return nil, err
@@ -166,7 +166,7 @@ func (r *BunRoleRegistry) UpdateRole(ctx context.Context, id uuid.UUID, input ty
 }
 
 // DeleteRole removes a custom role (unless marked as system).
-func (r *BunRoleRegistry) DeleteRole(ctx context.Context, id uuid.UUID, scope types.ScopeFilter, actor uuid.UUID) error {
+func (r *RoleRegistry) DeleteRole(ctx context.Context, id uuid.UUID, scope types.ScopeFilter, actor uuid.UUID) error {
 	role, err := r.roles.GetByID(ctx, id.String(), scopeSelectCriteria(scope))
 	if err != nil {
 		return err
@@ -189,7 +189,7 @@ func (r *BunRoleRegistry) DeleteRole(ctx context.Context, id uuid.UUID, scope ty
 }
 
 // AssignRole creates a user->role assignment scoped to tenant/org.
-func (r *BunRoleRegistry) AssignRole(ctx context.Context, userID, roleID uuid.UUID, scope types.ScopeFilter, actor uuid.UUID) error {
+func (r *RoleRegistry) AssignRole(ctx context.Context, userID, roleID uuid.UUID, scope types.ScopeFilter, actor uuid.UUID) error {
 	_, err := r.roles.GetByID(ctx, roleID.String(), scopeSelectCriteria(scope))
 	if err != nil {
 		return err
@@ -221,7 +221,7 @@ func (r *BunRoleRegistry) AssignRole(ctx context.Context, userID, roleID uuid.UU
 }
 
 // UnassignRole removes an existing user->role assignment.
-func (r *BunRoleRegistry) UnassignRole(ctx context.Context, userID, roleID uuid.UUID, scope types.ScopeFilter, actor uuid.UUID) error {
+func (r *RoleRegistry) UnassignRole(ctx context.Context, userID, roleID uuid.UUID, scope types.ScopeFilter, actor uuid.UUID) error {
 	err := r.assignments.DeleteWhere(ctx,
 		func(q *bun.DeleteQuery) *bun.DeleteQuery {
 			return q.Where("user_id = ? AND role_id = ? AND tenant_id = ? AND org_id = ?",
@@ -243,7 +243,7 @@ func (r *BunRoleRegistry) UnassignRole(ctx context.Context, userID, roleID uuid.
 }
 
 // ListRoles returns paginated roles filtered by scope/keyword.
-func (r *BunRoleRegistry) ListRoles(ctx context.Context, filter types.RoleFilter) (types.RolePage, error) {
+func (r *RoleRegistry) ListRoles(ctx context.Context, filter types.RoleFilter) (types.RolePage, error) {
 	pagination := normalizePagination(filter.Pagination, 50, 200)
 	criteria := []repository.SelectCriteria{
 		scopeSelectCriteria(filter.Scope),
@@ -282,7 +282,7 @@ func (r *BunRoleRegistry) ListRoles(ctx context.Context, filter types.RoleFilter
 }
 
 // GetRole returns a single role matching the scope constraints.
-func (r *BunRoleRegistry) GetRole(ctx context.Context, id uuid.UUID, scope types.ScopeFilter) (*types.RoleDefinition, error) {
+func (r *RoleRegistry) GetRole(ctx context.Context, id uuid.UUID, scope types.ScopeFilter) (*types.RoleDefinition, error) {
 	role, err := r.roles.GetByID(ctx, id.String(), scopeSelectCriteria(scope))
 	if err != nil {
 		return nil, err
@@ -291,7 +291,7 @@ func (r *BunRoleRegistry) GetRole(ctx context.Context, id uuid.UUID, scope types
 }
 
 // ListAssignments returns assignments filtered by scope/user/role.
-func (r *BunRoleRegistry) ListAssignments(ctx context.Context, filter types.RoleAssignmentFilter) ([]types.RoleAssignment, error) {
+func (r *RoleRegistry) ListAssignments(ctx context.Context, filter types.RoleAssignmentFilter) ([]types.RoleAssignment, error) {
 	criteria := []repository.SelectCriteria{
 		func(q *bun.SelectQuery) *bun.SelectQuery {
 			q = q.Where("tenant_id = ? AND org_id = ?", scopeUUID(filter.Scope.TenantID), scopeUUID(filter.Scope.OrgID))
@@ -335,7 +335,7 @@ func (r *BunRoleRegistry) ListAssignments(ctx context.Context, filter types.Role
 	return assignments, nil
 }
 
-func (r *BunRoleRegistry) loadRoleNames(ctx context.Context, assignments []*RoleAssignment) (map[uuid.UUID]string, error) {
+func (r *RoleRegistry) loadRoleNames(ctx context.Context, assignments []*RoleAssignment) (map[uuid.UUID]string, error) {
 	roleIDs := make([]uuid.UUID, 0, len(assignments))
 	seen := make(map[uuid.UUID]struct{}, len(assignments))
 	for _, assignment := range assignments {
@@ -361,7 +361,7 @@ func (r *BunRoleRegistry) loadRoleNames(ctx context.Context, assignments []*Role
 	return names, nil
 }
 
-func (r *BunRoleRegistry) emitRoleEvent(ctx context.Context, event types.RoleEvent) {
+func (r *RoleRegistry) emitRoleEvent(ctx context.Context, event types.RoleEvent) {
 	if r.hooks.AfterRoleChange == nil {
 		return
 	}
