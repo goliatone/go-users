@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	opts "github.com/goliatone/go-options"
 	"github.com/goliatone/go-users/pkg/types"
-	"github.com/goliatone/opts"
 	"github.com/google/uuid"
 )
 
