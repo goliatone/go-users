@@ -15,7 +15,7 @@ import (
 	"github.com/uptrace/bun/dialect/sqlitedialect"
 )
 
-func TestBunRoleRegistry_CreateListAssign(t *testing.T) {
+func TestRoleRegistry_CreateListAssign(t *testing.T) {
 	ctx := context.Background()
 	db := newTestDB(t)
 	applyTestMigration(t, db, roleSchemaDDL)
