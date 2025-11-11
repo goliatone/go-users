@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,6 +24,46 @@ const (
 type ScopeFilter struct {
 	TenantID uuid.UUID
 	OrgID    uuid.UUID
+	Labels   map[string]uuid.UUID
+}
+
+// Clone returns a copy of the scope filter with labels detached from the
+// original map reference so callers can mutate safely.
+func (s ScopeFilter) Clone() ScopeFilter {
+	clone := ScopeFilter{
+		TenantID: s.TenantID,
+		OrgID:    s.OrgID,
+	}
+	if len(s.Labels) > 0 {
+		clone.Labels = make(map[string]uuid.UUID, len(s.Labels))
+		for k, v := range s.Labels {
+			clone.Labels[k] = v
+		}
+	}
+	return clone
+}
+
+// WithLabel returns a cloned scope filter with the provided label set. Keys are
+// normalized to lower-case so lookups stay consistent across transports.
+func (s ScopeFilter) WithLabel(key string, id uuid.UUID) ScopeFilter {
+	if strings.TrimSpace(key) == "" || id == uuid.Nil {
+		return s
+	}
+	clone := s.Clone()
+	if clone.Labels == nil {
+		clone.Labels = make(map[string]uuid.UUID)
+	}
+	clone.Labels[strings.ToLower(key)] = id
+	return clone
+}
+
+// Label returns the identifier previously stored under the key (case
+// insensitive). When the label has not been set, uuid.Nil is returned.
+func (s ScopeFilter) Label(key string) uuid.UUID {
+	if len(s.Labels) == 0 {
+		return uuid.Nil
+	}
+	return s.Labels[strings.ToLower(strings.TrimSpace(key))]
 }
 
 // Pagination supports query pagination across admin panels.
@@ -155,6 +196,19 @@ type UserInventoryFilter struct {
 	UserIDs    []uuid.UUID
 }
 
+// Type implements gocommand.Message for query inputs.
+func (UserInventoryFilter) Type() string {
+	return "query.user.inventory"
+}
+
+// Validate implements gocommand.Message.
+func (filter UserInventoryFilter) Validate() error {
+	if filter.Actor.ID == uuid.Nil {
+		return ErrActorRequired
+	}
+	return nil
+}
+
 // UserInventoryPage represents a paginated list of auth users.
 type UserInventoryPage struct {
 	Users      []AuthUser
@@ -197,6 +251,19 @@ type RoleFilter struct {
 	Pagination    Pagination
 }
 
+// Type implements gocommand.Message for query inputs.
+func (RoleFilter) Type() string {
+	return "query.role.list"
+}
+
+// Validate implements gocommand.Message.
+func (filter RoleFilter) Validate() error {
+	if filter.Actor.ID == uuid.Nil {
+		return ErrActorRequired
+	}
+	return nil
+}
+
 // RolePage represents a paginated set of roles.
 type RolePage struct {
 	Roles      []RoleDefinition
@@ -223,6 +290,19 @@ type RoleAssignmentFilter struct {
 	RoleID  uuid.UUID
 	UserIDs []uuid.UUID
 	RoleIDs []uuid.UUID
+}
+
+// Type implements gocommand.Message for query inputs.
+func (RoleAssignmentFilter) Type() string {
+	return "query.role.assignments"
+}
+
+// Validate implements gocommand.Message.
+func (filter RoleAssignmentFilter) Validate() error {
+	if filter.Actor.ID == uuid.Nil {
+		return ErrActorRequired
+	}
+	return nil
 }
 
 // UserProfile captures the structured profile data stored alongside auth users.
@@ -337,6 +417,19 @@ type ActivityFilter struct {
 	Keyword    string
 }
 
+// Type implements gocommand.Message for query inputs.
+func (ActivityFilter) Type() string {
+	return "query.activity.feed"
+}
+
+// Validate implements gocommand.Message.
+func (filter ActivityFilter) Validate() error {
+	if filter.Actor.ID == uuid.Nil {
+		return ErrActorRequired
+	}
+	return nil
+}
+
 // ActivityPage represents a paginated feed response.
 type ActivityPage struct {
 	Records    []ActivityRecord
@@ -352,6 +445,19 @@ type ActivityStatsFilter struct {
 	Since *time.Time
 	Until *time.Time
 	Verbs []string
+}
+
+// Type implements gocommand.Message for query inputs.
+func (ActivityStatsFilter) Type() string {
+	return "query.activity.stats"
+}
+
+// Validate implements gocommand.Message.
+func (filter ActivityStatsFilter) Validate() error {
+	if filter.Actor.ID == uuid.Nil {
+		return ErrActorRequired
+	}
+	return nil
 }
 
 // ActivityStats powers dashboard widgets summarizing verbs/channels.
@@ -385,6 +491,8 @@ func (NopLogger) Info(string, ...any) {}
 func (NopLogger) Error(string, error, ...any) {}
 
 var (
+	// ErrActorRequired indicates an actor reference was not supplied.
+	ErrActorRequired = errors.New("go-users: actor reference required")
 	// ErrUserIDRequired indicates a user identifier was omitted.
 	ErrUserIDRequired = errors.New("go-users: user id required")
 	// ErrServiceNotReady indicates the service has not been properly configured.
