@@ -3,10 +3,13 @@ module github.com/goliatone/go-users
 go 1.23.4
 
 require (
-	github.com/goliatone/go-auth v0.13.0
+	github.com/goliatone/go-auth v0.15.0
 	github.com/goliatone/go-command v0.1.0
+	github.com/goliatone/go-crud v0.11.0
+	github.com/goliatone/go-errors v0.9.0
 	github.com/goliatone/go-options v0.4.0
-	github.com/goliatone/go-repository-bun v0.5.2
+	github.com/goliatone/go-repository-bun v0.9.0
+	github.com/goliatone/go-router v0.23.0
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-sqlite3 v1.14.28
 	github.com/stretchr/testify v1.10.0
@@ -40,10 +43,8 @@ require (
 	github.com/gofiber/utils v1.1.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
 	github.com/goliatone/go-composite-fs v0.0.1 // indirect
-	github.com/goliatone/go-errors v0.9.0 // indirect
 	github.com/goliatone/go-masker v0.1.0 // indirect
 	github.com/goliatone/go-print v0.4.1 // indirect
-	github.com/goliatone/go-router v0.14.0 // indirect
 	github.com/goliatone/hashid v0.1.1 // indirect
 	github.com/goodsign/monday v1.0.2 // indirect
 	github.com/google/cel-go v0.26.1 // indirect
@@ -57,7 +58,6 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
-	github.com/nyaruka/phonenumbers v1.5.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/puzpuzpuz/xsync/v3 v3.5.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
