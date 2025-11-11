@@ -195,6 +195,24 @@ func (s *Service) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
+// ScopeGuard exposes the guard instance used internally so transports can reuse
+// the same resolver/policy combination for HTTP adapters.
+func (s *Service) ScopeGuard() scope.Guard {
+	if s == nil {
+		return scope.NopGuard()
+	}
+	return scope.Ensure(s.scopeGuard)
+}
+
+// ActivitySink returns the configured sink so transports can emit activity
+// records for auxiliary workflows (e.g. CRUD controllers).
+func (s *Service) ActivitySink() types.ActivitySink {
+	if s == nil {
+		return nil
+	}
+	return s.cfg.ActivitySink
+}
+
 func (s *Service) buildCommands() Commands {
 	lifecycle := command.NewUserLifecycleTransitionCommand(command.LifecycleCommandConfig{
 		Repository: s.cfg.AuthRepository,
