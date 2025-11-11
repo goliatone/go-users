@@ -85,7 +85,7 @@ func newTestActivityDB(t *testing.T) *bun.DB {
 }
 
 func applyActivityDDL(t *testing.T, db *bun.DB) {
-	content, err := os.ReadFile("../data/sql/migrations/000003_user_activity.sql")
+	content, err := os.ReadFile("../data/sql/migrations/000002_user_activity.sql")
 	require.NoError(t, err)
 	for _, stmt := range splitStatements(string(content)) {
 		if strings.TrimSpace(stmt) == "" {
