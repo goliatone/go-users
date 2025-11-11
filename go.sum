@@ -70,6 +70,8 @@ github.com/goliatone/go-composite-fs v0.0.1 h1:sX1mHuYwIRhiyhnezK5JN3B70DpHjlGAy
 github.com/goliatone/go-composite-fs v0.0.1/go.mod h1:soZ1AneoCf50zh28NYag/HozxlvqgvmePsZo2tv1TRk=
 github.com/goliatone/go-crud v0.11.0 h1:G17lQqFZSzw08sy9uf+a0vJtdNMRz668rCRNGCl82j8=
 github.com/goliatone/go-crud v0.11.0/go.mod h1:3SV9/tn9NhEKhHEZ5yjY2S8+Vk/GeJw3GqHQK/3Bqts=
+github.com/goliatone/go-crud v0.12.0 h1:/mk33pJvltJQwyCFpXYuyDw5Udy1ZZYwNbnTiKw0vB8=
+github.com/goliatone/go-crud v0.12.0/go.mod h1:+/TgcYMOW2mebpQyP676v894FxE4BWN83RbDD+/kLXE=
 github.com/goliatone/go-errors v0.9.0 h1:Jvx5aV+QgSx5ZK4zagOW5YyVCUcqEYZNVZU4V1oqUDQ=
 github.com/goliatone/go-errors v0.9.0/go.mod h1:FiZEC2z5a8SBdRyljC9wFt+IzqZDfrst2dPoqWARbr4=
 github.com/goliatone/go-masker v0.1.0 h1:YiNxBRC7AXpGKtUlXIoU4oj3DUfE+M2fvcDRyYC4Tt4=
