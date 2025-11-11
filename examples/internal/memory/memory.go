@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 	"sync"
@@ -162,9 +163,7 @@ func cloneAuthUser(user *types.AuthUser) *types.AuthUser {
 	copy := *user
 	if user.Metadata != nil {
 		copy.Metadata = map[string]any{}
-		for k, v := range user.Metadata {
-			copy.Metadata[k] = v
-		}
+		maps.Copy(copy.Metadata, user.Metadata)
 	}
 	return &copy
 }
@@ -240,7 +239,7 @@ func (r *RoleRegistry) AssignRole(_ context.Context, userID, roleID uuid.UUID, s
 	}
 	assignments := r.assignments[roleID]
 	for _, existing := range assignments {
-		if existing.UserID == userID && existing.Scope == scope {
+		if existing.UserID == userID && scopeEqual(existing.Scope, scope) {
 			return nil
 		}
 	}
@@ -265,7 +264,7 @@ func (r *RoleRegistry) UnassignRole(_ context.Context, userID, roleID uuid.UUID,
 	}
 	filtered := assignments[:0]
 	for _, assignment := range assignments {
-		if assignment.UserID == userID && assignment.Scope == scope {
+		if assignment.UserID == userID && scopeEqual(assignment.Scope, scope) {
 			continue
 		}
 		filtered = append(filtered, assignment)
@@ -317,6 +316,21 @@ func (r *RoleRegistry) ListAssignments(_ context.Context, filter types.RoleAssig
 		}
 	}
 	return results, nil
+}
+
+func scopeEqual(a, b types.ScopeFilter) bool {
+	if a.TenantID != b.TenantID || a.OrgID != b.OrgID {
+		return false
+	}
+	if len(a.Labels) != len(b.Labels) {
+		return false
+	}
+	for k, v := range a.Labels {
+		if b.Labels[k] != v {
+			return false
+		}
+	}
+	return true
 }
 
 // ActivityStore logs activity entries in memory and exposes query helpers.
