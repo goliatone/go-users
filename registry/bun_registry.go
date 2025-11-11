@@ -433,6 +433,32 @@ func scopeFromRecord(record *CustomRole) types.ScopeFilter {
 	}
 }
 
+// CustomRoleToDefinition exposes the conversion logic for consumers that need to
+// translate Bun models into domain role definitions.
+func CustomRoleToDefinition(record *CustomRole) *types.RoleDefinition {
+	return toRoleDefinition(record)
+}
+
+// DefinitionToCustomRole converts a domain role definition into the Bun model.
+func DefinitionToCustomRole(definition *types.RoleDefinition) *CustomRole {
+	if definition == nil {
+		return nil
+	}
+	return &CustomRole{
+		ID:          definition.ID,
+		Name:        definition.Name,
+		Description: definition.Description,
+		Permissions: append([]string{}, definition.Permissions...),
+		IsSystem:    definition.IsSystem,
+		TenantID:    scopeUUID(definition.Scope.TenantID),
+		OrgID:       scopeUUID(definition.Scope.OrgID),
+		CreatedAt:   definition.CreatedAt,
+		UpdatedAt:   definition.UpdatedAt,
+		CreatedBy:   definition.CreatedBy,
+		UpdatedBy:   definition.UpdatedBy,
+	}
+}
+
 func normalizePagination(p types.Pagination, def, max int) types.Pagination {
 	if p.Limit <= 0 {
 		p.Limit = def
