@@ -244,6 +244,17 @@ func toActivityRecord(entry *LogEntry) types.ActivityRecord {
 	}
 }
 
+// FromActivityRecord converts a domain activity record into the Bun model so it
+// can be reused by transports without duplicating conversion logic.
+func FromActivityRecord(record types.ActivityRecord) *LogEntry {
+	return toLogEntry(record)
+}
+
+// ToActivityRecord converts the Bun model into the domain activity record.
+func ToActivityRecord(entry *LogEntry) types.ActivityRecord {
+	return toActivityRecord(entry)
+}
+
 func cloneMap(src map[string]any) map[string]any {
 	if len(src) == 0 {
 		return map[string]any{}
