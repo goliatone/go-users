@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+
+{% block title %}404 Not Found - go-users Demo{% endblock %}
+
+{% block content %}
+<div class="empty-state">
+    <div class="empty-state-icon">🔍</div>
+    <h1 class="empty-state-title">404 - Not Found</h1>
+    <p class="empty-state-message">{{ message|default:"The resource you're looking for doesn't exist" }}</p>
+    <a href="/" class="btn btn-primary">Go Home</a>
+</div>
+{% endblock %}

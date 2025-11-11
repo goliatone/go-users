@@ -1,0 +1,53 @@
+{% extends "layout.html" %}
+
+{% block title %}Role Detail - go-users Demo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">Role: {{ role.Name }}</h1>
+        <p class="page-subtitle">{{ role.Description }}</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="/roles" class="btn btn-secondary">Back to List</a>
+    </div>
+</div>
+
+<div class="detail-card">
+    <h3>Role Information</h3>
+    <dl class="detail-list">
+        <dt>ID</dt>
+        <dd>{{ role.ID }}</dd>
+
+        <dt>Name</dt>
+        <dd>{{ role.Name }}</dd>
+
+        <dt>Description</dt>
+        <dd>{{ role.Description }}</dd>
+
+        <dt>Created</dt>
+        <dd>{{ role.CreatedAt }}</dd>
+    </dl>
+</div>
+
+<div class="form-card">
+    <h3>Assign Role to User</h3>
+    <form action="/roles/{{ role.ID }}/assign" method="POST">
+        <div class="form-group">
+            <label for="user_id">User ID *</label>
+            <input
+                type="text"
+                id="user_id"
+                name="user_id"
+                class="form-control"
+                required
+                placeholder="User UUID"
+            >
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Assign Role</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

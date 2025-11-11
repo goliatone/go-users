@@ -1,0 +1,71 @@
+{% extends "layout.html" %}
+
+{% block title %}User Detail - go-users Demo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">User Details</h1>
+        <p class="page-subtitle">{{ user.Email }}</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="/users" class="btn btn-secondary">Back to List</a>
+    </div>
+</div>
+
+<div class="detail-card">
+    <div class="detail-section">
+        <h3>Basic Information</h3>
+        <dl class="detail-list">
+            <dt>ID</dt>
+            <dd>{{ user.ID }}</dd>
+
+            <dt>Email</dt>
+            <dd>{{ user.Email }}</dd>
+
+            <dt>Username</dt>
+            <dd>{{ user.Username }}</dd>
+
+            <dt>State</dt>
+            <dd><span class="badge badge-{{ user.State }}">{{ user.State }}</span></dd>
+
+            <dt>Role</dt>
+            <dd>{{ user.Role }}</dd>
+        </dl>
+    </div>
+
+    <div class="detail-section">
+        <h3>Lifecycle Transition</h3>
+        <form action="/users/{{ user.ID }}/transition" method="POST">
+            <div class="form-group">
+                <label for="target_state">New State</label>
+                <select id="target_state" name="target_state" class="form-control" required>
+                    <option value="pending">Pending</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="suspended">Suspended</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="reason">Reason</label>
+                <textarea id="reason" name="reason" class="form-control" rows="3"></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Apply Transition</button>
+        </form>
+    </div>
+
+    <div class="detail-section">
+        <h3>Custom Actions</h3>
+        <p class="help-text">These actions call go-users commands outside the default CRUD paths and still flow through the shared scope guard.</p>
+        <form action="/users/{{ user.ID }}/password-reset" method="POST" class="stacked-form">
+            <div class="form-group">
+                <label>Force Password Reset</label>
+                <p class="help-text">Triggers `UserPasswordReset` so the actor receives a fresh recovery email.</p>
+            </div>
+            <button type="submit" class="btn btn-warning">Send Reset Email</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

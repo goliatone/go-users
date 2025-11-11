@@ -1,0 +1,57 @@
+{% extends "layout.html" %}
+
+{% block title %}Invites - go-users Demo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">User Invitations</h1>
+        <p class="page-subtitle">Send and track user invites</p>
+    </div>
+    <div class="page-header-actions">
+        <a href="/invites/new" class="btn btn-primary">
+            <span class="btn-icon">+</span>
+            New Invite
+        </a>
+    </div>
+</div>
+
+{% if invites %}
+<div class="table-container">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Sent At</th>
+                <th>Expires At</th>
+                <th class="actions-column">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for invite in invites %}
+            <tr>
+                <td>{{ invite.email }}</td>
+                <td><span class="badge">{{ invite.status }}</span></td>
+                <td>{{ invite.sent_at }}</td>
+                <td>{{ invite.expires_at }}</td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn btn-sm btn-secondary">Resend</button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% else %}
+<div class="empty-state">
+    <div class="empty-state-icon">✉️</div>
+    <h3 class="empty-state-title">No invites sent</h3>
+    <p class="empty-state-message">Send your first user invite to get started</p>
+    <a href="/invites/new" class="btn btn-primary">Send Invite</a>
+</div>
+{% endif %}
+{% endblock %}

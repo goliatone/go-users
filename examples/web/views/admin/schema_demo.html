@@ -1,0 +1,45 @@
+{% extends "layout.html" %}
+
+{% block title %}Schema Demo - go-users{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">Schema Demo</h1>
+        <p class="page-subtitle">Live view of the `/admin/schemas` payload and registry feed.</p>
+    </div>
+    <div class="page-header-actions">
+        <button id="refresh-schema" class="btn btn-primary" type="button">Refresh Snapshot</button>
+    </div>
+</div>
+
+{% if has_schema %}
+<section class="detail-card">
+    <div class="detail-section">
+        <h3>Latest Snapshot</h3>
+        <p>Generated at <strong>{{ latest.GeneratedAt }}</strong> containing {{ latest.ResourceNames|length }} resources.</p>
+        <pre id="schema-json" class="code-block">{{ latest_json }}</pre>
+    </div>
+
+    <div class="detail-section">
+        <h3>Recent Registry Events</h3>
+        <ul id="schema-history" class="event-list">
+        {% for event in history %}
+            <li>
+                <span class="event-time">{{ event.GeneratedAt }}</span>
+                <span class="event-desc">{{ event.ResourceNames|join:", " }}</span>
+            </li>
+        {% empty %}
+            <li>No schema events recorded yet.</li>
+        {% endfor %}
+        </ul>
+    </div>
+</section>
+{% else %}
+<div class="empty-state">
+    <p>No schema snapshots available yet. Hit any CRUD endpoint to register resources.</p>
+</div>
+{% endif %}
+
+<script src="/js/schema-demo.js"></script>
+{% endblock %}

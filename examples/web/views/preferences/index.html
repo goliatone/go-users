@@ -1,0 +1,70 @@
+{% extends "layout.html" %}
+
+{% block title %}Preferences - go-users Demo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">User Preferences</h1>
+        <p class="page-subtitle">Manage preferences with scope hierarchy (user/org/tenant)</p>
+    </div>
+</div>
+
+<div class="form-card">
+    <h3>Add or Update Preference</h3>
+    <form action="/preferences" method="POST">
+        <div class="form-group">
+            <label for="key">Preference Key *</label>
+            <input
+                type="text"
+                id="key"
+                name="key"
+                class="form-control"
+                required
+                placeholder="theme"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="value">Value *</label>
+            <input
+                type="text"
+                id="value"
+                name="value"
+                class="form-control"
+                required
+                placeholder="dark"
+            >
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save Preference</button>
+    </form>
+</div>
+
+{% if preferences %}
+<div class="preferences-list">
+    <h3>Current Preferences</h3>
+    {% for pref in preferences %}
+    <div class="preference-item">
+        <div class="preference-info">
+            <strong>{{ pref.Key }}</strong>
+            <span class="preference-scope">{{ pref.ScopeLevel }}</span>
+        </div>
+        <div class="preference-value">
+            <code>{{ pref.Value }}</code>
+        </div>
+        <form action="/preferences/{{ pref.ID }}/delete" method="POST" style="display: inline;">
+            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+        </form>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="empty-state">
+    <div class="empty-state-icon">⚙️</div>
+    <h3 class="empty-state-title">No preferences set</h3>
+    <p class="empty-state-message">Add your first preference above</p>
+</div>
+{% endif %}
+{% endblock %}

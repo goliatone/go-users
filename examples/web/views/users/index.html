@@ -1,0 +1,57 @@
+{% extends "layout.html" %}
+
+{% block title %}User Inventory - go-users Demo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">User Inventory</h1>
+        <p class="page-subtitle">Manage users with lifecycle transitions and bulk operations</p>
+    </div>
+</div>
+
+{% if users %}
+<div class="table-container">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Username</th>
+                <th>State</th>
+                <th>Role</th>
+                <th>Created</th>
+                <th class="actions-column">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.Email }}</td>
+                <td>{{ user.Username }}</td>
+                <td><span class="badge badge-{{ user.State }}">{{ user.State }}</span></td>
+                <td>{{ user.Role }}</td>
+                <td>{{ user.CreatedAt }}</td>
+                <td>
+                    <div class="action-buttons">
+                        <a href="/users/{{ user.ID }}" class="btn btn-sm btn-secondary">View</a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="pagination">
+    <span>Total: {{ total }} users</span>
+</div>
+
+{% else %}
+<div class="empty-state">
+    <div class="empty-state-icon">👥</div>
+    <h3 class="empty-state-title">No users yet</h3>
+    <p class="empty-state-message">Invite your first user to get started</p>
+    <a href="/invites/new" class="btn btn-primary">Send Invite</a>
+</div>
+{% endif %}
+{% endblock %}

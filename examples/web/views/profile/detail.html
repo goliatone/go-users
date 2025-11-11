@@ -1,0 +1,77 @@
+{% extends "layout.html" %}
+
+{% block title %}Profile - go-users Demo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">User Profile</h1>
+        <p class="page-subtitle">View and edit your profile information</p>
+    </div>
+</div>
+
+<div class="form-card">
+    <form action="/profile" method="POST">
+        <div class="form-group">
+            <label for="display_name">Display Name</label>
+            <input
+                type="text"
+                id="display_name"
+                name="display_name"
+                class="form-control"
+                value="{{ profile.DisplayName }}"
+                placeholder="John Doe"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="avatar_url">Avatar URL</label>
+            <input
+                type="url"
+                id="avatar_url"
+                name="avatar_url"
+                class="form-control"
+                value="{{ profile.AvatarURL }}"
+                placeholder="https://example.com/avatar.jpg"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="bio">Bio</label>
+            <textarea
+                id="bio"
+                name="bio"
+                class="form-control"
+                rows="4"
+                placeholder="Tell us about yourself..."
+            >{{ profile.Bio }}</textarea>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Update Profile</button>
+        </div>
+    </form>
+</div>
+
+{% if profile %}
+<div class="detail-card">
+    <h3>Current Profile</h3>
+    <dl class="detail-list">
+        <dt>Display Name</dt>
+        <dd>{{ profile.DisplayName }}</dd>
+
+        <dt>Avatar URL</dt>
+        <dd>{{ profile.AvatarURL }}</dd>
+
+        <dt>Locale</dt>
+        <dd>{{ profile.Locale }}</dd>
+
+        <dt>Timezone</dt>
+        <dd>{{ profile.Timezone }}</dd>
+
+        <dt>Bio</dt>
+        <dd>{{ profile.Bio }}</dd>
+    </dl>
+</div>
+{% endif %}
+{% endblock %}

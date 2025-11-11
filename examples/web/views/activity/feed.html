@@ -1,0 +1,67 @@
+{% extends "layout.html" %}
+
+{% block title %}Activity Feed - go-users Demo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">Activity Feed</h1>
+        <p class="page-subtitle">Real-time monitoring of user actions and system events</p>
+    </div>
+</div>
+
+{% if stats %}
+<div class="activity-summary">
+    <div class="summary-header">
+        <h2>Scope totals</h2>
+        <p>{{ stats.Total }} events across tracked verbs</p>
+    </div>
+    <div class="activity-stats-grid">
+        {% for stat in verb_stats %}
+        <div class="stat-card">
+            <div class="stat-value">{{ stat.Count }}</div>
+            <div class="stat-label">{{ stat.Verb }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if activities %}
+<div class="activity-feed">
+    {% for activity in activities %}
+    <div class="activity-item">
+        <div class="activity-icon">
+            {% if activity.Verb == "created" %}🆕
+            {% elif activity.Verb == "updated" %}✏️
+            {% elif activity.Verb == "deleted" %}🗑️
+            {% elif activity.Verb == "login" %}🔑
+            {% else %}📋{% endif %}
+        </div>
+        <div class="activity-content">
+            <div class="activity-header">
+                <strong>{{ activity.Verb }}</strong> on {{ activity.ObjectType }}
+                <span class="activity-time">{{ activity.CreatedAt }}</span>
+            </div>
+            <div class="activity-details">
+                Object ID: <code>{{ activity.ObjectID }}</code>
+                {% if activity.IP %} | IP: {{ activity.IP }}{% endif %}
+                {% if activity.Channel %} | Channel: {{ activity.Channel }}{% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="pagination">
+    <span>Total: {{ total }} activities</span>
+</div>
+
+{% else %}
+<div class="empty-state">
+    <div class="empty-state-icon">📊</div>
+    <h3 class="empty-state-title">No activity yet</h3>
+    <p class="empty-state-message">Activity will appear here as users interact with the system</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/icon_dark.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    {{ csrf_meta|safe }}
+    <title>Auth | {{title}}</title>
+    <link rel="stylesheet" href="/css/main-CoC3SGxJ.css">
+  </head>
+  <body class="flex flex-col min-h-screen font-montserrat bg-light">
+    <!-- {% include "partials/header.html" %} -->
+    <div class="pt-10 mt-2"></div>
+    {% block content %}
+    {% endblock %}
+
+    <code>
+      is valid? {{jwt.SigningString()}}
+      <pre>
+        {{to_json(jwt)}}
+      </pre>
+    </code>
+    <!-- {% include "partials/footer.html" %} -->
+    <script src="/js/main-Dop5R4UJ.js"></script>
+
+    {% block scripts %}
+    {% endblock %}
+  </body>
+</html>

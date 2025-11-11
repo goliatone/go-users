@@ -1,0 +1,48 @@
+{% extends "layout.html" %}
+
+{% block title %}Roles - go-users Demo{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1 class="page-title">Role Management</h1>
+        <p class="page-subtitle">Create and manage custom roles</p>
+    </div>
+</div>
+
+{% if roles %}
+<div class="table-container">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Created</th>
+                <th class="actions-column">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for role in roles %}
+            <tr>
+                <td><strong>{{ role.Name }}</strong></td>
+                <td>{{ role.Description }}</td>
+                <td>{{ role.CreatedAt }}</td>
+                <td>
+                    <div class="action-buttons">
+                        <a href="/roles/{{ role.ID }}" class="btn btn-sm btn-secondary">View</a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% else %}
+<div class="empty-state">
+    <div class="empty-state-icon">🎭</div>
+    <h3 class="empty-state-title">No custom roles</h3>
+    <p class="empty-state-message">Create roles via the API to manage permissions</p>
+</div>
+{% endif %}
+{% endblock %}
