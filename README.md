@@ -1,6 +1,6 @@
 # go-users
 
-go-users provides user-management commands, queries, migrations, and scope controls that sit behind admin transports. Everything is transport agnostic and can be wired to HTTP, gRPC, jobs, or CLI pipelines.
+go-users provides user management commands, queries, migrations, and scope controls that sit behind admin transports. Everything is transport agnostic and can be wired to HTTP, gRPC, jobs, or CLI pipelines.
 
 ## Package map
 - `service`: builds the service façade and validates injected repositories.
@@ -105,7 +105,7 @@ More details live in `docs/MULTITENANCY.md` and `docs/WORKSPACES.md`.
 ## Examples
 - `examples/commands`: runs the service with in-memory repositories. `go run ./examples/commands`.
 - `examples/internal/memory`: shared fixtures for the sample binaries.
-- `examples/web`: Go-Fiber admin site showing guard-first controllers, schema registry feeds, and CRUD adapters.
+- `examples/web`: Go Fiber admin site showing guard first controllers, schema registry feeds, and CRUD adapters.
 
 Use the examples to confirm wiring and to capture request traces during development.
 
@@ -118,7 +118,7 @@ Use the examples to confirm wiring and to capture request traces during developm
 ## Documentation index
 - `docs/USER_MANAGEMENT_REPORT.md`: design notes for the service surface.
 - `docs/SERVICE_REFERENCE.md`: detailed command and query inputs and outputs.
-- `docs/ACTIVITY.md`, `docs/PROFILES_PREFERENCES.md`, `docs/WORKSPACES.md`: feature-specific guidance.
+- `docs/ACTIVITY.md`, `docs/PROFILES_PREFERENCES.md`, `docs/WORKSPACES.md`: feature specific guidance.
 - `docs/EXAMPLES.md`, `docs/MULTITENANCY.md`, `docs/ROLE_REGISTRY.md`: integration recipes.
 - `MIGRATIONS.md`: SQL execution guidance and versioning notes.
 - `docs/RELEASE_NOTES.md`: change history.
