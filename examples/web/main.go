@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"embed"
 	"fmt"
@@ -259,13 +260,13 @@ func WithHTTPServer(ctx context.Context, app *App) error {
 	}
 
 	srv := router.NewFiberAdapter(func(a *fiber.App) *fiber.App {
-		return fiber.New(fiber.Config{
+		return router.DefaultFiberOptions(fiber.New(fiber.Config{
 			UnescapePath:      true,
 			EnablePrintRoutes: true,
 			StrictRouting:     false,
 			PassLocalsToViews: true,
 			Views:             engine,
-		})
+		}))
 	})
 
 	// Register static files from ./public directory
@@ -273,12 +274,12 @@ func WithHTTPServer(ctx context.Context, app *App) error {
 
 	srv.Router().WithLogger(app.GetLogger("router"))
 
-	// key := sha256.Sum256([]byte(app.Config().GetAuth().GetSigningKey()))
-	// srv.Router().Use(csrf.New(csrf.Config{
-	// 	SecureKey: key[:],
-	// }))
+	key := sha256.Sum256([]byte(app.Config().GetAuth().GetSigningKey()))
+	srv.Router().Use(csrf.New(csrf.Config{
+		SecureKey: key[:],
+	}))
 
-	// csrf.RegisterRoutes(srv.Router())
+	csrf.RegisterRoutes(srv.Router())
 
 	srv.Router().Use(mflash.New(mflash.ConfigDefault))
 
