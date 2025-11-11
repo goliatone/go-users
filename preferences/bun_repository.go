@@ -19,9 +19,13 @@ type RepositoryConfig struct {
 	IDGen      types.IDGenerator
 }
 
+type preferenceStore interface {
+	repository.Repository[*Record]
+}
+
 // Repository implements types.PreferenceRepository.
 type Repository struct {
-	repo  repository.Repository[*Record]
+	preferenceStore
 	clock types.Clock
 	idGen types.IDGenerator
 }
@@ -58,13 +62,16 @@ func NewRepository(cfg RepositoryConfig) (*Repository, error) {
 	}
 
 	return &Repository{
-		repo:  repo,
-		clock: clock,
-		idGen: idGen,
+		preferenceStore: repo,
+		clock:           clock,
+		idGen:           idGen,
 	}, nil
 }
 
-var _ types.PreferenceRepository = (*Repository)(nil)
+var (
+	_ repository.Repository[*Record] = (*Repository)(nil)
+	_ types.PreferenceRepository     = (*Repository)(nil)
+)
 
 // ListPreferences fetches preference records for the requested scope level.
 func (r *Repository) ListPreferences(ctx context.Context, filter types.PreferenceFilter) ([]types.PreferenceRecord, error) {
@@ -91,7 +98,7 @@ func (r *Repository) ListPreferences(ctx context.Context, filter types.Preferenc
 		},
 	}
 
-	rows, _, err := r.repo.List(ctx, criteria...)
+	rows, _, err := r.List(ctx, criteria...)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +132,7 @@ func (r *Repository) UpsertPreference(ctx context.Context, record types.Preferen
 		payload.CreatedBy = existing.CreatedBy
 		payload.Version = existing.Version + 1
 		payload.UpdatedAt = now
-		updated, err := r.repo.Update(ctx, payload)
+		updated, err := r.Update(ctx, payload)
 		if err != nil {
 			return nil, err
 		}
@@ -138,7 +145,7 @@ func (r *Repository) UpsertPreference(ctx context.Context, record types.Preferen
 		if payload.CreatedBy == uuid.Nil {
 			payload.CreatedBy = payload.UpdatedBy
 		}
-		created, err := r.repo.Create(ctx, payload)
+		created, err := r.Create(ctx, payload)
 		if err != nil {
 			return nil, err
 		}
@@ -159,7 +166,7 @@ func (r *Repository) DeletePreference(ctx context.Context, userID uuid.UUID, sco
 	if err != nil {
 		return err
 	}
-	return r.repo.Delete(ctx, existing)
+	return r.Delete(ctx, existing)
 }
 
 func (r *Repository) findExisting(ctx context.Context, level types.PreferenceLevel, ids scopeValues, key string) (*Record, error) {
@@ -178,7 +185,7 @@ func (r *Repository) findExisting(ctx context.Context, level types.PreferenceLev
 				Limit(1)
 		},
 	}
-	rows, _, err := r.repo.List(ctx, criteria...)
+	rows, _, err := r.List(ctx, criteria...)
 	if err != nil {
 		return nil, err
 	}
@@ -276,6 +283,16 @@ func toDomain(record *Record) types.PreferenceRecord {
 func toDomainPtr(record *Record) *types.PreferenceRecord {
 	rec := toDomain(record)
 	return &rec
+}
+
+// FromPreferenceRecord converts a domain preference record into the Bun model.
+func FromPreferenceRecord(record types.PreferenceRecord) *Record {
+	return fromDomain(record)
+}
+
+// ToPreferenceRecord converts the Bun model into the domain preference record.
+func ToPreferenceRecord(record *Record) types.PreferenceRecord {
+	return toDomain(record)
 }
 
 func cloneMap(origin map[string]any) map[string]any {
