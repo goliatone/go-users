@@ -3,8 +3,8 @@ module github.com/goliatone/go-users
 go 1.23.4
 
 require (
-	github.com/goliatone/go-auth v0.15.0
-	github.com/goliatone/go-command v0.1.0
+	github.com/goliatone/go-auth v0.17.0
+	github.com/goliatone/go-command v0.5.0
 	github.com/goliatone/go-crud v0.12.0
 	github.com/goliatone/go-errors v0.9.0
 	github.com/goliatone/go-options v0.4.0
@@ -22,6 +22,7 @@ require (
 	dario.cat/mergo v1.0.1 // indirect
 	github.com/MicahParks/keyfunc/v2 v2.1.0 // indirect
 	github.com/alecthomas/chroma/v2 v2.16.0 // indirect
+	github.com/alecthomas/kong v1.11.0 // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
