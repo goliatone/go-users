@@ -20,6 +20,19 @@ type PreferenceQueryInput struct {
 	Actor  types.ActorRef
 }
 
+// Type implements gocommand.Message.
+func (PreferenceQueryInput) Type() string {
+	return "query.preferences.effective"
+}
+
+// Validate implements gocommand.Message.
+func (input PreferenceQueryInput) Validate() error {
+	if input.Actor.ID == uuid.Nil {
+		return types.ErrActorRequired
+	}
+	return nil
+}
+
 // PreferenceQuery resolves effective preferences via the injected resolver.
 type PreferenceQuery struct {
 	resolver preferenceResolver
@@ -44,6 +57,9 @@ var _ gocommand.Querier[PreferenceQueryInput, types.PreferenceSnapshot] = (*Pref
 func (q *PreferenceQuery) Query(ctx context.Context, input PreferenceQueryInput) (types.PreferenceSnapshot, error) {
 	if q.resolver == nil {
 		return types.PreferenceSnapshot{}, types.ErrMissingPreferenceResolver
+	}
+	if err := input.Validate(); err != nil {
+		return types.PreferenceSnapshot{}, err
 	}
 	scope, err := q.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionPreferencesRead, input.UserID)
 	if err != nil {

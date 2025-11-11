@@ -24,6 +24,9 @@ func TestUserInventoryQuery_NormalizesFilters(t *testing.T) {
 		TenantID: uuid.New(),
 	}
 	filter := types.UserInventoryFilter{
+		Actor: types.ActorRef{
+			ID: uuid.New(),
+		},
 		Scope: scope,
 		// Negative offset and zero limit should be corrected.
 		Pagination: types.Pagination{

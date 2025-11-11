@@ -33,6 +33,9 @@ func (q *RoleListQuery) Query(ctx context.Context, filter types.RoleFilter) (typ
 	if q.registry == nil {
 		return types.RolePage{}, types.ErrMissingRoleRegistry
 	}
+	if err := filter.Validate(); err != nil {
+		return types.RolePage{}, err
+	}
 	scope, err := q.guard.Enforce(ctx, filter.Actor, filter.Scope, types.PolicyActionRolesRead, uuid.Nil)
 	if err != nil {
 		return types.RolePage{}, err
@@ -46,6 +49,23 @@ type RoleDetailInput struct {
 	RoleID uuid.UUID
 	Scope  types.ScopeFilter
 	Actor  types.ActorRef
+}
+
+// Type implements gocommand.Message.
+func (RoleDetailInput) Type() string {
+	return "query.role.detail"
+}
+
+// Validate implements gocommand.Message.
+func (input RoleDetailInput) Validate() error {
+	switch {
+	case input.RoleID == uuid.Nil:
+		return errRoleIDRequired
+	case input.Actor.ID == uuid.Nil:
+		return types.ErrActorRequired
+	default:
+		return nil
+	}
 }
 
 // RoleDetailQuery loads custom role metadata.
@@ -69,8 +89,8 @@ func (q *RoleDetailQuery) Query(ctx context.Context, input RoleDetailInput) (*ty
 	if q.registry == nil {
 		return nil, types.ErrMissingRoleRegistry
 	}
-	if input.RoleID == uuid.Nil {
-		return nil, errRoleIDRequired
+	if err := input.Validate(); err != nil {
+		return nil, err
 	}
 	scope, err := q.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionRolesRead, input.RoleID)
 	if err != nil {
@@ -99,6 +119,9 @@ var _ gocommand.Querier[types.RoleAssignmentFilter, []types.RoleAssignment] = (*
 func (q *RoleAssignmentsQuery) Query(ctx context.Context, filter types.RoleAssignmentFilter) ([]types.RoleAssignment, error) {
 	if q.registry == nil {
 		return nil, types.ErrMissingRoleRegistry
+	}
+	if err := filter.Validate(); err != nil {
+		return nil, err
 	}
 	scope, err := q.guard.Enforce(ctx, filter.Actor, filter.Scope, types.PolicyActionRolesRead, uuid.Nil)
 	if err != nil {

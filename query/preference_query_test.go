@@ -16,6 +16,9 @@ func TestPreferenceQuery_DelegatesToResolver(t *testing.T) {
 
 	result, err := query.Query(context.Background(), PreferenceQueryInput{
 		UserID: uuid.New(),
+		Actor: types.ActorRef{
+			ID: uuid.New(),
+		},
 	})
 	require.NoError(t, err)
 	require.True(t, resolver.called)

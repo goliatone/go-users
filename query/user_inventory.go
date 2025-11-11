@@ -38,6 +38,9 @@ func (q *UserInventoryQuery) Query(ctx context.Context, filter types.UserInvento
 	if q.repo == nil {
 		return types.UserInventoryPage{}, types.ErrMissingInventoryRepository
 	}
+	if err := filter.Validate(); err != nil {
+		return types.UserInventoryPage{}, err
+	}
 	scope, err := q.guard.Enforce(ctx, filter.Actor, filter.Scope, types.PolicyActionUsersRead, uuid.Nil)
 	if err != nil {
 		return types.UserInventoryPage{}, err

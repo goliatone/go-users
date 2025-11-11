@@ -30,6 +30,9 @@ func (q *ActivityFeedQuery) Query(ctx context.Context, filter types.ActivityFilt
 	if q.repo == nil {
 		return types.ActivityPage{}, types.ErrMissingActivityRepository
 	}
+	if err := filter.Validate(); err != nil {
+		return types.ActivityPage{}, err
+	}
 	scope, err := q.guard.Enforce(ctx, filter.Actor, filter.Scope, types.PolicyActionActivityRead, uuid.Nil)
 	if err != nil {
 		return types.ActivityPage{}, err
@@ -58,6 +61,9 @@ var _ gocommand.Querier[types.ActivityStatsFilter, types.ActivityStats] = (*Acti
 func (q *ActivityStatsQuery) Query(ctx context.Context, filter types.ActivityStatsFilter) (types.ActivityStats, error) {
 	if q.repo == nil {
 		return types.ActivityStats{}, types.ErrMissingActivityRepository
+	}
+	if err := filter.Validate(); err != nil {
+		return types.ActivityStats{}, err
 	}
 	scope, err := q.guard.Enforce(ctx, filter.Actor, filter.Scope, types.PolicyActionActivityRead, uuid.Nil)
 	if err != nil {

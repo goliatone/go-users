@@ -16,6 +16,23 @@ type ProfileQueryInput struct {
 	Actor  types.ActorRef
 }
 
+// Type implements gocommand.Message.
+func (ProfileQueryInput) Type() string {
+	return "query.profile.detail"
+}
+
+// Validate implements gocommand.Message.
+func (input ProfileQueryInput) Validate() error {
+	switch {
+	case input.UserID == uuid.Nil:
+		return types.ErrUserIDRequired
+	case input.Actor.ID == uuid.Nil:
+		return types.ErrActorRequired
+	default:
+		return nil
+	}
+}
+
 // ProfileQuery fetches user profile records.
 type ProfileQuery struct {
 	repo  types.ProfileRepository
@@ -37,8 +54,8 @@ func (q *ProfileQuery) Query(ctx context.Context, input ProfileQueryInput) (*typ
 	if q.repo == nil {
 		return nil, types.ErrMissingProfileRepository
 	}
-	if input.UserID == uuid.Nil {
-		return nil, types.ErrUserIDRequired
+	if err := input.Validate(); err != nil {
+		return nil, err
 	}
 	scope, err := q.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionProfilesRead, input.UserID)
 	if err != nil {
