@@ -10,6 +10,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
+	users "github.com/goliatone/go-users"
 	"github.com/goliatone/go-users/migrations"
 )
 
@@ -25,10 +26,16 @@ func TestMigrationsApplyToSQLite(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	for _, fsys := range migrations.Filesystems() {
-		if err := applyFilesystem(ctx, db, fsys); err != nil {
-			t.Fatalf("failed to apply migrations: %v", err)
-		}
+	if len(migrations.Filesystems()) == 0 {
+		t.Fatalf("no migration filesystems registered")
+	}
+
+	sqliteFS, err := fs.Sub(users.MigrationsFS, "data/sql/migrations/sqlite")
+	if err != nil {
+		t.Fatalf("failed to load sqlite migrations: %v", err)
+	}
+	if err := applyFilesystem(ctx, db, sqliteFS); err != nil {
+		t.Fatalf("failed to apply migrations: %v", err)
 	}
 
 	var tableName string
@@ -41,7 +48,7 @@ func TestMigrationsApplyToSQLite(t *testing.T) {
 }
 
 func applyFilesystem(ctx context.Context, db *sql.DB, filesystem fs.FS) error {
-	entries, err := fs.Glob(filesystem, "data/sql/migrations/*.sql")
+	entries, err := fs.Glob(filesystem, "*.up.sql")
 	if err != nil {
 		return err
 	}

@@ -116,7 +116,7 @@ func newTestDB(t *testing.T) *bun.DB {
 }
 
 func applyDDL(t *testing.T, db *bun.DB) {
-	content, err := os.ReadFile("../data/sql/migrations/000003_profiles_preferences.sql")
+	content, err := os.ReadFile("../data/sql/migrations/sqlite/00005_profiles_preferences.up.sql")
 	require.NoError(t, err)
 	for _, stmt := range splitStatements(string(content)) {
 		if strings.TrimSpace(stmt) == "" {
