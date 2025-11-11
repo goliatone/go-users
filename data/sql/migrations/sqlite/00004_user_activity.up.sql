@@ -1,18 +1,19 @@
--- 000003_user_activity.sql
+-- 00004_user_activity.up.sql (SQLite version)
 -- Activity log table powering go-admin dashboards and audit exports.
+-- Changes from PostgreSQL: UUID -> TEXT, JSONB -> TEXT
 
 CREATE TABLE IF NOT EXISTS user_activity (
-    id UUID PRIMARY KEY,
-    user_id UUID,
-    actor_id UUID,
-    tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
-    org_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    actor_id TEXT,
+    tenant_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    org_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
     verb TEXT NOT NULL,
     object_type TEXT,
     object_id TEXT,
     channel TEXT,
     ip TEXT,
-    data JSONB NOT NULL DEFAULT '{}',
+    data TEXT NOT NULL DEFAULT '{}',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -1,4 +1,4 @@
--- 000002_custom_roles.sql
+-- 00003_custom_roles.up.sql
 -- Introduces custom roles and assignment tables with tenant/org scope columns.
 
 CREATE TABLE IF NOT EXISTS custom_roles (

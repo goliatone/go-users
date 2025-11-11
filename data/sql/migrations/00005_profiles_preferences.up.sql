@@ -1,4 +1,4 @@
--- 000004_profiles_preferences.sql
+-- 00005_profiles_preferences.up.sql
 -- Adds profile and preference tables with tenant/org scoping plus metadata.
 
 CREATE TABLE IF NOT EXISTS user_profiles (
