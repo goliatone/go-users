@@ -20,6 +20,25 @@ type UserLifecycleTransitionInput struct {
 	Result   *UserLifecycleTransitionResult
 }
 
+// Type implements gocommand.Message.
+func (UserLifecycleTransitionInput) Type() string {
+	return "command.user.lifecycle.transition"
+}
+
+// Validate implements gocommand.Message.
+func (input UserLifecycleTransitionInput) Validate() error {
+	switch {
+	case input.UserID == uuid.Nil:
+		return ErrLifecycleUserIDRequired
+	case input.Target == "":
+		return ErrLifecycleTargetRequired
+	case input.Actor.ID == uuid.Nil:
+		return ErrActorRequired
+	default:
+		return nil
+	}
+}
+
 // UserLifecycleTransitionResult carries the updated auth user.
 type UserLifecycleTransitionResult struct {
 	User *types.AuthUser
@@ -69,7 +88,7 @@ var _ gocommand.Commander[UserLifecycleTransitionInput] = (*UserLifecycleTransit
 
 // Execute performs the lifecycle transition against the upstream repository.
 func (c *UserLifecycleTransitionCommand) Execute(ctx context.Context, input UserLifecycleTransitionInput) error {
-	if err := c.validate(input); err != nil {
+	if err := input.Validate(); err != nil {
 		return err
 	}
 	scope, err := c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionUsersWrite, input.UserID)
@@ -131,19 +150,6 @@ func (c *UserLifecycleTransitionCommand) Execute(ctx context.Context, input User
 		input.Result.User = updated
 	}
 	return nil
-}
-
-func (c *UserLifecycleTransitionCommand) validate(input UserLifecycleTransitionInput) error {
-	switch {
-	case input.UserID == uuid.Nil:
-		return ErrLifecycleUserIDRequired
-	case input.Target == "":
-		return ErrLifecycleTargetRequired
-	case input.Actor.ID == uuid.Nil:
-		return ErrActorRequired
-	default:
-		return nil
-	}
 }
 
 func (c *UserLifecycleTransitionCommand) enforcePolicy(current *types.AuthUser, target types.LifecycleState) error {

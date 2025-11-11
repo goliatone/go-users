@@ -21,6 +21,16 @@ type CreateRoleInput struct {
 	Result      *types.RoleDefinition
 }
 
+// Type implements gocommand.Message.
+func (CreateRoleInput) Type() string {
+	return "command.role.create"
+}
+
+// Validate implements gocommand.Message.
+func (input CreateRoleInput) Validate() error {
+	return validateRoleMutation(input.Actor, input.Name)
+}
+
 // CreateRoleCommand invokes the injected role registry.
 type CreateRoleCommand struct {
 	registry types.RoleRegistry
@@ -39,7 +49,7 @@ var _ gocommand.Commander[CreateRoleInput] = (*CreateRoleCommand)(nil)
 
 // Execute validates and forwards the creation payload to the registry.
 func (c *CreateRoleCommand) Execute(ctx context.Context, input CreateRoleInput) error {
-	if err := validateRoleMutation(input.Actor, input.Name); err != nil {
+	if err := input.Validate(); err != nil {
 		return err
 	}
 	scope, err := c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionRolesWrite, uuid.Nil)

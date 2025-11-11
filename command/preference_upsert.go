@@ -29,6 +29,28 @@ type PreferenceUpsertInput struct {
 	Result *types.PreferenceRecord
 }
 
+// Type implements gocommand.Message.
+func (PreferenceUpsertInput) Type() string {
+	return "command.preference.upsert"
+}
+
+// Validate implements gocommand.Message.
+func (input PreferenceUpsertInput) Validate() error {
+	if strings.TrimSpace(input.Key) == "" {
+		return ErrPreferenceKeyRequired
+	}
+	if input.Value == nil {
+		return ErrPreferenceValueRequired
+	}
+	if needsUser(input.Level) && input.UserID == uuid.Nil {
+		return types.ErrUserIDRequired
+	}
+	if input.Actor.ID == uuid.Nil {
+		return ErrActorRequired
+	}
+	return nil
+}
+
 // PreferenceUpsertCommand upserts a scoped preference record.
 type PreferenceUpsertCommand struct {
 	repo  types.PreferenceRepository
@@ -54,17 +76,8 @@ func (c *PreferenceUpsertCommand) Execute(ctx context.Context, input PreferenceU
 	if c.repo == nil {
 		return types.ErrMissingPreferenceRepository
 	}
-	if strings.TrimSpace(input.Key) == "" {
-		return ErrPreferenceKeyRequired
-	}
-	if input.Value == nil {
-		return ErrPreferenceValueRequired
-	}
-	if needsUser(input.Level) && input.UserID == uuid.Nil {
-		return types.ErrUserIDRequired
-	}
-	if input.Actor.ID == uuid.Nil {
-		return ErrActorRequired
+	if err := input.Validate(); err != nil {
+		return err
 	}
 
 	scope, err := c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionPreferencesWrite, input.UserID)

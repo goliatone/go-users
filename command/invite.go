@@ -25,6 +25,23 @@ type UserInviteInput struct {
 	Result    *UserInviteResult
 }
 
+// Type implements gocommand.Message.
+func (UserInviteInput) Type() string {
+	return "command.user.invite"
+}
+
+// Validate implements gocommand.Message.
+func (input UserInviteInput) Validate() error {
+	switch {
+	case strings.TrimSpace(input.Email) == "":
+		return ErrInviteEmailRequired
+	case input.Actor.ID == uuid.Nil:
+		return ErrActorRequired
+	default:
+		return nil
+	}
+}
+
 // UserInviteResult exposes the creation output and invite token details.
 type UserInviteResult struct {
 	User      *types.AuthUser
@@ -82,7 +99,7 @@ var _ gocommand.Commander[UserInviteInput] = (*UserInviteCommand)(nil)
 
 // Execute creates the pending user record and registers invite metadata.
 func (c *UserInviteCommand) Execute(ctx context.Context, input UserInviteInput) error {
-	if err := c.validate(input); err != nil {
+	if err := input.Validate(); err != nil {
 		return err
 	}
 	scope, err := c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionUsersWrite, uuid.Nil)
@@ -143,17 +160,6 @@ func (c *UserInviteCommand) Execute(ctx context.Context, input UserInviteInput) 
 	}
 
 	return nil
-}
-
-func (c *UserInviteCommand) validate(input UserInviteInput) error {
-	switch {
-	case strings.TrimSpace(input.Email) == "":
-		return ErrInviteEmailRequired
-	case input.Actor.ID == uuid.Nil:
-		return ErrActorRequired
-	default:
-		return nil
-	}
 }
 
 func cloneMap(src map[string]any) map[string]any {

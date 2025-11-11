@@ -1,6 +1,10 @@
 package command
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/goliatone/go-users/pkg/types"
+)
 
 var (
 	// ErrLifecycleUserIDRequired indicates the transition command lacks a user ID.
@@ -8,7 +12,7 @@ var (
 	// ErrLifecycleTargetRequired indicates the desired lifecycle state is missing.
 	ErrLifecycleTargetRequired = errors.New("go-users: lifecycle transition requires target state")
 	// ErrActorRequired indicates an actor reference was not supplied.
-	ErrActorRequired = errors.New("go-users: actor reference required")
+	ErrActorRequired = types.ErrActorRequired
 	// ErrInviteEmailRequired occurs when an invite omits the email address.
 	ErrInviteEmailRequired = errors.New("go-users: invite requires email")
 	// ErrPasswordHashRequired occurs when a password reset omits the hashed password.
@@ -20,7 +24,7 @@ var (
 	// ErrRoleIDRequired signals the role ID was missing.
 	ErrRoleIDRequired = errors.New("go-users: role id required")
 	// ErrUserIDRequired occurs when assignment commands omit the user.
-	ErrUserIDRequired = errors.New("go-users: user id required")
+	ErrUserIDRequired = types.ErrUserIDRequired
 	// ErrActivityVerbRequired indicates an activity log entry is missing a verb.
 	ErrActivityVerbRequired = errors.New("go-users: activity verb required")
 	// ErrPreferenceKeyRequired indicates the preference key was missing.

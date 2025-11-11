@@ -16,6 +16,16 @@ type DeleteRoleInput struct {
 	Actor  types.ActorRef
 }
 
+// Type implements gocommand.Message.
+func (DeleteRoleInput) Type() string {
+	return "command.role.delete"
+}
+
+// Validate implements gocommand.Message.
+func (input DeleteRoleInput) Validate() error {
+	return validateRoleTarget(input.RoleID, input.Actor)
+}
+
 // DeleteRoleCommand deletes roles through the registry.
 type DeleteRoleCommand struct {
 	registry types.RoleRegistry
@@ -34,7 +44,7 @@ var _ gocommand.Commander[DeleteRoleInput] = (*DeleteRoleCommand)(nil)
 
 // Execute deletes the requested role after validation.
 func (c *DeleteRoleCommand) Execute(ctx context.Context, input DeleteRoleInput) error {
-	if err := validateRoleTarget(input.RoleID, input.Actor); err != nil {
+	if err := input.Validate(); err != nil {
 		return err
 	}
 	scope, err := c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionRolesWrite, input.RoleID)

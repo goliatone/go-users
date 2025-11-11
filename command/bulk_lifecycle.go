@@ -22,6 +22,25 @@ type BulkUserTransitionInput struct {
 	Results     *[]BulkUserTransitionResult
 }
 
+// Type implements gocommand.Message.
+func (BulkUserTransitionInput) Type() string {
+	return "command.user.lifecycle.bulk"
+}
+
+// Validate implements gocommand.Message.
+func (input BulkUserTransitionInput) Validate() error {
+	switch {
+	case len(input.UserIDs) == 0:
+		return ErrUserIDsRequired
+	case input.Actor.ID == uuid.Nil:
+		return ErrActorRequired
+	case input.Target == "":
+		return ErrLifecycleTargetRequired
+	default:
+		return nil
+	}
+}
+
 // BulkUserTransitionResult captures the outcome for a single user.
 type BulkUserTransitionResult struct {
 	UserID uuid.UUID
@@ -45,14 +64,8 @@ var _ gocommand.Commander[BulkUserTransitionInput] = (*BulkUserTransitionCommand
 
 // Execute transitions each user sequentially. Errors are aggregated.
 func (c *BulkUserTransitionCommand) Execute(ctx context.Context, input BulkUserTransitionInput) error {
-	if len(input.UserIDs) == 0 {
-		return ErrUserIDsRequired
-	}
-	if input.Actor.ID == uuid.Nil {
-		return ErrActorRequired
-	}
-	if input.Target == "" {
-		return ErrLifecycleTargetRequired
+	if err := input.Validate(); err != nil {
+		return err
 	}
 
 	var errs []error

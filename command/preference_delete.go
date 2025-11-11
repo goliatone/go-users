@@ -19,6 +19,25 @@ type PreferenceDeleteInput struct {
 	Actor  types.ActorRef
 }
 
+// Type implements gocommand.Message.
+func (PreferenceDeleteInput) Type() string {
+	return "command.preference.delete"
+}
+
+// Validate implements gocommand.Message.
+func (input PreferenceDeleteInput) Validate() error {
+	if strings.TrimSpace(input.Key) == "" {
+		return ErrPreferenceKeyRequired
+	}
+	if needsUser(input.Level) && input.UserID == uuid.Nil {
+		return types.ErrUserIDRequired
+	}
+	if input.Actor.ID == uuid.Nil {
+		return ErrActorRequired
+	}
+	return nil
+}
+
 // PreferenceDeleteCommand removes a scoped preference entry.
 type PreferenceDeleteCommand struct {
 	repo  types.PreferenceRepository
@@ -44,14 +63,8 @@ func (c *PreferenceDeleteCommand) Execute(ctx context.Context, input PreferenceD
 	if c.repo == nil {
 		return types.ErrMissingPreferenceRepository
 	}
-	if strings.TrimSpace(input.Key) == "" {
-		return ErrPreferenceKeyRequired
-	}
-	if needsUser(input.Level) && input.UserID == uuid.Nil {
-		return types.ErrUserIDRequired
-	}
-	if input.Actor.ID == uuid.Nil {
-		return ErrActorRequired
+	if err := input.Validate(); err != nil {
+		return err
 	}
 	level := input.Level
 	if level == "" {

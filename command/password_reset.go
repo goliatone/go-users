@@ -18,6 +18,25 @@ type UserPasswordResetInput struct {
 	Result          *UserPasswordResetResult
 }
 
+// Type implements gocommand.Message.
+func (UserPasswordResetInput) Type() string {
+	return "command.user.password_reset"
+}
+
+// Validate implements gocommand.Message.
+func (input UserPasswordResetInput) Validate() error {
+	switch {
+	case input.UserID == uuid.Nil:
+		return ErrLifecycleUserIDRequired
+	case input.Actor.ID == uuid.Nil:
+		return ErrActorRequired
+	case input.NewPasswordHash == "":
+		return ErrPasswordHashRequired
+	default:
+		return nil
+	}
+}
+
 // UserPasswordResetResult surfaces auditing metadata.
 type UserPasswordResetResult struct {
 	User *types.AuthUser
@@ -59,14 +78,8 @@ var _ gocommand.Commander[UserPasswordResetInput] = (*UserPasswordResetCommand)(
 
 // Execute resets the user's password hash and logs audit metadata.
 func (c *UserPasswordResetCommand) Execute(ctx context.Context, input UserPasswordResetInput) error {
-	if input.UserID == uuid.Nil {
-		return ErrLifecycleUserIDRequired
-	}
-	if input.Actor.ID == uuid.Nil {
-		return ErrActorRequired
-	}
-	if input.NewPasswordHash == "" {
-		return ErrPasswordHashRequired
+	if err := input.Validate(); err != nil {
+		return err
 	}
 
 	scope, err := c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionUsersWrite, input.UserID)

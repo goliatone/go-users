@@ -49,6 +49,9 @@ func TestLifecycleCommandLogsActivity(t *testing.T) {
 
 	feedQuery := query.NewActivityFeedQuery(store, nil)
 	page, err := feedQuery.Query(ctx, types.ActivityFilter{
+		Actor: types.ActorRef{
+			ID: uuid.New(),
+		},
 		Verbs:      []string{"user.lifecycle.transition"},
 		Pagination: types.Pagination{Limit: 5},
 	})
@@ -71,7 +74,7 @@ func newActivityTestDB(t *testing.T) *bun.DB {
 }
 
 func applyActivityMigration(t *testing.T, db *bun.DB) {
-	content, err := os.ReadFile("../data/sql/migrations/000003_user_activity.sql")
+	content, err := os.ReadFile("../data/sql/migrations/000002_user_activity.sql")
 	require.NoError(t, err)
 	for _, stmt := range splitSQLStatements(string(content)) {
 		if strings.TrimSpace(stmt) == "" {

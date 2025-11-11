@@ -26,6 +26,22 @@ type ProfileUpsertInput struct {
 	Result *types.UserProfile
 }
 
+// Type implements gocommand.Message.
+func (ProfileUpsertInput) Type() string {
+	return "command.profile.upsert"
+}
+
+// Validate implements gocommand.Message.
+func (input ProfileUpsertInput) Validate() error {
+	if input.UserID == uuid.Nil {
+		return types.ErrUserIDRequired
+	}
+	if input.Actor.ID == uuid.Nil {
+		return ErrActorRequired
+	}
+	return nil
+}
+
 // ProfileUpsertCommand applies profile patches for a user.
 type ProfileUpsertCommand struct {
 	repo  types.ProfileRepository
@@ -51,11 +67,8 @@ func (c *ProfileUpsertCommand) Execute(ctx context.Context, input ProfileUpsertI
 	if c.repo == nil {
 		return types.ErrMissingProfileRepository
 	}
-	if input.UserID == uuid.Nil {
-		return types.ErrUserIDRequired
-	}
-	if input.Actor.ID == uuid.Nil {
-		return ErrActorRequired
+	if err := input.Validate(); err != nil {
+		return err
 	}
 
 	scope, err := c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionProfilesWrite, input.UserID)

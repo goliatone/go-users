@@ -22,6 +22,22 @@ type UpdateRoleInput struct {
 	Result      *types.RoleDefinition
 }
 
+// Type implements gocommand.Message.
+func (UpdateRoleInput) Type() string {
+	return "command.role.update"
+}
+
+// Validate implements gocommand.Message.
+func (input UpdateRoleInput) Validate() error {
+	if err := validateRoleTarget(input.RoleID, input.Actor); err != nil {
+		return err
+	}
+	if strings.TrimSpace(input.Name) == "" {
+		return ErrRoleNameRequired
+	}
+	return nil
+}
+
 // UpdateRoleCommand updates custom roles.
 type UpdateRoleCommand struct {
 	registry types.RoleRegistry
@@ -40,11 +56,8 @@ var _ gocommand.Commander[UpdateRoleInput] = (*UpdateRoleCommand)(nil)
 
 // Execute forwards the update payload to the registry.
 func (c *UpdateRoleCommand) Execute(ctx context.Context, input UpdateRoleInput) error {
-	if err := validateRoleTarget(input.RoleID, input.Actor); err != nil {
+	if err := input.Validate(); err != nil {
 		return err
-	}
-	if strings.TrimSpace(input.Name) == "" {
-		return ErrRoleNameRequired
 	}
 	scope, err := c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionRolesWrite, input.RoleID)
 	if err != nil {

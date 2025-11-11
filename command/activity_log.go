@@ -13,6 +13,19 @@ type ActivityLogInput struct {
 	Record types.ActivityRecord
 }
 
+// Type implements gocommand.Message.
+func (ActivityLogInput) Type() string {
+	return "command.activity.log"
+}
+
+// Validate implements gocommand.Message.
+func (input ActivityLogInput) Validate() error {
+	if strings.TrimSpace(input.Record.Verb) == "" {
+		return ErrActivityVerbRequired
+	}
+	return nil
+}
+
 // ActivityLogCommand logs arbitrary activity records.
 type ActivityLogCommand struct {
 	sink  types.ActivitySink
@@ -43,10 +56,10 @@ func (c *ActivityLogCommand) Execute(ctx context.Context, input ActivityLogInput
 	if c.sink == nil {
 		return types.ErrMissingActivitySink
 	}
-	record := input.Record
-	if strings.TrimSpace(record.Verb) == "" {
-		return ErrActivityVerbRequired
+	if err := input.Validate(); err != nil {
+		return err
 	}
+	record := input.Record
 	if record.OccurredAt.IsZero() {
 		record.OccurredAt = now(c.clock)
 	}
