@@ -443,7 +443,7 @@ func renderRolesList(app *App) router.HandlerFunc {
 			return c.Status(http.StatusInternalServerError).SendString("Session error")
 		}
 
-		roles, err := app.users.Queries().RoleList.Query(c.Context(), types.RoleFilter{
+		rolePage, err := app.users.Queries().RoleList.Query(c.Context(), types.RoleFilter{
 			Actor: actor,
 		})
 		if err != nil {
@@ -453,7 +453,8 @@ func renderRolesList(app *App) router.HandlerFunc {
 		}
 
 		return renderWithGlobals(c, "roles/index", router.ViewContext{
-			"roles": roles,
+			"roles": rolePage.Roles,
+			"total": rolePage.Total,
 		})
 	}
 }
