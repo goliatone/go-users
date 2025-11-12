@@ -3,7 +3,7 @@ module github.com/goliatone/go-users
 go 1.23.4
 
 require (
-	github.com/goliatone/go-auth v0.17.0
+	github.com/goliatone/go-auth v0.19.0
 	github.com/goliatone/go-command v0.5.0
 	github.com/goliatone/go-crud v0.12.0
 	github.com/goliatone/go-errors v0.9.0
