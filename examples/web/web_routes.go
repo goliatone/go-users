@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"time"
 
 	"github.com/goliatone/go-auth"
 	"github.com/goliatone/go-router"
@@ -14,6 +15,19 @@ import (
 	"github.com/goliatone/go-users/query"
 	"github.com/google/uuid"
 )
+
+type preferenceView struct {
+	Key        string
+	ScopeLevel string
+	Value      any
+}
+
+type inviteView struct {
+	Email     string
+	Status    string
+	SentAt    string
+	ExpiresAt string
+}
 
 // RegisterWebRoutes mounts all HTML web handlers
 func RegisterWebRoutes(app *App) {
@@ -232,11 +246,51 @@ func serveActivityStats(app *App) router.HandlerFunc {
 // Invites handlers
 func renderInvitesList(app *App) router.HandlerFunc {
 	return func(c router.Context) error {
-		// For now, just render empty list
+		actor, err := actorFromSession(c, app)
+		if err != nil {
+			return c.Status(http.StatusUnauthorized).SendString("Session required")
+		}
+
+		invites, err := listInvites(c, app)
+		if err != nil {
+			app.GetLogger("invites").Error("failed to list invites", "error", err)
+			return renderWithGlobals(c, "invites/index", router.ViewContext{
+				"error": "Failed to load invites",
+			})
+		}
+
+		app.GetLogger("invites").Debug("invites listed", "count", len(invites), "actor", actor.ID)
+
 		return renderWithGlobals(c, "invites/index", router.ViewContext{
-			"invites": []any{},
+			"invites": invites,
 		})
 	}
+}
+
+func listInvites(c router.Context, app *App) ([]inviteView, error) {
+	users, _, err := app.repo.Users().List(c.Context())
+	if err != nil {
+		return nil, err
+	}
+	invites := make([]inviteView, 0)
+	for _, user := range users {
+		meta := user.Metadata
+		inviteMeta, ok := meta["invite"].(map[string]any)
+		if !ok {
+			continue
+		}
+		expires := ""
+		if str, ok := inviteMeta["expires_at"].(string); ok {
+			expires = str
+		}
+		invites = append(invites, inviteView{
+			Email:     user.Email,
+			Status:    string(user.Status),
+			SentAt:    formatTimePtr(user.CreatedAt),
+			ExpiresAt: expires,
+		})
+	}
+	return invites, nil
 }
 
 func renderInviteForm(app *App) router.HandlerFunc {
@@ -295,17 +349,56 @@ func renderPreferences(app *App) router.HandlerFunc {
 			UserID: actor.ID,
 		}
 
-		prefs, err := app.users.Queries().Preferences.Query(c.Context(), input)
+		snapshot, err := app.users.Queries().Preferences.Query(c.Context(), input)
 		if err != nil {
 			return renderWithGlobals(c, "errors/500", router.ViewContext{
 				"message": err.Error(),
 			})
 		}
 
+		prefs := buildPreferenceViews(snapshot)
+
 		return renderWithGlobals(c, "preferences/index", router.ViewContext{
 			"preferences": prefs,
 		})
 	}
+}
+
+func buildPreferenceViews(snapshot types.PreferenceSnapshot) []preferenceView {
+	prefs := make([]preferenceView, 0, len(snapshot.Effective))
+	for key, val := range snapshot.Effective {
+		prefs = append(prefs, preferenceView{
+			Key:        key,
+			ScopeLevel: preferenceScopeLevel(snapshot.Traces, key),
+			Value:      val,
+		})
+	}
+	sort.Slice(prefs, func(i, j int) bool {
+		return prefs[i].Key < prefs[j].Key
+	})
+	return prefs
+}
+
+func preferenceScopeLevel(traces []types.PreferenceTrace, key string) string {
+	for _, trace := range traces {
+		if trace.Key != key {
+			continue
+		}
+		for _, layer := range trace.Layers {
+			if layer.Found {
+				return string(layer.Level)
+			}
+		}
+		break
+	}
+	return ""
+}
+
+func formatTimePtr(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return t.Format(time.RFC3339)
 }
 
 func handleUpsertPreference(app *App) router.HandlerFunc {
