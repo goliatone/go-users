@@ -13,6 +13,7 @@
 <div class="form-card">
     <h3>Add or Update Preference</h3>
     <form action="/preferences" method="POST">
+        {{ csrf_field|safe }}
         <div class="form-group">
             <label for="key">Preference Key *</label>
             <input
@@ -51,9 +52,10 @@
             <span class="preference-scope">{{ pref.ScopeLevel }}</span>
         </div>
         <div class="preference-value">
-            <code>{{ pref.Value }}</code>
+            <code>{{ to_json(pref.Value) }}</code>
         </div>
-        <form action="/preferences/{{ pref.ID }}/delete" method="POST" style="display: inline;">
+        <form action="/preferences/{{ pref.Key }}/delete" method="POST" style="display: inline;">
+            {{ csrf_field|safe }}
             <button type="submit" class="btn btn-sm btn-danger">Delete</button>
         </form>
     </div>

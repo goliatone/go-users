@@ -33,6 +33,7 @@
 <div class="form-card">
     <h3>Assign Role to User</h3>
     <form action="/roles/{{ role.ID }}/assign" method="POST">
+        {{ csrf_field|safe }}
         <div class="form-group">
             <label for="user_id">User ID *</label>
             <input

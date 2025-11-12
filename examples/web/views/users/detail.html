@@ -36,7 +36,8 @@
 
     <div class="detail-section">
         <h3>Lifecycle Transition</h3>
-        <form action="/users/{{ user.ID }}/transition" method="POST">
+        <form action="./transition" method="POST">
+            {{ csrf_field|safe }}
             <div class="form-group">
                 <label for="target_state">New State</label>
                 <select id="target_state" name="target_state" class="form-control" required>
@@ -59,7 +60,8 @@
     <div class="detail-section">
         <h3>Custom Actions</h3>
         <p class="help-text">These actions call go-users commands outside the default CRUD paths and still flow through the shared scope guard.</p>
-        <form action="/users/{{ user.ID }}/password-reset" method="POST" class="stacked-form">
+        <form action="./password-reset" method="POST" class="stacked-form">
+            {{ csrf_field|safe }}
             <div class="form-group">
                 <label>Force Password Reset</label>
                 <p class="help-text">Triggers `UserPasswordReset` so the actor receives a fresh recovery email.</p>

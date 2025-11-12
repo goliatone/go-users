@@ -19,6 +19,7 @@
     {% endif %}
 
     <form action="/invites" method="POST">
+        {{ csrf_field|safe }}
         <div class="form-group">
             <label for="email">Email Address *</label>
             <input

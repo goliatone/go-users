@@ -12,6 +12,7 @@
 
 <div class="form-card">
     <form action="/profile" method="POST">
+        {{ csrf_field|safe }}
         <div class="form-group">
             <label for="display_name">Display Name</label>
             <input
