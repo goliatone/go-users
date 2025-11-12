@@ -138,7 +138,7 @@ func main() {
 		Auth: config.AuthConfig{
 			SigningKey:            "changeme-secret-key-please-use-env-var",
 			SigningMethod:         "HS256",
-			ContextKey:            "user",
+			ContextKey:            "auth_token",
 			TokenExpiration:       3600,
 			ExtendedTokenDuration: 86400,
 			TokenLookup:           "cookie:auth_token",
@@ -229,11 +229,7 @@ func main() {
 }
 
 func renderWithGlobals(ctx router.Context, name string, data router.ViewContext) error {
-	viewData := auth.MergeTemplateData(ctx, data)
-	if _, ok := viewData[csrf.DefaultTemplateHelpersKey]; !ok {
-		viewData[csrf.DefaultTemplateHelpersKey] = auth.TemplateHelpersWithRouter(ctx, auth.TemplateUserKey)
-	}
-	return ctx.Render(name, viewData)
+	return ctx.Render(name, auth.MergeTemplateData(ctx, data))
 }
 
 func WithHTTPServer(ctx context.Context, app *App) error {
@@ -269,7 +265,7 @@ func WithHTTPServer(ctx context.Context, app *App) error {
 		}))
 	})
 
-	// Register static files from ./public directory
+	// Serve static assets (CSS/JS/images) from ./public like go-auth example.
 	srv.Router().Static("/", "./public")
 
 	srv.Router().WithLogger(app.GetLogger("router"))
@@ -295,7 +291,7 @@ func WithPersistence(ctx context.Context, app *App) error {
 	// Get DSN from Server field (for SQLite, this is the file path or :memory:)
 	dsn := cfg.GetServer()
 	if dsn == "" {
-		dsn = "file::memory:?cache=shared"
+		dsn = "file:test.db?_journal_mode=WAL&cache=shared&_fk=1"
 	}
 
 	db, err := sql.Open(sqliteshim.ShimName, dsn)
