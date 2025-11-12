@@ -48,13 +48,13 @@
     {% for pref in preferences %}
     <div class="preference-item">
         <div class="preference-info">
-            <strong>{{ pref.Key }}</strong>
-            <span class="preference-scope">{{ pref.ScopeLevel }}</span>
+            <strong>{{ pref.key }}</strong>
+            <span class="preference-scope">{{ pref.scope_level }}</span>
         </div>
         <div class="preference-value">
-            <code>{{ to_json(pref.Value) }}</code>
+            <code>{{ to_json(pref.value) }}</code>
         </div>
-        <form action="/preferences/{{ pref.Key }}/delete" method="POST" style="display: inline;">
+        <form action="/preferences/{{ pref.key }}/delete" method="POST" style="display: inline;">
             {{ csrf_field|safe }}
             <button type="submit" class="btn btn-sm btn-danger">Delete</button>
         </form>
