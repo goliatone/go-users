@@ -16,18 +16,8 @@ import (
 	"github.com/google/uuid"
 )
 
-type preferenceView struct {
-	Key        string
-	ScopeLevel string
-	Value      any
-}
-
-type inviteView struct {
-	Email     string
-	Status    string
-	SentAt    string
-	ExpiresAt string
-}
+type preferenceView map[string]any
+type inviteView map[string]any
 
 // RegisterWebRoutes mounts all HTML web handlers
 func RegisterWebRoutes(app *App) {
@@ -284,10 +274,10 @@ func listInvites(c router.Context, app *App) ([]inviteView, error) {
 			expires = str
 		}
 		invites = append(invites, inviteView{
-			Email:     user.Email,
-			Status:    string(user.Status),
-			SentAt:    formatTimePtr(user.CreatedAt),
-			ExpiresAt: expires,
+			"email":      user.Email,
+			"status":     string(user.Status),
+			"sent_at":    formatTimePtr(user.CreatedAt),
+			"expires_at": expires,
 		})
 	}
 	return invites, nil
@@ -368,13 +358,13 @@ func buildPreferenceViews(snapshot types.PreferenceSnapshot) []preferenceView {
 	prefs := make([]preferenceView, 0, len(snapshot.Effective))
 	for key, val := range snapshot.Effective {
 		prefs = append(prefs, preferenceView{
-			Key:        key,
-			ScopeLevel: preferenceScopeLevel(snapshot.Traces, key),
-			Value:      val,
+			"key":         key,
+			"scope_level": preferenceScopeLevel(snapshot.Traces, key),
+			"value":       val,
 		})
 	}
 	sort.Slice(prefs, func(i, j int) bool {
-		return prefs[i].Key < prefs[j].Key
+		return prefs[i]["key"].(string) < prefs[j]["key"].(string)
 	})
 	return prefs
 }
