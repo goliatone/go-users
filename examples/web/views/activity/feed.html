@@ -14,12 +14,12 @@
 <div class="activity-summary">
     <div class="summary-header">
         <h2>Scope totals</h2>
-        <p>{{ stats.Total }} events across tracked verbs</p>
+        <p>{{ stats.Total|integer }} events across tracked verbs</p>
     </div>
     <div class="activity-stats-grid">
         {% for stat in verb_stats %}
         <div class="stat-card">
-            <div class="stat-value">{{ stat.Count }}</div>
+            <div class="stat-value">{{ stat.Count|integer }}</div>
             <div class="stat-label">{{ stat.Verb }}</div>
         </div>
         {% endfor %}
@@ -54,7 +54,7 @@
 </div>
 
 <div class="pagination">
-    <span>Total: {{ total }} activities</span>
+    <span>Total: {{ total|integer }} activities</span>
 </div>
 
 {% else %}
