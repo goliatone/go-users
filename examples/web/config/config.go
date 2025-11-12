@@ -26,7 +26,7 @@ type ServerConfig struct {
 type AuthConfig struct {
 	SigningKey            string   `json:"signing_key" env:"AUTH_SIGNING_KEY" default:"changeme-secret-key"`
 	SigningMethod         string   `json:"signing_method" default:"HS256"`
-	ContextKey            string   `json:"context_key" default:"user"`
+	ContextKey            string   `json:"context_key" default:"auth_token"`
 	TokenExpiration       int      `json:"token_expiration" default:"3600"`
 	ExtendedTokenDuration int      `json:"extended_token_duration" default:"86400"`
 	TokenLookup           string   `json:"token_lookup" default:"cookie:auth_token"`
@@ -53,7 +53,7 @@ func (c AuthConfig) GetRejectedRouteDefault() string { return c.RejectedRouteDef
 type PersistenceConfig struct {
 	Debug          bool          `json:"debug" default:"true"`
 	Driver         string        `json:"driver" default:"sqlite"`
-	Server         string        `json:"server" env:"DB_SERVER" default:"file::memory:?cache=shared"`
+	Server         string        `json:"server" env:"DB_SERVER" default:"file:test.db?_journal_mode=WAL&cache=shared&_fk=1"`
 	PingTimeout    time.Duration `json:"ping_timeout" default:"5s"`
 	OtelIdentifier string        `json:"otel_identifier" default:"go-users-web"`
 }
