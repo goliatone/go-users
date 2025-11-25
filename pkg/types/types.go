@@ -124,7 +124,7 @@ type Hooks struct {
 	AfterActivity         func(context.Context, ActivityRecord)
 }
 
-// ActivityRecord describes sink inputs.
+// ActivityRecord describes sink inputs and is shared across sink and query layers.
 type ActivityRecord struct {
 	ID         uuid.UUID
 	UserID     uuid.UUID
@@ -140,7 +140,9 @@ type ActivityRecord struct {
 	OccurredAt time.Time
 }
 
-// ActivitySink persists activity log entries.
+// ActivitySink is the minimal DI contract for emitting activity. Keep it stable
+// and limited to Log so downstream modules can swap sinks without breaking
+// changes.
 type ActivitySink interface {
 	Log(context.Context, ActivityRecord) error
 }
