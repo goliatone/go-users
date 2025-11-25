@@ -9,6 +9,7 @@ go-users provides user management commands, queries, migrations, and scope contr
 - `preferences`: resolver helpers for scoped preference trees.
 - `scope`: guard, policies, and resolver utilities.
 - `registry`: Bun helpers for registering SQL migrations and schema metadata.
+- `activity`: Bun repository, ActivitySink helpers, and fixtures for audit logging.
 - `docs` and `examples`: runnable references for transports, guards, and schema feeds.
 
 ## Prerequisites
@@ -20,8 +21,9 @@ go-users provides user management commands, queries, migrations, and scope contr
 1. `go get github.com/goliatone/go-users`.
 2. Implement the interfaces in `pkg/types` or reuse the Bun repositories under `activity`, `preferences`, and `registry`.
 3. Provide a scope resolver and authorization policy if multitenancy is required.
-4. Call `service.New` and expose the returned commands and queries through your transport.
-5. Run the SQL migrations under `data/sql/migrations` before serving traffic.
+4. Wire activity by injecting an `ActivitySink`/`ActivityRepository` (Bun or custom) and use the helper `activity.BuildRecordFromActor` to construct records from the go-auth middleware context; add a channel via `activity.WithChannel` when you want module-level filtering.
+5. Call `service.New` and expose the returned commands and queries through your transport.
+6. Run the SQL migrations under `data/sql/migrations` before serving traffic.
 
 ### Wiring the service
 
@@ -108,6 +110,34 @@ More details live in `docs/MULTITENANCY.md` and `docs/WORKSPACES.md`.
 - `examples/web`: Go Fiber admin site showing guard first controllers, schema registry feeds, and CRUD adapters.
 
 Use the examples to confirm wiring and to capture request traces during development.
+
+### Activity helper usage
+
+The activity helpers keep DI minimal (`ActivitySink.Log(ctx, ActivityRecord)`) and let you build records directly from the go-auth `ActorContext`:
+
+```go
+actor := &auth.ActorContext{
+    ActorID:  adminID.String(),
+    TenantID: tenantID.String(),
+    Role:     "admin",
+}
+
+record, err := activity.BuildRecordFromActor(actor,
+    "settings.updated",
+    "settings",
+    "global",
+    map[string]any{"path": "ui.theme", "from": "light", "to": "dark"},
+    activity.WithChannel("settings"),
+)
+if err != nil {
+    return err
+}
+if err := svc.ActivitySink.Log(ctx, record); err != nil {
+    return err
+}
+```
+
+Recommended verbs/objects and channel guidance live in `docs/ACTIVITY.md`.
 
 ## Development workflow
 - `./taskfile lint`: runs `go vet` across the module.
