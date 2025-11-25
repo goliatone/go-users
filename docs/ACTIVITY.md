@@ -2,6 +2,59 @@
 
 Phase 4 ships the first-class activity sink and query surfaces so go-admin/go-cms can render audit feeds, lifecycle breakdowns, and other widgets without duplicating storage concerns.
 
+## DI Contract
+
+- The Activity sink interface lives in `pkg/types` as `ActivitySink` with the minimal method `Log(ctx, ActivityRecord) error`. Keep implementations limited to this contract so hosts can swap sinks (Bun, in-memory, streaming) without breaking changes.
+- `ActivityRecord` is shared across sink and query layers; avoid extending the interface or moving it to keep compatibility for downstream modules.
+- Use `activity.BuildRecordFromActor` to construct an `ActivityRecord` directly from the go-auth `ActorContext`, optionally tagging a channel via `activity.WithChannel`. The helper normalizes actor/tenant/org IDs and copies metadata to remain nil-safe.
+
+## Verb/Object Conventions
+
+Recommended verbs and object types for admin modules so dashboards and exports stay consistent:
+
+- Settings: `settings.updated`, `settings.snapshot.created` with `object_type=settings` or `settings.snapshot`; metadata keys: `path`, `from`, `to`, `scope` (tenant/org), `version`.
+- Media: `media.uploaded`, `media.variant.generated` with `object_type=media.asset` or `media.variant`; metadata: `asset_id`, `path`, `format`, `size_bytes`, `variant`.
+- Export: `export.requested`, `export.completed`, `export.failed` with `object_type=export.job`; metadata: `job_id`, `format`, `count`, `status`, `error` (for failures).
+- Bulk: `bulk.users.updated`, `bulk.roles.assigned` with `object_type=bulk.job`; metadata: `job_id`, `target`, `count_total`, `count_succeeded`, `count_failed`.
+
+Metadata structure: prefer flat keys with clear units; always include `object_id` when relevant, `tenant_id`/`org_id` scope hints when the action affects multiple tenants, and counts for batch operations. Keep values JSON-serializable primitives or small maps to avoid bloating rows.
+
+## Channel Guidance
+
+Use the `channel` field for module-level filtering (e.g., `settings`, `media`, `export`, `bulk`). Keep channels lowercase, stable, and limited to the module name; reserve verb/object fields for finer-grained analysis. When emitting from shared helpers, set the channel via `activity.WithChannel("settings")`; omit it for legacy compatibility when a module tag is not needed.
+
+## Repository & Index Guidance
+
+Current SQLite/Postgres schema ships indexes for:
+
+- `(tenant_id, org_id, created_at)` – tenant/org scoped feeds.
+- `(user_id, created_at)` – user-specific timelines.
+- `(object_type, object_id)` – object drill-downs.
+- `verb` – verb-specific filtering.
+
+Queries: prefer `ActivityFilter` and `ActivityStatsFilter` to leverage these indexes. When filtering by channel in high-volume modules, add an optional composite index `(tenant_id, channel, created_at)` (or `(org_id, channel, created_at)` for org-scoped deployments). For metadata-heavy use cases, Postgres consumers can add a GIN index on `data` to accelerate keyword searches.
+
+## Integration & Examples
+
+Inject sinks and emit module-aligned records via helpers:
+
+```go
+store, _ := activity.NewRepository(activity.RepositoryConfig{DB: bunDB})
+cfg := users.Config{ActivitySink: store, ActivityRepository: store /* other deps */}
+svc := users.New(cfg)
+
+actor := auth.ActorContext{ActorID: adminID.String(), TenantID: tenantID.String()}
+rec, _ := activity.BuildRecordFromActor(&actor, "settings.updated", "settings", "global", map[string]any{"path": "feature.flags"}, activity.WithChannel("settings"))
+_ = svc.ActivitySink.Log(ctx, rec)
+```
+
+Module examples (verbs/objects align with the conventions above):
+
+- Settings: `BuildRecordFromActor(..., "settings.updated", "settings", "global", {"path": "ui.theme", "from": "light", "to": "dark"}, WithChannel("settings"))`
+- Media: `BuildRecordFromActor(..., "media.uploaded", "media.asset", assetID, {"path": "/uploads/img.png", "size_bytes": 2048}, WithChannel("media"))`
+- Export: `BuildRecordFromActor(..., "export.completed", "export.job", jobID, {"format": "csv", "count": 120}, WithChannel("export"))`
+- Bulk: `BuildRecordFromActor(..., "bulk.users.updated", "bulk.job", jobID, {"count_total": 500, "count_succeeded": 498}, WithChannel("bulk"))`
+
 ## Schema
 
 Migration `000003_user_activity.sql` provisions the `user_activity` table with:
