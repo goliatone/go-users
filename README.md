@@ -9,7 +9,7 @@ go-users provides user management commands, queries, migrations, and scope contr
 - `preferences`: resolver helpers for scoped preference trees.
 - `scope`: guard, policies, and resolver utilities.
 - `registry`: Bun helpers for registering SQL migrations and schema metadata.
-- `activity`: Bun repository, ActivitySink helpers, and fixtures for audit logging.
+- `activity`: Bun repository, ActivitySink helpers, and fixtures for audit logging (see `activity/README.md`).
 - `docs` and `examples`: runnable references for transports, guards, and schema feeds.
 
 ## Prerequisites
@@ -21,7 +21,7 @@ go-users provides user management commands, queries, migrations, and scope contr
 1. `go get github.com/goliatone/go-users`.
 2. Implement the interfaces in `pkg/types` or reuse the Bun repositories under `activity`, `preferences`, and `registry`.
 3. Provide a scope resolver and authorization policy if multitenancy is required.
-4. Wire activity by injecting an `ActivitySink`/`ActivityRepository` (Bun or custom) and use the helper `activity.BuildRecordFromActor` to construct records from the go-auth middleware context; add a channel via `activity.WithChannel` when you want module-level filtering.
+4. Wire activity by injecting an `ActivitySink`/`ActivityRepository` (Bun or custom) and use helpers (`activity.BuildRecordFromActor` or `activity.BuildRecordFromUUID`) to construct records; add a channel via `activity.WithChannel` and override scope/timestamps via `activity.WithTenant`, `activity.WithOrg`, or `activity.WithOccurredAt` when needed.
 5. Call `service.New` and expose the returned commands and queries through your transport.
 6. Run the SQL migrations under `data/sql/migrations` before serving traffic.
 
@@ -113,15 +113,15 @@ Use the examples to confirm wiring and to capture request traces during developm
 
 ### Activity helper usage
 
-The activity helpers keep DI minimal (`ActivitySink.Log(ctx, ActivityRecord)`) and let you build records directly from the go-auth `ActorContext`:
+The activity helpers keep DI minimal (`ActivitySink.Log(ctx, ActivityRecord)`) and cover both request and background flows:
 
 ```go
+// From an HTTP request with go-auth middleware.
 actor := &auth.ActorContext{
     ActorID:  adminID.String(),
     TenantID: tenantID.String(),
     Role:     "admin",
 }
-
 record, err := activity.BuildRecordFromActor(actor,
     "settings.updated",
     "settings",
@@ -129,6 +129,18 @@ record, err := activity.BuildRecordFromActor(actor,
     map[string]any{"path": "ui.theme", "from": "light", "to": "dark"},
     activity.WithChannel("settings"),
 )
+
+// From a background worker with only an actor UUID.
+record, err = activity.BuildRecordFromUUID(adminID,
+    "export.completed",
+    "export.job",
+    jobID,
+    map[string]any{"format": "csv", "count": 120},
+    activity.WithTenant(tenantID),
+    activity.WithOrg(orgID),
+    activity.WithOccurredAt(startedAt),
+)
+
 if err != nil {
     return err
 }
@@ -137,7 +149,12 @@ if err := svc.ActivitySink.Log(ctx, record); err != nil {
 }
 ```
 
-Recommended verbs/objects and channel guidance live in `docs/ACTIVITY.md`.
+Options:
+- `WithChannel` for module-level filtering.
+- `WithTenant` / `WithOrg` to set scope when not present on the actor context.
+- `WithOccurredAt` to override the default `time.Now().UTC()`.
+
+See `activity/README.md` for wiring tips and `docs/ACTIVITY.md` for verb/object conventions.
 
 ## Development workflow
 - `./taskfile lint`: runs `go vet` across the module.
