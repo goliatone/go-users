@@ -1,11 +1,14 @@
 package activity
 
 import (
+	"errors"
 	"strings"
+	"time"
 
 	"github.com/goliatone/go-auth"
 	"github.com/goliatone/go-users/pkg/authctx"
 	"github.com/goliatone/go-users/pkg/types"
+	"github.com/google/uuid"
 )
 
 // RecordOption mutates the ActivityRecord produced by BuildRecordFromActor.
@@ -16,6 +19,62 @@ func WithChannel(channel string) RecordOption {
 	return func(record *types.ActivityRecord) {
 		record.Channel = strings.TrimSpace(channel)
 	}
+}
+
+// WithTenant sets the tenant identifier for the record.
+func WithTenant(tenantID uuid.UUID) RecordOption {
+	return func(record *types.ActivityRecord) {
+		record.TenantID = tenantID
+	}
+}
+
+// WithOrg sets the organization identifier for the record.
+func WithOrg(orgID uuid.UUID) RecordOption {
+	return func(record *types.ActivityRecord) {
+		record.OrgID = orgID
+	}
+}
+
+// WithOccurredAt overrides the default occurrence timestamp.
+func WithOccurredAt(occurredAt time.Time) RecordOption {
+	return func(record *types.ActivityRecord) {
+		record.OccurredAt = occurredAt
+	}
+}
+
+// BuildRecordFromUUID constructs an ActivityRecord when only the actor UUID is
+// available. It trims verb/object fields, validates required values, copies
+// metadata defensively, and applies RecordOptions.
+func BuildRecordFromUUID(actorID uuid.UUID, verb, objectType, objectID string, metadata map[string]any, opts ...RecordOption) (types.ActivityRecord, error) {
+	verb = strings.TrimSpace(verb)
+	objectType = strings.TrimSpace(objectType)
+	objectID = strings.TrimSpace(objectID)
+
+	if verb == "" {
+		return types.ActivityRecord{}, errors.New("activity verb is required")
+	}
+
+	if objectType == "" {
+		return types.ActivityRecord{}, errors.New("activity objectType is required")
+	}
+
+	record := types.ActivityRecord{
+		ActorID:    actorID,
+		Verb:       verb,
+		ObjectType: objectType,
+		ObjectID:   objectID,
+		Channel:    "",
+		Data:       cloneMetadata(metadata),
+		OccurredAt: time.Now().UTC(),
+	}
+
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&record)
+		}
+	}
+
+	return record, nil
 }
 
 // BuildRecordFromActor constructs an ActivityRecord using the actor metadata
