@@ -1,5 +1,25 @@
 # Changelog
 
+# [0.3.0](https://github.com/goliatone/go-users/compare/v0.2.0...v0.3.0) - (2025-12-02)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.3.0 ([8536432](https://github.com/goliatone/go-users/commit/85364320e40f1749d05ea6df1b4ee386cf42a60b))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- Command adapter ([59cee85](https://github.com/goliatone/go-users/commit/59cee85f0efb8bec97b11f6de538ea901565bbf5))  - (goliatone)
+- Activity helper ([03f5e94](https://github.com/goliatone/go-users/commit/03f5e94b217f7b0284e12300e415b8852d107345))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.2.0 ([09f89cd](https://github.com/goliatone/go-users/commit/09f89cd78abda425159361dbb6aecca398d2910c))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update docs ([3a54aed](https://github.com/goliatone/go-users/commit/3a54aed8e27d34d126ba43ca4cec9779ad2ee584))  - (goliatone)
+- Update gitignore ([59e50cd](https://github.com/goliatone/go-users/commit/59e50cda10e7ff480102820c514d1b20afa21347))  - (goliatone)
+
 # [0.2.0](https://github.com/goliatone/go-users/tree/v0.2.0) - (2025-11-25)
 
 ## <!-- 1 -->🐛 Bug Fixes
