@@ -38,12 +38,16 @@ func TestRoleRegistry_CreateListAssign(t *testing.T) {
 	role, err := registry.CreateRole(ctx, types.RoleMutation{
 		Name:        "Content Editor",
 		Description: "can edit content",
+		RoleKey:     "editor",
 		Permissions: []string{"content.read", "content.update"},
+		Metadata:    map[string]any{"tier": "content"},
 		Scope:       scope,
 		ActorID:     actor,
 	})
 	require.NoError(t, err)
 	require.Equal(t, "Content Editor", role.Name)
+	require.Equal(t, "editor", role.RoleKey)
+	require.Equal(t, "content", role.Metadata["tier"])
 
 	page, err := registry.ListRoles(ctx, types.RoleFilter{
 		Scope:      scope,
@@ -52,6 +56,7 @@ func TestRoleRegistry_CreateListAssign(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, page.Roles, 1)
 	require.Equal(t, role.ID, page.Roles[0].ID)
+	require.Equal(t, "editor", page.Roles[0].RoleKey)
 
 	userID := uuid.New()
 	require.NoError(t, registry.AssignRole(ctx, userID, role.ID, scope, actor))
@@ -129,7 +134,9 @@ CREATE TABLE custom_roles (
     id UUID PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
+    role_key TEXT,
     permissions JSONB NOT NULL DEFAULT '[]',
+    metadata JSONB NOT NULL DEFAULT '{}',
     is_system BOOLEAN NOT NULL DEFAULT FALSE,
     tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
     org_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
