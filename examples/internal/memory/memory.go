@@ -168,6 +168,17 @@ func cloneAuthUser(user *types.AuthUser) *types.AuthUser {
 	return &copy
 }
 
+func cloneMap(values map[string]any) map[string]any {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make(map[string]any, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
+}
+
 // RoleRegistry is an in-memory registry used by examples.
 type RoleRegistry struct {
 	mu          sync.RWMutex
@@ -193,7 +204,9 @@ func (r *RoleRegistry) CreateRole(_ context.Context, input types.RoleMutation) (
 		ID:          id,
 		Name:        input.Name,
 		Description: input.Description,
+		RoleKey:     strings.TrimSpace(input.RoleKey),
 		Permissions: append([]string{}, input.Permissions...),
+		Metadata:    cloneMap(input.Metadata),
 		IsSystem:    input.IsSystem,
 		Scope:       input.Scope,
 		CreatedAt:   time.Now().UTC(),
@@ -216,7 +229,11 @@ func (r *RoleRegistry) UpdateRole(_ context.Context, id uuid.UUID, input types.R
 		role.Name = input.Name
 	}
 	role.Description = input.Description
+	role.RoleKey = strings.TrimSpace(input.RoleKey)
 	role.Permissions = append([]string{}, input.Permissions...)
+	if input.Metadata != nil {
+		role.Metadata = cloneMap(input.Metadata)
+	}
 	role.UpdatedAt = time.Now().UTC()
 	role.UpdatedBy = input.ActorID
 	r.roles[id] = role
@@ -284,6 +301,9 @@ func (r *RoleRegistry) ListRoles(_ context.Context, filter types.RoleFilter) (ty
 		if filter.Keyword != "" && !strings.Contains(strings.ToLower(role.Name), strings.ToLower(filter.Keyword)) {
 			continue
 		}
+		if filter.RoleKey != "" && role.RoleKey != strings.TrimSpace(filter.RoleKey) {
+			continue
+		}
 		roles = append(roles, role)
 	}
 	return types.RolePage{Roles: roles, Total: len(roles)}, nil
@@ -297,6 +317,7 @@ func (r *RoleRegistry) GetRole(_ context.Context, id uuid.UUID, _ types.ScopeFil
 		return nil, ErrRoleNotFound
 	}
 	copy := role
+	copy.Metadata = cloneMap(role.Metadata)
 	return &copy, nil
 }
 
