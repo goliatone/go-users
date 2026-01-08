@@ -14,7 +14,9 @@ import (
 type CreateRoleInput struct {
 	Name        string
 	Description string
+	RoleKey     string
 	Permissions []string
+	Metadata    map[string]any
 	IsSystem    bool
 	Scope       types.ScopeFilter
 	Actor       types.ActorRef
@@ -59,7 +61,9 @@ func (c *CreateRoleCommand) Execute(ctx context.Context, input CreateRoleInput) 
 	role, err := c.registry.CreateRole(ctx, types.RoleMutation{
 		Name:        strings.TrimSpace(input.Name),
 		Description: strings.TrimSpace(input.Description),
+		RoleKey:     strings.TrimSpace(input.RoleKey),
 		Permissions: input.Permissions,
+		Metadata:    input.Metadata,
 		IsSystem:    input.IsSystem,
 		Scope:       scope,
 		ActorID:     input.Actor.ID,
