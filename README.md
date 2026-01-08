@@ -1,8 +1,9 @@
 # go-users
 
-go-users provides user management commands, queries, migrations, and scope controls that sit behind admin transports. Everything is transport agnostic and can be wired to HTTP, gRPC, jobs, or CLI pipelines.
+`go-users` provides user management commands, queries, migrations, and scope controls that sit behind admin transports. Everything is transport agnostic and can be wired to HTTP, gRPC, jobs, or CLI pipelines.
 
 ## Package map
+
 - `service`: builds the service façade and validates injected repositories.
 - `command`: lifecycle, invite, password reset, role, profile, preference, and activity handlers.
 - `query`: inventory, role, assignment, profile, preference, and activity read models.
@@ -13,11 +14,13 @@ go-users provides user management commands, queries, migrations, and scope contr
 - `docs` and `examples`: runnable references for transports, guards, and schema feeds.
 
 ## Prerequisites
+
 - Go 1.23+.
 - A repository implementation for each interface located in `pkg/types`.
 - Access to a SQL database when using the bundled migrations (PostgreSQL or SQLite).
 
 ## Quick start
+
 1. `go get github.com/goliatone/go-users`.
 2. Implement the interfaces in `pkg/types` or reuse the Bun repositories under `activity`, `preferences`, and `registry`.
 3. Provide a scope resolver and authorization policy if multitenancy is required.
@@ -71,16 +74,18 @@ func buildService(deps Dependencies) *service.Service {
 Check `service.Service.Ready` or `HealthCheck` before wiring transports.
 
 ## Commands
+
 - `UserLifecycleTransition` and `BulkUserTransition`: lifecycle state changes with policy enforcement.
 - `UserInvite` and `UserPasswordReset`: invite token and reset token workflows.
 - `CreateRole`, `UpdateRole`, `DeleteRole`: custom role CRUD with registry notifications.
-- `AssignRole` and `UnassignRole`: actor-to-role assignments, with guard checks.
+- `AssignRole` and `UnassignRole`: "actor-to-role" assignments, with guard checks.
 - `ActivityLog`: structured audit trails stored through the configured repository or sink.
 - `ProfileUpsert`, `PreferenceUpsert`, `PreferenceDelete`: profile and scoped preference management.
 
-Every command runs through the scope guard before invoking repositories. Hooks fire after each command so transports can sync e-mail, analytics, or caches.
+Every command runs through the scope guard before invoking repositories. Hooks fire after each command so transports can sync email, analytics, or caches.
 
 ## Queries
+
 - `UserInventory`: list, filter, and search users.
 - `RoleList` and `RoleDetail`: role registry lookups.
 - `RoleAssignments`: view assignments per role or user.
@@ -90,6 +95,7 @@ Every command runs through the scope guard before invoking repositories. Hooks f
 Queries also rely on the guard to derive the effective scope passed to repositories.
 
 ## Scope guard
+
 - Provide a `types.ScopeResolver` that understands tenant, workspace, or organization hints carried in the request.
 - Provide a `types.AuthorizationPolicy` that asserts whether the actor can operate in the requested scope.
 - Call `service.ScopeGuard()` when building HTTP or job adapters so the same guard instance drives controllers.
@@ -98,13 +104,107 @@ Queries also rely on the guard to derive the effective scope passed to repositor
 More details live in `docs/MULTITENANCY.md` and `docs/WORKSPACES.md`.
 
 ## Storage and migrations
+
 - SQL definitions live under `data/sql/migrations`. Files are numbered and include `.up.sql` and `.down.sql`.
 - Register migrations through `migrations.Register(fsys)` and feed the returned filesystems to your runner.
 - `migrations.TestMigrationsApplyToSQLite` verifies that the SQL stack applies cleanly to SQLite.
 - Bun repositories under `activity`, `preferences`, and `registry` are thin wrappers around `bun.DB` and match the interfaces in `pkg/types`.
 - You can replace any repository with your own implementation as long as it satisfies the interface.
 
+### User tables
+
+`users` stores core auth identities and lifecycle state. Use `user_role` for the built-in auth tier; use custom roles for app-specific capabilities.
+
+- `id`: UUID primary key.
+- `user_role`: core auth tier (`guest`, `member`, `admin`, `owner`).
+- `first_name`/`last_name`: required user display names.
+- `username`: unique login handle.
+- `profile_picture`: optional avatar URL.
+- `email`: unique login email.
+- `phone_number`: optional contact number.
+- `password_hash`: stored password hash (nullable for external providers).
+- `metadata`: JSON object for provider or app-specific attributes.
+- `is_email_verified`: email verification flag.
+- `login_attempts`/`login_attempt_at`: throttling and lockout tracking.
+- `loggedin_at`: last successful login timestamp.
+- `reseted_at`: last password reset timestamp.
+- `status`: lifecycle state (`pending`, `active`, `suspended`, `disabled`, `archived`).
+- `suspended_at`: suspension timestamp for audit.
+- `created_at`/`updated_at`, `deleted_at`: audit and soft delete timestamps.
+
+`password_reset` tracks reset requests and their lifecycle.
+
+- `id`: UUID primary key.
+- `user_id`: user receiving the reset.
+- `email`: email used for the reset flow.
+- `status`: reset lifecycle (`unknown`, `requested`, `expired`, `changed`).
+- `reseted_at`: completion timestamp.
+- `created_at`/`updated_at`, `deleted_at`: audit and soft delete timestamps.
+
+### Activity tables
+
+`user_activity` stores audit log entries and feed events.
+
+- `id`: UUID primary key.
+- `user_id`: target user (optional).
+- `actor_id`: actor who performed the action.
+- `tenant_id`/`org_id`: scope identifiers.
+- `verb`: action name (e.g. `role.assigned`).
+- `object_type`/`object_id`: optional object for the action.
+- `channel`: optional grouping (e.g. `settings`).
+- `ip`: optional actor IP address.
+- `data`: JSON payload with action-specific details.
+- `created_at`: event timestamp.
+
+### Profile and preference tables
+
+`user_profiles` stores profile attributes separate from core auth fields.
+
+- `user_id`: primary key and foreign key to users.
+- `display_name`: friendly name for UI.
+- `avatar_url`: profile avatar URL.
+- `locale`: locale code (e.g. `en-US`).
+- `timezone`: IANA timezone string.
+- `bio`: optional profile summary.
+- `contact`: JSON object for structured contact data.
+- `metadata`: JSON object for app-specific profile attributes.
+- `tenant_id`/`org_id`: scope identifiers.
+- `created_at`/`updated_at`, `created_by`/`updated_by`: audit fields.
+
+`user_preferences` stores scoped preference values.
+
+- `id`: UUID primary key.
+- `user_id`: user receiving the preference.
+- `tenant_id`/`org_id`: scope identifiers.
+- `scope_level`: preference tier (`system`, `tenant`, `org`, `user`).
+- `key`: preference key (case insensitive).
+- `value`: JSON payload for the preference.
+- `version`: monotonically increasing version per key/scope.
+- `created_at`/`updated_at`, `created_by`/`updated_by`: audit fields.
+
+### Role registry tables
+
+`custom_roles` stores role definitions scoped by tenant and org. Use `name` as the short display label, `description` as the longer admin facing explanation, and `role_key` as the stable machine key for grouping/filtering.
+
+- `id`: UUID primary key.
+- `name`: short display label shown in admin UIs, unique per scope.
+- `description`: longer help text for admins, not intended for filtering.
+- `role_key`: optional, stable key for app level grouping (e.g. editor).
+- `permissions`: JSON array of permission slugs.
+- `metadata`: JSON object for app specific attributes or UI hints.
+- `is_system`: marks built-in roles versus admin defined roles.
+- `tenant_id`/`org_id`: scope identifiers.
+- `created_at`/`updated_at`, `created_by`/`updated_by`: audit fields.
+
+`user_custom_roles` stores role assignments within the same scope.
+
+- `user_id`: assigned user.
+- `role_id`: assigned role.
+- `tenant_id`/`org_id`: scope identifiers.
+- `assigned_at`/`assigned_by`: audit fields.
+
 ## Examples
+
 - `examples/commands`: runs the service with in-memory repositories. `go run ./examples/commands`.
 - `examples/internal/memory`: shared fixtures for the sample binaries.
 - `examples/web`: Go Fiber admin site showing guard first controllers, schema registry feeds, and CRUD adapters.
@@ -150,19 +250,22 @@ if err := svc.ActivitySink.Log(ctx, record); err != nil {
 ```
 
 Options:
-- `WithChannel` for module-level filtering.
+
+- `WithChannel` for module level filtering.
 - `WithTenant` / `WithOrg` to set scope when not present on the actor context.
 - `WithOccurredAt` to override the default `time.Now().UTC()`.
 
 See `activity/README.md` for wiring tips and `docs/ACTIVITY.md` for verb/object conventions.
 
 ## Development workflow
+
 - `./taskfile lint`: runs `go vet` across the module.
 - `./taskfile test`: runs `go test ./...`.
 - `./taskfile migrate`: exercises the SQLite migration test.
 - Standard `go test ./...` and `golangci-lint` setups also work if you prefer direct tool invocations.
 
 ## Documentation index
+
 - `docs/USER_MANAGEMENT_REPORT.md`: design notes for the service surface.
 - `docs/SERVICE_REFERENCE.md`: detailed command and query inputs and outputs.
 - `docs/ACTIVITY.md`, `docs/PROFILES_PREFERENCES.md`, `docs/WORKSPACES.md`: feature specific guidance.
