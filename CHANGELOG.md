@@ -1,5 +1,28 @@
 # Changelog
 
+# [0.4.0](https://github.com/goliatone/go-users/compare/v0.3.0...v0.4.0) - (2026-01-08)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.4.0 ([e61479a](https://github.com/goliatone/go-users/commit/e61479a2102099708d68ced6d7b247eebecbba53))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- Crud service include new fields ([dceedda](https://github.com/goliatone/go-users/commit/dceedda3bf052d84c7f94318b325ca4b8e6560d3))  - (goliatone)
+- Role create command ([e7f3754](https://github.com/goliatone/go-users/commit/e7f3754636a7f4849cc6cd5e147966a1fb0b332d))  - (goliatone)
+- Update custom role model ([bc8a509](https://github.com/goliatone/go-users/commit/bc8a5096a465eade4edb526e98def0a5f9d588b1))  - (goliatone)
+- Migrations to register custom roles meta and role_key ([264f5ae](https://github.com/goliatone/go-users/commit/264f5aeee6ca0ddc8357397033178539b37fb7ab))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.3.0 ([41c53fe](https://github.com/goliatone/go-users/commit/41c53fee4b75f448d98c20f036ec7509fe780fd2))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update readme ([96a278f](https://github.com/goliatone/go-users/commit/96a278f8df60b49034cd381c06941dbbc6b2c7b1))  - (goliatone)
+- Update examples ([683316f](https://github.com/goliatone/go-users/commit/683316f8b47b8b525de400da3bc4a3878f9a4d08))  - (goliatone)
+- Update tests ([8710f60](https://github.com/goliatone/go-users/commit/8710f60bc0c9ec02c0d6206adaac6f95451d6f61))  - (goliatone)
+
 # [0.3.0](https://github.com/goliatone/go-users/compare/v0.2.0...v0.3.0) - (2025-12-02)
 
 ## <!-- 13 -->📦 Bumps
