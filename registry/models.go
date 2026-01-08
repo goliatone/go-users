@@ -11,17 +11,19 @@ import (
 type CustomRole struct {
 	bun.BaseModel `bun:"table:custom_roles"`
 
-	ID          uuid.UUID `bun:",pk,type:uuid"`
-	Name        string    `bun:"name,notnull"`
-	Description string    `bun:"description"`
-	Permissions []string  `bun:"permissions,type:jsonb"`
-	IsSystem    bool      `bun:"is_system,notnull"`
-	TenantID    uuid.UUID `bun:"tenant_id,type:uuid,notnull,default:'00000000-0000-0000-0000-000000000000'"`
-	OrgID       uuid.UUID `bun:"org_id,type:uuid,notnull,default:'00000000-0000-0000-0000-000000000000'"`
-	CreatedAt   time.Time `bun:"created_at,notnull"`
-	UpdatedAt   time.Time `bun:"updated_at,notnull"`
-	CreatedBy   uuid.UUID `bun:"created_by,type:uuid,notnull"`
-	UpdatedBy   uuid.UUID `bun:"updated_by,type:uuid,notnull"`
+	ID          uuid.UUID      `bun:",pk,type:uuid"`
+	Name        string         `bun:"name,notnull"`
+	Description string         `bun:"description"`
+	RoleKey     string         `bun:"role_key"`
+	Permissions []string       `bun:"permissions,type:jsonb"`
+	Metadata    map[string]any `bun:"metadata,type:jsonb"`
+	IsSystem    bool           `bun:"is_system,notnull"`
+	TenantID    uuid.UUID      `bun:"tenant_id,type:uuid,notnull,default:'00000000-0000-0000-0000-000000000000'"`
+	OrgID       uuid.UUID      `bun:"org_id,type:uuid,notnull,default:'00000000-0000-0000-0000-000000000000'"`
+	CreatedAt   time.Time      `bun:"created_at,notnull"`
+	UpdatedAt   time.Time      `bun:"updated_at,notnull"`
+	CreatedBy   uuid.UUID      `bun:"created_by,type:uuid,notnull"`
+	UpdatedBy   uuid.UUID      `bun:"updated_by,type:uuid,notnull"`
 }
 
 // RoleAssignment represents rows from user_custom_roles.
