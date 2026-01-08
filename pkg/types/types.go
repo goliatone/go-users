@@ -223,7 +223,9 @@ type UserInventoryPage struct {
 type RoleMutation struct {
 	Name        string
 	Description string
+	RoleKey     string
 	Permissions []string
+	Metadata    map[string]any
 	IsSystem    bool
 	Scope       ScopeFilter
 	ActorID     uuid.UUID
@@ -234,7 +236,9 @@ type RoleDefinition struct {
 	ID          uuid.UUID
 	Name        string
 	Description string
+	RoleKey     string
 	Permissions []string
+	Metadata    map[string]any
 	IsSystem    bool
 	Scope       ScopeFilter
 	CreatedAt   time.Time
@@ -248,6 +252,7 @@ type RoleFilter struct {
 	Actor         ActorRef
 	Scope         ScopeFilter
 	Keyword       string
+	RoleKey       string
 	IncludeSystem bool
 	RoleIDs       []uuid.UUID
 	Pagination    Pagination
