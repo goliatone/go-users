@@ -105,7 +105,9 @@ func (r *RoleRegistry) CreateRole(ctx context.Context, input types.RoleMutation)
 		ID:          r.idGen.UUID(),
 		Name:        name,
 		Description: strings.TrimSpace(input.Description),
+		RoleKey:     strings.TrimSpace(input.RoleKey),
 		Permissions: copyPermissions(input.Permissions),
+		Metadata:    copyMetadata(input.Metadata),
 		IsSystem:    input.IsSystem,
 		TenantID:    scopeUUID(input.Scope.TenantID),
 		OrgID:       scopeUUID(input.Scope.OrgID),
@@ -140,8 +142,12 @@ func (r *RoleRegistry) UpdateRole(ctx context.Context, id uuid.UUID, input types
 		role.Name = name
 	}
 	role.Description = strings.TrimSpace(input.Description)
+	role.RoleKey = strings.TrimSpace(input.RoleKey)
 	if input.Permissions != nil {
 		role.Permissions = copyPermissions(input.Permissions)
+	}
+	if input.Metadata != nil {
+		role.Metadata = copyMetadata(input.Metadata)
 	}
 	if input.IsSystem {
 		role.IsSystem = true
@@ -257,6 +263,9 @@ func (r *RoleRegistry) ListRoles(ctx context.Context, filter types.RoleFilter) (
 			if filter.Keyword != "" {
 				keyword := "%" + strings.ToLower(strings.TrimSpace(filter.Keyword)) + "%"
 				q = q.Where("LOWER(name) LIKE ? OR LOWER(description) LIKE ?", keyword, keyword)
+			}
+			if filter.RoleKey != "" {
+				q = q.Where("role_key = ?", strings.TrimSpace(filter.RoleKey))
 			}
 			if !filter.IncludeSystem {
 				q = q.Where("is_system = FALSE")
@@ -405,6 +414,17 @@ func copyPermissions(values []string) []string {
 	return out
 }
 
+func copyMetadata(values map[string]any) map[string]any {
+	if len(values) == 0 {
+		return map[string]any{}
+	}
+	out := make(map[string]any, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
+}
+
 func toRoleDefinition(record *CustomRole) *types.RoleDefinition {
 	if record == nil {
 		return nil
@@ -413,7 +433,9 @@ func toRoleDefinition(record *CustomRole) *types.RoleDefinition {
 		ID:          record.ID,
 		Name:        record.Name,
 		Description: record.Description,
+		RoleKey:     record.RoleKey,
 		Permissions: append([]string{}, record.Permissions...),
+		Metadata:    copyMetadata(record.Metadata),
 		IsSystem:    record.IsSystem,
 		Scope:       scopeFromRecord(record),
 		CreatedAt:   record.CreatedAt,
@@ -448,7 +470,9 @@ func DefinitionToCustomRole(definition *types.RoleDefinition) *CustomRole {
 		ID:          definition.ID,
 		Name:        definition.Name,
 		Description: definition.Description,
+		RoleKey:     definition.RoleKey,
 		Permissions: append([]string{}, definition.Permissions...),
+		Metadata:    copyMetadata(definition.Metadata),
 		IsSystem:    definition.IsSystem,
 		TenantID:    scopeUUID(definition.Scope.TenantID),
 		OrgID:       scopeUUID(definition.Scope.OrgID),
