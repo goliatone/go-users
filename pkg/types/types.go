@@ -222,6 +222,7 @@ type UserInventoryPage struct {
 // RoleMutation describes create/update payloads for roles.
 type RoleMutation struct {
 	Name        string
+	Order       int
 	Description string
 	RoleKey     string
 	Permissions []string
@@ -235,6 +236,7 @@ type RoleMutation struct {
 type RoleDefinition struct {
 	ID          uuid.UUID
 	Name        string
+	Order       int
 	Description string
 	RoleKey     string
 	Permissions []string
