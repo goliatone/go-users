@@ -172,6 +172,7 @@ The go-auth schema is already solid. Only need to add optional custom roles tabl
 CREATE TABLE custom_roles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(100) UNIQUE NOT NULL,
+    "order" INT NOT NULL DEFAULT 0,
     description TEXT,
     permissions JSONB NOT NULL DEFAULT '[]',
     is_system BOOLEAN DEFAULT FALSE,
