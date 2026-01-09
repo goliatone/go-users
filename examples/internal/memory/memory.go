@@ -203,6 +203,7 @@ func (r *RoleRegistry) CreateRole(_ context.Context, input types.RoleMutation) (
 	role := types.RoleDefinition{
 		ID:          id,
 		Name:        input.Name,
+		Order:       input.Order,
 		Description: input.Description,
 		RoleKey:     strings.TrimSpace(input.RoleKey),
 		Permissions: append([]string{}, input.Permissions...),
@@ -228,6 +229,7 @@ func (r *RoleRegistry) UpdateRole(_ context.Context, id uuid.UUID, input types.R
 	if input.Name != "" {
 		role.Name = input.Name
 	}
+	role.Order = input.Order
 	role.Description = input.Description
 	role.RoleKey = strings.TrimSpace(input.RoleKey)
 	role.Permissions = append([]string{}, input.Permissions...)
@@ -306,6 +308,12 @@ func (r *RoleRegistry) ListRoles(_ context.Context, filter types.RoleFilter) (ty
 		}
 		roles = append(roles, role)
 	}
+	sort.SliceStable(roles, func(i, j int) bool {
+		if roles[i].Order != roles[j].Order {
+			return roles[i].Order < roles[j].Order
+		}
+		return strings.ToLower(roles[i].Name) < strings.ToLower(roles[j].Name)
+	})
 	return types.RolePage{Roles: roles, Total: len(roles)}, nil
 }
 
