@@ -14,6 +14,7 @@ import (
 type UpdateRoleInput struct {
 	RoleID      uuid.UUID
 	Name        string
+	Order       int
 	Description string
 	RoleKey     string
 	Permissions []string
@@ -67,6 +68,7 @@ func (c *UpdateRoleCommand) Execute(ctx context.Context, input UpdateRoleInput) 
 	}
 	role, err := c.registry.UpdateRole(ctx, input.RoleID, types.RoleMutation{
 		Name:        strings.TrimSpace(input.Name),
+		Order:       input.Order,
 		Description: strings.TrimSpace(input.Description),
 		RoleKey:     strings.TrimSpace(input.RoleKey),
 		Permissions: input.Permissions,
