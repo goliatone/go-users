@@ -104,6 +104,7 @@ func (r *RoleRegistry) CreateRole(ctx context.Context, input types.RoleMutation)
 	role := &CustomRole{
 		ID:          r.idGen.UUID(),
 		Name:        name,
+		Order:       input.Order,
 		Description: strings.TrimSpace(input.Description),
 		RoleKey:     strings.TrimSpace(input.RoleKey),
 		Permissions: copyPermissions(input.Permissions),
@@ -141,6 +142,7 @@ func (r *RoleRegistry) UpdateRole(ctx context.Context, id uuid.UUID, input types
 	if name := normalizeRoleName(input.Name); name != "" {
 		role.Name = name
 	}
+	role.Order = input.Order
 	role.Description = strings.TrimSpace(input.Description)
 	role.RoleKey = strings.TrimSpace(input.RoleKey)
 	if input.Permissions != nil {
@@ -254,9 +256,10 @@ func (r *RoleRegistry) ListRoles(ctx context.Context, filter types.RoleFilter) (
 	criteria := []repository.SelectCriteria{
 		scopeSelectCriteria(filter.Scope),
 		func(q *bun.SelectQuery) *bun.SelectQuery {
-			q = q.OrderExpr("LOWER(name) ASC").
+			q = q.OrderExpr("? ASC, LOWER(name) ASC", bun.Ident("order")).
 				Limit(pagination.Limit).
 				Offset(pagination.Offset)
+
 			if len(filter.RoleIDs) > 0 {
 				q = q.Where("id IN (?)", bun.In(filter.RoleIDs))
 			}
@@ -432,6 +435,7 @@ func toRoleDefinition(record *CustomRole) *types.RoleDefinition {
 	return &types.RoleDefinition{
 		ID:          record.ID,
 		Name:        record.Name,
+		Order:       record.Order,
 		Description: record.Description,
 		RoleKey:     record.RoleKey,
 		Permissions: append([]string{}, record.Permissions...),
@@ -469,6 +473,7 @@ func DefinitionToCustomRole(definition *types.RoleDefinition) *CustomRole {
 	return &CustomRole{
 		ID:          definition.ID,
 		Name:        definition.Name,
+		Order:       definition.Order,
 		Description: definition.Description,
 		RoleKey:     definition.RoleKey,
 		Permissions: append([]string{}, definition.Permissions...),
