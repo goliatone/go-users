@@ -13,6 +13,7 @@ import (
 // CreateRoleInput carries data for creating custom roles.
 type CreateRoleInput struct {
 	Name        string
+	Order       int
 	Description string
 	RoleKey     string
 	Permissions []string
@@ -60,6 +61,7 @@ func (c *CreateRoleCommand) Execute(ctx context.Context, input CreateRoleInput) 
 	}
 	role, err := c.registry.CreateRole(ctx, types.RoleMutation{
 		Name:        strings.TrimSpace(input.Name),
+		Order:       input.Order,
 		Description: strings.TrimSpace(input.Description),
 		RoleKey:     strings.TrimSpace(input.RoleKey),
 		Permissions: input.Permissions,
