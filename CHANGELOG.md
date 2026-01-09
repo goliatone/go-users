@@ -1,5 +1,27 @@
 # Changelog
 
+# [0.5.0](https://github.com/goliatone/go-users/compare/v0.4.0...v0.5.0) - (2026-01-09)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.5.0 ([99a0cf4](https://github.com/goliatone/go-users/commit/99a0cf4c7a2261fdf92af5fe4167d0eed297497e))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- Order field to custom roles ([f312711](https://github.com/goliatone/go-users/commit/f312711c16276b68988e418d53a1421e6b92293a))  - (goliatone)
+- Curd service ([4e7b201](https://github.com/goliatone/go-users/commit/4e7b20176fd707c8e2c521290034cf4d953c3ec4))  - (goliatone)
+- Migration for order field ([eedd795](https://github.com/goliatone/go-users/commit/eedd795488ab2f0611d20a3019460432f1a0b08f))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.4.0 ([19b4dda](https://github.com/goliatone/go-users/commit/19b4dda6b86b9c839004e475d8d7acdcf2b434ff))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update docs ([b487b27](https://github.com/goliatone/go-users/commit/b487b27eceb6029f4fa91236deb6c24698cdaef3))  - (goliatone)
+- Update tests ([946243a](https://github.com/goliatone/go-users/commit/946243a3cb9d73403b6a584d0106e1d0ebc60168))  - (goliatone)
+- Update deps ([04a0cbe](https://github.com/goliatone/go-users/commit/04a0cbe5663ca7d569fdc49d296fb3a884fdca4b))  - (goliatone)
+
 # [0.4.0](https://github.com/goliatone/go-users/compare/v0.3.0...v0.4.0) - (2026-01-08)
 
 ## <!-- 13 -->📦 Bumps
