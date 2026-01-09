@@ -133,6 +133,7 @@ const roleSchemaDDL = `
 CREATE TABLE custom_roles (
     id UUID PRIMARY KEY,
     name TEXT NOT NULL,
+    "order" INTEGER NOT NULL DEFAULT 0,
     description TEXT,
     role_key TEXT,
     permissions JSONB NOT NULL DEFAULT '[]',

@@ -280,6 +280,13 @@ func (t *testCrudContext) Query(key string, defaultValue ...string) string {
 	return ""
 }
 
+func (t *testCrudContext) QueryValues(key string) []string {
+	if v, ok := t.queries[key]; ok {
+		return []string{v}
+	}
+	return nil
+}
+
 func (t *testCrudContext) QueryInt(string, ...int) int {
 	return 0
 }

@@ -305,6 +305,7 @@ func (r *mtRoleRegistry) CreateRole(_ context.Context, input types.RoleMutation)
 	role := types.RoleDefinition{
 		ID:    uuid.New(),
 		Name:  input.Name,
+		Order: input.Order,
 		Scope: input.Scope,
 	}
 	tenant := input.Scope.TenantID
@@ -313,7 +314,7 @@ func (r *mtRoleRegistry) CreateRole(_ context.Context, input types.RoleMutation)
 }
 
 func (r *mtRoleRegistry) UpdateRole(_ context.Context, id uuid.UUID, input types.RoleMutation) (*types.RoleDefinition, error) {
-	return &types.RoleDefinition{ID: id, Name: input.Name, Scope: input.Scope}, nil
+	return &types.RoleDefinition{ID: id, Name: input.Name, Order: input.Order, Scope: input.Scope}, nil
 }
 
 func (r *mtRoleRegistry) DeleteRole(context.Context, uuid.UUID, types.ScopeFilter, uuid.UUID) error {

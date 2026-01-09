@@ -215,6 +215,13 @@ func (s *stubCrudContext) Query(key string, defaultValue ...string) string {
 	return ""
 }
 
+func (s *stubCrudContext) QueryValues(key string) []string {
+	if v, ok := s.queries[key]; ok {
+		return []string{v}
+	}
+	return nil
+}
+
 func (s *stubCrudContext) QueryInt(key string, defaultValue ...int) int {
 	if len(defaultValue) > 0 {
 		return defaultValue[0]
