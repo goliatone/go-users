@@ -13,6 +13,7 @@ type CustomRole struct {
 
 	ID          uuid.UUID      `bun:",pk,type:uuid"`
 	Name        string         `bun:"name,notnull"`
+	Order       int            `bun:"order,notnull,default:0"`
 	Description string         `bun:"description"`
 	RoleKey     string         `bun:"role_key"`
 	Permissions []string       `bun:"permissions,type:jsonb"`
