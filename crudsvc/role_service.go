@@ -71,6 +71,7 @@ func (s *RoleService) Create(ctx crud.Context, record *registry.CustomRole) (*re
 	result := types.RoleDefinition{}
 	input := command.CreateRoleInput{
 		Name:        record.Name,
+		Order:       record.Order,
 		Description: record.Description,
 		RoleKey:     record.RoleKey,
 		Permissions: append([]string{}, record.Permissions...),
@@ -111,6 +112,7 @@ func (s *RoleService) Update(ctx crud.Context, record *registry.CustomRole) (*re
 	input := command.UpdateRoleInput{
 		RoleID:      record.ID,
 		Name:        record.Name,
+		Order:       record.Order,
 		Description: record.Description,
 		RoleKey:     record.RoleKey,
 		Permissions: append([]string{}, record.Permissions...),
