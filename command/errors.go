@@ -13,6 +13,10 @@ var (
 	ErrLifecycleTargetRequired = errors.New("go-users: lifecycle transition requires target state")
 	// ErrActorRequired indicates an actor reference was not supplied.
 	ErrActorRequired = types.ErrActorRequired
+	// ErrUserRequired indicates a user payload was not supplied.
+	ErrUserRequired = errors.New("go-users: user payload required")
+	// ErrUserEmailRequired indicates a user email address was missing.
+	ErrUserEmailRequired = errors.New("go-users: user email required")
 	// ErrInviteEmailRequired occurs when an invite omits the email address.
 	ErrInviteEmailRequired = errors.New("go-users: invite requires email")
 	// ErrPasswordHashRequired occurs when a password reset omits the hashed password.
