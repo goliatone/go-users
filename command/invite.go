@@ -16,6 +16,7 @@ const defaultInviteTTL = 72 * time.Hour
 // UserInviteInput carries the data required to invite a new user.
 type UserInviteInput struct {
 	Email     string
+	Username  string
 	FirstName string
 	LastName  string
 	Role      string
@@ -99,6 +100,9 @@ var _ gocommand.Commander[UserInviteInput] = (*UserInviteCommand)(nil)
 
 // Execute creates the pending user record and registers invite metadata.
 func (c *UserInviteCommand) Execute(ctx context.Context, input UserInviteInput) error {
+	if c.repo == nil {
+		return types.ErrMissingAuthRepository
+	}
 	if err := input.Validate(); err != nil {
 		return err
 	}
@@ -120,6 +124,7 @@ func (c *UserInviteCommand) Execute(ctx context.Context, input UserInviteInput) 
 
 	user := &types.AuthUser{
 		Email:     strings.TrimSpace(input.Email),
+		Username:  strings.TrimSpace(input.Username),
 		FirstName: strings.TrimSpace(input.FirstName),
 		LastName:  strings.TrimSpace(input.LastName),
 		Role:      input.Role,
