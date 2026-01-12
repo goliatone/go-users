@@ -5,12 +5,12 @@ go 1.24.0
 toolchain go1.24.11
 
 require (
-	github.com/goliatone/go-auth v0.22.0
+	github.com/goliatone/go-auth v0.23.0
 	github.com/goliatone/go-command v0.12.0
-	github.com/goliatone/go-crud v0.15.0
+	github.com/goliatone/go-crud v0.16.0
 	github.com/goliatone/go-errors v0.9.0
 	github.com/goliatone/go-options v0.7.0
-	github.com/goliatone/go-repository-bun v0.10.0
+	github.com/goliatone/go-repository-bun v0.11.0
 	github.com/goliatone/go-router v0.41.0
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-sqlite3 v1.14.28
@@ -50,7 +50,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
 	github.com/goliatone/go-composite-fs v0.0.1 // indirect
 	github.com/goliatone/go-masker v0.1.0 // indirect
-	github.com/goliatone/go-persistence-bun v0.7.0 // indirect
+	github.com/goliatone/go-persistence-bun v0.9.0 // indirect
 	github.com/goliatone/go-print v0.4.1 // indirect
 	github.com/goliatone/hashid v0.1.1 // indirect
 	github.com/goodsign/monday v1.0.2 // indirect
