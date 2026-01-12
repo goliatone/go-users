@@ -1,5 +1,34 @@
 # Changelog
 
+# [0.6.0](https://github.com/goliatone/go-users/compare/v0.5.0...v0.6.0) - (2026-01-12)
+
+## <!-- 1 -->🐛 Bug Fixes
+
+- Clone auth user ([0e69e05](https://github.com/goliatone/go-users/commit/0e69e05895b450f1253b29232c8c9f30327b2638))  - (goliatone)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.6.0 ([ca3e5d2](https://github.com/goliatone/go-users/commit/ca3e5d296ec5a54ec8652acde3c6120fa7a394a9))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- User actions ([1736fe2](https://github.com/goliatone/go-users/commit/1736fe2795d666fe716ce1eedcb79a7ee4c3306a))  - (goliatone)
+- User create and update commands ([550fbbe](https://github.com/goliatone/go-users/commit/550fbbe36402d83b506e935d3554e412ec0650ec))  - (goliatone)
+- User service implement crud ([8943e91](https://github.com/goliatone/go-users/commit/8943e9178f26f3042344b9f5b8391ddbb6b55d05))  - (goliatone)
+- Include username to auth user ([07aa323](https://github.com/goliatone/go-users/commit/07aa32360f2ae356cd396729d9cc1281a83f2d09))  - (goliatone)
+- Error for user and email req ([e523336](https://github.com/goliatone/go-users/commit/e52333650e12f1cfed1d39aea8c5b61c73253700))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.5.0 ([c5e886b](https://github.com/goliatone/go-users/commit/c5e886bc6ecce46c91acf3968e42be3b52328fbc))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update examples ([a35f941](https://github.com/goliatone/go-users/commit/a35f941a8aa2a7ddd8f5d47d887dfe3f0329680a))  - (goliatone)
+- Update tests ([7070cdc](https://github.com/goliatone/go-users/commit/7070cdc729fd41b4da128e658b2d62f7e266ef9b))  - (goliatone)
+- Update deps ([5044e0f](https://github.com/goliatone/go-users/commit/5044e0f0c0e3e5c2220a7bb7020e3f222574afcc))  - (goliatone)
+- Update guides ([4e7a182](https://github.com/goliatone/go-users/commit/4e7a182f79bb022f1ec98c56432ec611bc8d5aa2))  - (goliatone)
+
 # [0.5.0](https://github.com/goliatone/go-users/compare/v0.4.0...v0.5.0) - (2026-01-09)
 
 ## <!-- 13 -->📦 Bumps
