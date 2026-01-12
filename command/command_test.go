@@ -142,7 +142,8 @@ func TestUserInviteCommand_GeneratesTokenAndActivity(t *testing.T) {
 
 	result := &UserInviteResult{}
 	err := cmd.Execute(context.Background(), UserInviteInput{
-		Email: "new@example.com",
+		Email:    "new@example.com",
+		Username: "new-user",
 		Actor: types.ActorRef{
 			ID: uuid.New(),
 		},
@@ -154,7 +155,78 @@ func TestUserInviteCommand_GeneratesTokenAndActivity(t *testing.T) {
 	require.Equal(t, "new@example.com", recorded.Data["email"])
 	require.Equal(t, "user.invite", recorded.Verb)
 	require.NotNil(t, result.User)
+	require.Equal(t, "new-user", result.User.Username)
 	require.Equal(t, types.LifecycleStatePending, result.User.Status)
+}
+
+func TestUserCreateCommand_DefaultsStatusAndLogsActivity(t *testing.T) {
+	repo := newFakeAuthRepo()
+	var recorded types.ActivityRecord
+	sink := &recordingActivitySink{
+		onLog: func(r types.ActivityRecord) {
+			recorded = r
+		},
+	}
+
+	cmd := NewUserCreateCommand(UserCreateCommandConfig{
+		Repository: repo,
+		Activity:   sink,
+	})
+
+	result := &types.AuthUser{}
+	err := cmd.Execute(context.Background(), UserCreateInput{
+		User: &types.AuthUser{
+			Email: "create@example.com",
+			Role:  "member",
+		},
+		Actor: types.ActorRef{
+			ID: uuid.New(),
+		},
+		Result: result,
+	})
+
+	require.NoError(t, err)
+	require.NotEqual(t, uuid.Nil, result.ID)
+	require.Equal(t, types.LifecycleStateActive, result.Status)
+	require.Equal(t, "user.created", recorded.Verb)
+	require.Equal(t, result.ID, recorded.UserID)
+}
+
+func TestUserUpdateCommand_LogsActivity(t *testing.T) {
+	userID := uuid.New()
+	repo := newFakeAuthRepo()
+	repo.users[userID] = &types.AuthUser{
+		ID:    userID,
+		Email: "before@example.com",
+	}
+	var recorded types.ActivityRecord
+	sink := &recordingActivitySink{
+		onLog: func(r types.ActivityRecord) {
+			recorded = r
+		},
+	}
+
+	cmd := NewUserUpdateCommand(UserUpdateCommandConfig{
+		Repository: repo,
+		Activity:   sink,
+	})
+
+	result := &types.AuthUser{}
+	err := cmd.Execute(context.Background(), UserUpdateInput{
+		User: &types.AuthUser{
+			ID:    userID,
+			Email: "after@example.com",
+		},
+		Actor: types.ActorRef{
+			ID: uuid.New(),
+		},
+		Result: result,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "after@example.com", result.Email)
+	require.Equal(t, "user.updated", recorded.Verb)
+	require.Equal(t, userID, recorded.UserID)
 }
 
 func TestActivityLogCommand_LogsRecord(t *testing.T) {
@@ -265,6 +337,8 @@ type fakeAuthRepo struct {
 	lastTransitionMetadata map[string]any
 	lastResetUserID        uuid.UUID
 	lastResetHash          string
+	lastCreated            *types.AuthUser
+	lastUpdated            *types.AuthUser
 }
 
 func newFakeAuthRepo() *fakeAuthRepo {
@@ -289,11 +363,13 @@ func (f *fakeAuthRepo) Create(_ context.Context, input *types.AuthUser) (*types.
 	if input.ID == uuid.Nil {
 		input.ID = uuid.New()
 	}
+	f.lastCreated = input
 	f.users[input.ID] = input
 	return input, nil
 }
 
 func (f *fakeAuthRepo) Update(_ context.Context, input *types.AuthUser) (*types.AuthUser, error) {
+	f.lastUpdated = input
 	f.users[input.ID] = input
 	return input, nil
 }
