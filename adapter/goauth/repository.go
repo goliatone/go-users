@@ -161,7 +161,16 @@ func fromAuthUser(user *types.AuthUser) *auth.User {
 		return nil
 	}
 	if raw, ok := user.Raw.(*auth.User); ok && raw != nil {
-		return raw
+		clone := *raw
+		clone.ID = user.ID
+		clone.Role = auth.UserRole(user.Role)
+		clone.Status = auth.UserStatus(user.Status)
+		clone.Email = user.Email
+		clone.Username = user.Username
+		clone.FirstName = user.FirstName
+		clone.LastName = user.LastName
+		clone.Metadata = copyMetadata(user.Metadata)
+		return &clone
 	}
 	return &auth.User{
 		ID:        user.ID,
