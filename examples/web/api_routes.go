@@ -87,22 +87,18 @@ func RegisterAPIRoutes(app *App) {
 
 	userGuard := mustGuardAdapter(app, scopeGuard, types.PolicyActionUsersRead, types.PolicyActionUsersWrite, "users")
 	userService := crudsvc.NewUserService(crudsvc.UserServiceConfig{
-		Guard:     userGuard,
-		Inventory: queries.UserInventory,
-		AuthRepo:  app.authRepo,
+		Guard:         userGuard,
+		Inventory:     queries.UserInventory,
+		AuthRepo:      app.authRepo,
+		Create:        commands.UserCreate,
+		Update:        commands.UserUpdate,
+		Invite:        commands.UserInvite,
+		Lifecycle:     commands.UserLifecycleTransition,
+		BulkLifecycle: commands.BulkUserTransition,
 	}, crudsvc.WithLogger(&loggerAdapter{app.GetLogger("svc:users")}))
 	userController := crud.NewController(createUserRepository(app),
 		crud.WithService(userService),
-		crud.WithRouteConfig[*auth.User](crud.RouteConfig{
-			Operations: map[crud.CrudOperation]crud.RouteOptions{
-				crud.OpCreate:      {Enabled: crud.BoolPtr(false)},
-				crud.OpUpdate:      {Enabled: crud.BoolPtr(false)},
-				crud.OpDelete:      {Enabled: crud.BoolPtr(false)},
-				crud.OpCreateBatch: {Enabled: crud.BoolPtr(false)},
-				crud.OpUpdateBatch: {Enabled: crud.BoolPtr(false)},
-				crud.OpDeleteBatch: {Enabled: crud.BoolPtr(false)},
-			},
-		}),
+		crud.WithActions(crudsvc.UserInviteAction(userService)),
 	)
 	userController.RegisterRoutes(apiAdapter)
 	app.registerSchemaProvider(userController)
