@@ -31,7 +31,7 @@ This guide covers managing user profiles and scoped preferences in `go-users`. L
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                        User Data                              │
+│                        User Data                             │
 ├──────────────────┬──────────────────┬────────────────────────┤
 │   Core User      │     Profile      │     Preferences        │
 │   (go-auth)      │   (go-users)     │     (go-users)         │
@@ -40,7 +40,7 @@ This guide covers managing user profiles and scoped preferences in `go-users`. L
 │ - Email          │ - AvatarURL      │ - Notification prefs   │
 │ - Password hash  │ - Locale         │ - Feature flags        │
 │ - Status         │ - Timezone       │ - UI customization     │
-│ - Roles          │ - Bio            │ - Application config   │
+│ - Role           │ - Bio            │ - Application config   │
 │                  │ - Contact info   │                        │
 │                  │ - Metadata       │                        │
 └──────────────────┴──────────────────┴────────────────────────┘
@@ -103,7 +103,7 @@ Understanding when to use profiles vs core user fields:
 |----------|---------------|-----|
 | Email address | Core user (go-auth) | Required for authentication |
 | Password | Core user (go-auth) | Security-critical |
-| Roles | Core user (go-auth) | Authorization decisions |
+| Role | Core user (go-auth) | Authorization decisions |
 | Account status | Core user (go-auth) | Lifecycle management |
 | Display name | Profile | User-editable, non-critical |
 | Avatar | Profile | User-editable, display only |
@@ -147,8 +147,8 @@ func updateUserProfile(ctx context.Context, svc *service.Service) error {
             TenantID: uuid.MustParse("tenant-uuid"),
         },
         Actor: types.ActorRef{
-            ID:    actorID,
-            Roles: []string{"user"},
+            ID:   actorID,
+            Type: "user",
         },
         Result: &result, // Populated with the updated profile
     })
@@ -198,8 +198,8 @@ func getProfile(ctx context.Context, svc *service.Service, userID uuid.UUID) (*t
             TenantID: uuid.MustParse("tenant-uuid"),
         },
         Actor: types.ActorRef{
-            ID:    uuid.MustParse("actor-uuid"),
-            Roles: []string{"admin"},
+            ID:   uuid.MustParse("actor-uuid"),
+            Type: types.ActorRoleSystemAdmin,
         },
     })
 }
@@ -228,16 +228,16 @@ const (
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Preference Resolution                     │
+│                    Preference Resolution                    │
 ├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│   ┌──────────┐   ┌──────────┐   ┌─────┐   ┌──────┐         │
-│   │  System  │ → │  Tenant  │ → │ Org │ → │ User │         │
-│   │ (base)   │   │ override │   │     │   │(wins)│         │
-│   └──────────┘   └──────────┘   └─────┘   └──────┘         │
-│                                                              │
+│                                                             │
+│   ┌──────────┐   ┌──────────┐   ┌─────┐   ┌──────┐          │
+│   │  System  │ → │  Tenant  │ → │ Org │ → │ User │          │
+│   │ (base)   │   │ override │   │     │   │(wins)│          │
+│   └──────────┘   └──────────┘   └─────┘   └──────┘          │
+│                                                             │
 │   Priority:  1         2          3         4               │
-│                                                              │
+│                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -280,7 +280,7 @@ func setUserTheme(ctx context.Context, svc *service.Service, userID uuid.UUID, t
         },
         Actor: types.ActorRef{
             ID:    userID,  // User setting their own preference
-            Roles: []string{"user"},
+            Type:  "user",
         },
         Result: &result,
     })
@@ -307,7 +307,7 @@ func setTenantDefaults(ctx context.Context, svc *service.Service, tenantID, admi
         },
         Actor: types.ActorRef{
             ID:    adminID,
-            Roles: []string{"tenant_admin"},
+            Type:  types.ActorRoleTenantAdmin,
         },
     })
 }
@@ -328,7 +328,7 @@ func resetUserTheme(ctx context.Context, svc *service.Service, userID uuid.UUID)
         },
         Actor: types.ActorRef{
             ID:    userID,
-            Roles: []string{"user"},
+            Type:  "user",
         },
     })
     // After deletion, "theme" falls back to org/tenant/system default
@@ -351,7 +351,7 @@ func getUserSettings(ctx context.Context, svc *service.Service, userID uuid.UUID
         },
         Actor: types.ActorRef{
             ID:    userID,
-            Roles: []string{"user"},
+            Type:  "user",
         },
     })
     if err != nil {
@@ -413,7 +413,7 @@ snapshot, err := svc.Queries().Preferences.Query(ctx, query.PreferenceQueryInput
     Scope: types.ScopeFilter{...},
     Actor: actor,
 })
-// Base values are overridden by system, then tenant, org, user
+// Base values are merged into the system layer, then system/tenant/org/user override them
 ```
 
 ### Preference Traces
@@ -468,6 +468,24 @@ for _, trace := range snapshot.Traces {
 
 ---
 
+### Caching (placeholder)
+
+Preferences are read frequently in UI flows. We plan to support opt-in caching
+by wrapping the preference repository with `go-repository-cache` (and exposing
+constructor options once implemented). Cached repositories invalidate read
+caches on writes using method-prefix eviction (repository-wide), which is safe
+but coarse.
+
+Example wiring:
+
+```go
+repo, err := preferences.NewRepository(preferences.RepositoryConfig{
+    DB: bunDB,
+}, preferences.WithCache(true))
+```
+
+---
+
 ## The Preference Resolver
 
 The preference resolver handles the complexity of merging multiple scope layers. It's automatically created when you provide a `PreferenceRepository`:
@@ -500,7 +518,7 @@ The resolver uses `go-options` internally for layer merging with proper priority
 
 ## Version Tracking
 
-Preference records include version numbers for optimistic concurrency control:
+Preference records include version numbers that increment on each upsert (the repository does this automatically). go-users does not enforce optimistic concurrency checks, so applications that need it should compare versions before writing.
 
 ```go
 type PreferenceRecord struct {
@@ -521,7 +539,7 @@ type PreferenceRecord struct {
 Use versions to detect concurrent modifications in your UI:
 
 ```go
-// Fetch current preference
+// Fetch current preference (use PreferenceRepository.ListPreferences or your own API)
 current, _ := getPreference(ctx, userID, "theme")
 displayVersion := current.Version
 
@@ -815,7 +833,7 @@ func setOrgFeatureFlags(ctx context.Context, svc *service.Service, tenantID, org
         },
         Actor: types.ActorRef{
             ID:    adminID,
-            Roles: []string{"org_admin"},
+            Type:  types.ActorRoleOrgAdmin,
         },
     })
 }
