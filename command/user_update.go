@@ -39,6 +39,7 @@ func (input UserUpdateInput) Validate() error {
 // UserUpdateCommand updates existing users while enforcing scopes.
 type UserUpdateCommand struct {
 	repo   types.AuthRepository
+	policy types.TransitionPolicy
 	clock  types.Clock
 	sink   types.ActivitySink
 	hooks  types.Hooks
@@ -49,6 +50,7 @@ type UserUpdateCommand struct {
 // UserUpdateCommandConfig wires dependencies for the update command.
 type UserUpdateCommandConfig struct {
 	Repository types.AuthRepository
+	Policy     types.TransitionPolicy
 	Clock      types.Clock
 	Activity   types.ActivitySink
 	Hooks      types.Hooks
@@ -58,8 +60,13 @@ type UserUpdateCommandConfig struct {
 
 // NewUserUpdateCommand constructs the update handler.
 func NewUserUpdateCommand(cfg UserUpdateCommandConfig) *UserUpdateCommand {
+	policy := cfg.Policy
+	if policy == nil {
+		policy = types.DefaultTransitionPolicy()
+	}
 	return &UserUpdateCommand{
 		repo:   cfg.Repository,
+		policy: policy,
 		clock:  safeClock(cfg.Clock),
 		sink:   safeActivitySink(cfg.Activity),
 		hooks:  safeHooks(cfg.Hooks),
@@ -72,7 +79,7 @@ var _ gocommand.Commander[UserUpdateInput] = (*UserUpdateCommand)(nil)
 
 // Execute updates the user record and logs audit metadata.
 func (c *UserUpdateCommand) Execute(ctx context.Context, input UserUpdateInput) error {
-	if c.repo == nil {
+	if c == nil || c.repo == nil {
 		return types.ErrMissingAuthRepository
 	}
 	if err := input.Validate(); err != nil {
@@ -85,6 +92,17 @@ func (c *UserUpdateCommand) Execute(ctx context.Context, input UserUpdateInput) 
 	}
 
 	user := normalizeAuthUser(input.User)
+	if user != nil && user.Status != "" {
+		current, err := c.repo.GetByID(ctx, user.ID)
+		if err != nil {
+			return err
+		}
+		if current != nil && current.Status != user.Status && c.policy != nil {
+			if err := c.policy.Validate(current.Status, user.Status); err != nil {
+				return err
+			}
+		}
+	}
 	updated, err := c.repo.Update(ctx, user)
 	if err != nil {
 		return err
