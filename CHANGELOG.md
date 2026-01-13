@@ -1,5 +1,27 @@
 # Changelog
 
+# [0.8.0](https://github.com/goliatone/go-users/compare/v0.7.0...v0.8.0) - (2026-01-13)
+
+## <!-- 1 -->🐛 Bug Fixes
+
+- Return page total for redorcs ([96ffd03](https://github.com/goliatone/go-users/commit/96ffd0337567bd357bf17a1c5e1bd8df29a8146b))  - (goliatone)
+- Enforce lifecycle transitions during updates ([e168711](https://github.com/goliatone/go-users/commit/e168711faea2ab71493005cd21fdafd3361b60c7))  - (goliatone)
+- Guard nil dependency ([27a3ea1](https://github.com/goliatone/go-users/commit/27a3ea10fa8856095fd71921b9b016ac889fe095))  - (goliatone)
+- Make activity filters trea user/actor as OR ([faae728](https://github.com/goliatone/go-users/commit/faae728efc17052118684cf21a3f1180daee285e))  - (goliatone)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.8.0 ([c2a200b](https://github.com/goliatone/go-users/commit/c2a200b78ddc356d7a557d003b41bb2af36b0ff0))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.7.0 ([8da3657](https://github.com/goliatone/go-users/commit/8da3657d4379053d6cde246780b3afce7853f4e4))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update examples ([f91c9ae](https://github.com/goliatone/go-users/commit/f91c9ae0e9c1327cb4c6923411b211f5cf294690))  - (goliatone)
+- Update tests ([85ebda4](https://github.com/goliatone/go-users/commit/85ebda4db1455551b5d206756bc6888171589005))  - (goliatone)
+
 # [0.7.0](https://github.com/goliatone/go-users/compare/v0.6.0...v0.7.0) - (2026-01-13)
 
 ## <!-- 13 -->📦 Bumps
