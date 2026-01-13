@@ -1,5 +1,25 @@
 # Changelog
 
+# [0.9.0](https://github.com/goliatone/go-users/compare/v0.8.0...v0.9.0) - (2026-01-13)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.9.0 ([5adde72](https://github.com/goliatone/go-users/commit/5adde720af822a3a44650ac005015aaab683c07a))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- Cache service option ([f7485d9](https://github.com/goliatone/go-users/commit/f7485d947f31b5460129d88e1a2f7e63c5a01a45))  - (goliatone)
+- Use cache invalidation using tags ([767d28f](https://github.com/goliatone/go-users/commit/767d28f0440cd3aa67138782b793bf9d219d44ff))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.8.0 ([2969be0](https://github.com/goliatone/go-users/commit/2969be021fb4299e2d6587a10e61a402fadbfe49))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update deps ([a0b579c](https://github.com/goliatone/go-users/commit/a0b579c0eec69e9cf746f6249bb6ce4df5edf657))  - (goliatone)
+- Update docs ([ce178b0](https://github.com/goliatone/go-users/commit/ce178b0e761160c1ef6ab7209ae3ade315b7be6f))  - (goliatone)
+
 # [0.8.0](https://github.com/goliatone/go-users/compare/v0.7.0...v0.8.0) - (2026-01-13)
 
 ## <!-- 1 -->🐛 Bug Fixes
