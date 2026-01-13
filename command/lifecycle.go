@@ -88,6 +88,9 @@ var _ gocommand.Commander[UserLifecycleTransitionInput] = (*UserLifecycleTransit
 
 // Execute performs the lifecycle transition against the upstream repository.
 func (c *UserLifecycleTransitionCommand) Execute(ctx context.Context, input UserLifecycleTransitionInput) error {
+	if c == nil || c.repo == nil {
+		return types.ErrMissingAuthRepository
+	}
 	if err := input.Validate(); err != nil {
 		return err
 	}
