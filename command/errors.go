@@ -23,6 +23,8 @@ var (
 	ErrPasswordHashRequired = errors.New("go-users: password reset requires password hash")
 	// ErrUserIDsRequired occurs when bulk handlers are invoked without targets.
 	ErrUserIDsRequired = errors.New("go-users: user ids required")
+	// ErrUsersRequired occurs when bulk user import lacks users.
+	ErrUsersRequired = errors.New("go-users: users required")
 	// ErrRoleNameRequired occurs when a role command omits the role name.
 	ErrRoleNameRequired = errors.New("go-users: role name required")
 	// ErrRoleIDRequired signals the role ID was missing.
