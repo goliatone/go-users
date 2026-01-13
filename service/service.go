@@ -29,6 +29,7 @@ type Service struct {
 type Commands struct {
 	UserLifecycleTransition *command.UserLifecycleTransitionCommand
 	BulkUserTransition      *command.BulkUserTransitionCommand
+	BulkUserImport          *command.BulkUserImportCommand
 	UserCreate              *command.UserCreateCommand
 	UserUpdate              *command.UserUpdateCommand
 	UserInvite              *command.UserInviteCommand
@@ -225,17 +226,19 @@ func (s *Service) buildCommands() Commands {
 		Activity:   s.cfg.ActivitySink,
 		ScopeGuard: s.scopeGuard,
 	})
+	userCreate := command.NewUserCreateCommand(command.UserCreateCommandConfig{
+		Repository: s.cfg.AuthRepository,
+		Clock:      s.cfg.Clock,
+		Activity:   s.cfg.ActivitySink,
+		Hooks:      s.cfg.Hooks,
+		Logger:     s.cfg.Logger,
+		ScopeGuard: s.scopeGuard,
+	})
 	return Commands{
 		UserLifecycleTransition: lifecycle,
 		BulkUserTransition:      command.NewBulkUserTransitionCommand(lifecycle),
-		UserCreate: command.NewUserCreateCommand(command.UserCreateCommandConfig{
-			Repository: s.cfg.AuthRepository,
-			Clock:      s.cfg.Clock,
-			Activity:   s.cfg.ActivitySink,
-			Hooks:      s.cfg.Hooks,
-			Logger:     s.cfg.Logger,
-			ScopeGuard: s.scopeGuard,
-		}),
+		BulkUserImport:          command.NewBulkUserImportCommand(userCreate),
+		UserCreate:              userCreate,
 		UserUpdate: command.NewUserUpdateCommand(command.UserUpdateCommandConfig{
 			Repository: s.cfg.AuthRepository,
 			Clock:      s.cfg.Clock,
