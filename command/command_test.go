@@ -229,6 +229,35 @@ func TestUserUpdateCommand_LogsActivity(t *testing.T) {
 	require.Equal(t, userID, recorded.UserID)
 }
 
+func TestUserUpdateCommand_EnforcesLifecyclePolicy(t *testing.T) {
+	userID := uuid.New()
+	repo := newFakeAuthRepo()
+	repo.users[userID] = &types.AuthUser{
+		ID:     userID,
+		Email:  "pending@example.com",
+		Status: types.LifecycleStatePending,
+	}
+
+	cmd := NewUserUpdateCommand(UserUpdateCommandConfig{
+		Repository: repo,
+		Policy:     types.DefaultTransitionPolicy(),
+	})
+
+	err := cmd.Execute(context.Background(), UserUpdateInput{
+		User: &types.AuthUser{
+			ID:     userID,
+			Email:  "pending@example.com",
+			Status: types.LifecycleStateArchived,
+		},
+		Actor: types.ActorRef{
+			ID: uuid.New(),
+		},
+	})
+
+	require.ErrorIs(t, err, types.ErrTransitionNotAllowed)
+	require.Nil(t, repo.lastUpdated)
+}
+
 func TestActivityLogCommand_LogsRecord(t *testing.T) {
 	sink := &recordingActivitySink{}
 	cmd := NewActivityLogCommand(ActivityLogConfig{
