@@ -93,8 +93,8 @@ github.com/goliatone/go-print v0.4.1 h1:rRcmZOWd27gq25Ays0nRu09tAH6wgTdfshE4rPpN
 github.com/goliatone/go-print v0.4.1/go.mod h1:hx13/Im2TeOYwwBwj/ImfjneDQ0MyN0ybfrgHripAus=
 github.com/goliatone/go-repository-bun v0.11.0 h1:kE7wnjNLYyi/3GccvVopsEuMzuTapPS9RG1Nl+sp9m4=
 github.com/goliatone/go-repository-bun v0.11.0/go.mod h1:ZG2ZKOpbHhgi81rUtVgdtNCCApu49ihPhHpce4qjaOI=
-github.com/goliatone/go-repository-cache v0.5.0 h1:NIYtv7G9z+CJC0ryoLpKf0TZOnGppJTidnGx+Uh5zSY=
-github.com/goliatone/go-repository-cache v0.5.0/go.mod h1:SaGDxDSI2ZOmQWUo5VMHlkqroU4BkDopMDVs4nUJy7U=
+github.com/goliatone/go-repository-cache v0.6.0 h1:FipPsUZwlYsP+jzEI4POdy6Z7oCxYZ3D57aVvKGYW4k=
+github.com/goliatone/go-repository-cache v0.6.0/go.mod h1:SaGDxDSI2ZOmQWUo5VMHlkqroU4BkDopMDVs4nUJy7U=
 github.com/goliatone/go-router v0.41.0 h1:m7qH0TUj+0msW+sCe4GwbcDsD4pfs9tsne0Zjasr9r0=
 github.com/goliatone/go-router v0.41.0/go.mod h1:85wCKmRHdnZSChgDl1QCRP385mh9CoSCrks7AQe7EPQ=
 github.com/goliatone/hashid v0.1.1 h1:VfZZf7s0uM+JZ3ZBkqaEM1mL/CJfiTmFOzZ1QuXY3EM=
