@@ -90,15 +90,25 @@ func wrapCachedRepository(repo repository.Repository[*Record], options Repositor
 	if isCachedRepository(repo) {
 		return repo, nil
 	}
-	cacheConfig := cache.DefaultConfig()
-	if options.CacheConfig != nil {
-		cacheConfig = *options.CacheConfig
+	cacheService := options.CacheService
+	if cacheService == nil {
+		cacheConfig := cache.DefaultConfig()
+		if options.CacheConfig != nil {
+			cacheConfig = *options.CacheConfig
+		}
+		var err error
+		cacheService, err = cache.NewCacheService(cacheConfig)
+		if err != nil {
+			return nil, err
+		}
 	}
-	cacheService, err := cache.NewCacheService(cacheConfig)
-	if err != nil {
-		return nil, err
+	keySerializer := options.CacheKeySerializer
+	if keySerializer == nil {
+		keySerializer = cache.NewDefaultKeySerializer()
 	}
-	keySerializer := cache.NewDefaultKeySerializer()
+	if len(options.CacheIdentifierFields) > 0 {
+		return repositorycache.NewWithIdentifierFields(repo, cacheService, keySerializer, options.CacheIdentifierFields...), nil
+	}
 	return repositorycache.New(repo, cacheService, keySerializer), nil
 }
 
@@ -148,6 +158,9 @@ func (r *Repository) UpsertPreference(ctx context.Context, record types.Preferen
 	if err != nil {
 		return nil, err
 	}
+	keys := normalizePreferenceKeys([]string{record.Key})
+	readCtx := withPreferenceScopeData(ctx, level, ids, keys)
+	writeCtx := withPreferenceScopeData(ctx, level, ids, nil)
 	now := r.clock.Now()
 	payload := fromDomain(record)
 	payload.ScopeLevel = string(level)
@@ -156,7 +169,7 @@ func (r *Repository) UpsertPreference(ctx context.Context, record types.Preferen
 	payload.OrgID = ids.org
 	payload.Value = cloneMap(payload.Value)
 
-	existing, err := r.findExisting(ctx, level, ids, record.Key)
+	existing, err := r.findExisting(readCtx, level, ids, record.Key)
 	switch {
 	case err == nil && existing != nil:
 		payload.ID = existing.ID
@@ -164,7 +177,7 @@ func (r *Repository) UpsertPreference(ctx context.Context, record types.Preferen
 		payload.CreatedBy = existing.CreatedBy
 		payload.Version = existing.Version + 1
 		payload.UpdatedAt = now
-		updated, err := r.Update(ctx, payload)
+		updated, err := r.Update(writeCtx, payload)
 		if err != nil {
 			return nil, err
 		}
@@ -177,7 +190,7 @@ func (r *Repository) UpsertPreference(ctx context.Context, record types.Preferen
 		if payload.CreatedBy == uuid.Nil {
 			payload.CreatedBy = payload.UpdatedBy
 		}
-		created, err := r.Create(ctx, payload)
+		created, err := r.Create(writeCtx, payload)
 		if err != nil {
 			return nil, err
 		}
@@ -194,11 +207,14 @@ func (r *Repository) DeletePreference(ctx context.Context, userID uuid.UUID, sco
 	if err != nil {
 		return err
 	}
-	existing, err := r.findExisting(ctx, level, ids, key)
+	keys := normalizePreferenceKeys([]string{key})
+	readCtx := withPreferenceScopeData(ctx, level, ids, keys)
+	writeCtx := withPreferenceScopeData(ctx, level, ids, nil)
+	existing, err := r.findExisting(readCtx, level, ids, key)
 	if err != nil {
 		return err
 	}
-	return r.Delete(ctx, existing)
+	return r.Delete(writeCtx, existing)
 }
 
 func (r *Repository) findExisting(ctx context.Context, level types.PreferenceLevel, ids scopeValues, key string) (*Record, error) {
