@@ -241,6 +241,7 @@ func (s *Service) buildCommands() Commands {
 		UserCreate:              userCreate,
 		UserUpdate: command.NewUserUpdateCommand(command.UserUpdateCommandConfig{
 			Repository: s.cfg.AuthRepository,
+			Policy:     s.cfg.TransitionPolicy,
 			Clock:      s.cfg.Clock,
 			Activity:   s.cfg.ActivitySink,
 			Hooks:      s.cfg.Hooks,
