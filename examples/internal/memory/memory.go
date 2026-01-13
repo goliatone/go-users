@@ -399,6 +399,15 @@ func (s *ActivityStore) ListActivity(_ context.Context, filter types.ActivityFil
 		if filter.Scope.TenantID != zeroUUID && record.TenantID != filter.Scope.TenantID {
 			continue
 		}
+		if filter.UserID != zeroUUID && filter.ActorID != zeroUUID {
+			if record.UserID != filter.UserID && record.ActorID != filter.ActorID {
+				continue
+			}
+		} else if filter.UserID != zeroUUID && record.UserID != filter.UserID {
+			continue
+		} else if filter.ActorID != zeroUUID && record.ActorID != filter.ActorID {
+			continue
+		}
 		if len(filter.Verbs) > 0 && !containsVerb(filter.Verbs, record.Verb) {
 			continue
 		}
