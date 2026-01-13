@@ -146,7 +146,7 @@ func (s *ActivityService) Index(ctx crud.Context, _ []repository.SelectCriteria)
 	for _, record := range filtered {
 		records = append(records, applyActivityFieldPolicy(activity.FromActivityRecord(record), res.Actor))
 	}
-	return records, len(filtered), nil
+	return records, page.Total, nil
 }
 
 func (s *ActivityService) Show(crud.Context, string, []repository.SelectCriteria) (*activity.LogEntry, error) {
