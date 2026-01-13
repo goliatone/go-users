@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	repository "github.com/goliatone/go-repository-bun"
+	"github.com/goliatone/go-repository-cache/cache"
+	"github.com/goliatone/go-repository-cache/repositorycache"
 	"github.com/goliatone/go-users/pkg/types"
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
@@ -31,10 +33,11 @@ type Repository struct {
 }
 
 // NewRepository constructs the default preference repository.
-func NewRepository(cfg RepositoryConfig) (*Repository, error) {
+func NewRepository(cfg RepositoryConfig, opts ...RepositoryOption) (*Repository, error) {
 	if cfg.Repository == nil && cfg.DB == nil {
 		return nil, errors.New("preferences: db or repository required")
 	}
+	options := applyRepositoryOptions(opts)
 	repo := cfg.Repository
 	if repo == nil {
 		repo = repository.NewRepository(cfg.DB, repository.ModelHandlers[*Record]{
@@ -51,6 +54,13 @@ func NewRepository(cfg RepositoryConfig) (*Repository, error) {
 				}
 			},
 		})
+	}
+	if options.CacheEnabled {
+		cached, err := wrapCachedRepository(repo, options)
+		if err != nil {
+			return nil, err
+		}
+		repo = cached
 	}
 	clock := cfg.Clock
 	if clock == nil {
@@ -73,6 +83,30 @@ var (
 	_ types.PreferenceRepository     = (*Repository)(nil)
 )
 
+func wrapCachedRepository(repo repository.Repository[*Record], options RepositoryOptions) (repository.Repository[*Record], error) {
+	if repo == nil {
+		return nil, nil
+	}
+	if isCachedRepository(repo) {
+		return repo, nil
+	}
+	cacheConfig := cache.DefaultConfig()
+	if options.CacheConfig != nil {
+		cacheConfig = *options.CacheConfig
+	}
+	cacheService, err := cache.NewCacheService(cacheConfig)
+	if err != nil {
+		return nil, err
+	}
+	keySerializer := cache.NewDefaultKeySerializer()
+	return repositorycache.New(repo, cacheService, keySerializer), nil
+}
+
+func isCachedRepository(repo repository.Repository[*Record]) bool {
+	_, ok := repo.(*repositorycache.CachedRepository[*Record])
+	return ok
+}
+
 // ListPreferences fetches preference records for the requested scope level.
 func (r *Repository) ListPreferences(ctx context.Context, filter types.PreferenceFilter) ([]types.PreferenceRecord, error) {
 	level := coalesceLevel(filter.Level)
@@ -80,6 +114,8 @@ func (r *Repository) ListPreferences(ctx context.Context, filter types.Preferenc
 	if err != nil {
 		return nil, err
 	}
+	keys := normalizePreferenceKeys(filter.Keys)
+	ctx = withPreferenceScopeData(ctx, level, ids, keys)
 	criteria := []repository.SelectCriteria{
 		func(q *bun.SelectQuery) *bun.SelectQuery {
 			q = q.Where("scope_level = ?", string(level)).
@@ -87,11 +123,7 @@ func (r *Repository) ListPreferences(ctx context.Context, filter types.Preferenc
 				Where("tenant_id = ?", ids.tenant).
 				Where("org_id = ?", ids.org).
 				OrderExpr("key ASC")
-			if len(filter.Keys) > 0 {
-				keys := make([]string, len(filter.Keys))
-				for i, key := range filter.Keys {
-					keys[i] = strings.ToLower(strings.TrimSpace(key))
-				}
+			if len(keys) > 0 {
 				q = q.Where("lower(key) IN (?)", bun.In(keys))
 			}
 			return q
@@ -174,6 +206,7 @@ func (r *Repository) findExisting(ctx context.Context, level types.PreferenceLev
 	if lowerKey == "" {
 		return nil, errors.New("preferences: key required")
 	}
+	ctx = withPreferenceScopeData(ctx, level, ids, []string{lowerKey})
 	criteria := []repository.SelectCriteria{
 		func(q *bun.SelectQuery) *bun.SelectQuery {
 			return q.
@@ -239,6 +272,35 @@ func coalesceLevel(level types.PreferenceLevel) types.PreferenceLevel {
 		return types.PreferenceLevelUser
 	}
 	return level
+}
+
+func normalizePreferenceKeys(keys []string) []string {
+	if len(keys) == 0 {
+		return nil
+	}
+	normalized := make([]string, 0, len(keys))
+	for _, key := range keys {
+		key = strings.ToLower(strings.TrimSpace(key))
+		if key == "" {
+			continue
+		}
+		normalized = append(normalized, key)
+	}
+	if len(normalized) == 0 {
+		return nil
+	}
+	return normalized
+}
+
+func withPreferenceScopeData(ctx context.Context, level types.PreferenceLevel, ids scopeValues, keys []string) context.Context {
+	ctx = repository.WithScopeData(ctx, "preferences.level", string(level))
+	ctx = repository.WithScopeData(ctx, "preferences.user_id", ids.user)
+	ctx = repository.WithScopeData(ctx, "preferences.tenant_id", ids.tenant)
+	ctx = repository.WithScopeData(ctx, "preferences.org_id", ids.org)
+	if len(keys) > 0 {
+		ctx = repository.WithScopeData(ctx, "preferences.keys", keys)
+	}
+	return ctx
 }
 
 func fromDomain(record types.PreferenceRecord) *Record {
