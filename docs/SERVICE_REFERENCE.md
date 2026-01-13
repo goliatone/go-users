@@ -20,7 +20,7 @@ go-users internals.
 store, _ := activity.NewRepository(activity.RepositoryConfig{DB: bunDB})
 registry := registry.NewRoleRegistry(registry.RoleRegistryConfig{DB: bunDB})
 profileRepo := profile.NewRepository(bunDB)
-preferenceRepo := preferences.NewRepository(bunDB)
+preferenceRepo, _ := preferences.NewRepository(preferences.RepositoryConfig{DB: bunDB})
 
 svc := users.New(users.Config{
     AuthRepository:       goauth.NewUsersAdapter(authRepo),
@@ -182,7 +182,7 @@ the latest schema snapshot on login).
 | `ActivitySink` | ✅ | `activity.Repository` or custom sink | Logs all verbs; if it also satisfies `ActivityRepository` the service will reuse it |
 | `ActivityRepository` | ✅ | Same as sink or read replica | Powers feed/stats queries |
 | `ProfileRepository` | ✅ | `profile.Repository` | Required for profile command/query |
-| `PreferenceRepository` | ✅ | `preferences.Repository` | Enables preference commands; also used by the resolver |
+| `PreferenceRepository` | ✅ | `preferences.Repository` | Enables preference commands; also used by the resolver (can be cache-wrapped via `WithCache`) |
 | `PreferenceResolver` | ⛔ (auto) | `preferences.NewResolver` | Provide your own to integrate remote config layers |
 | `Hooks` | ⛔ | Struct of callbacks | Use to fan-out events to WebSockets, queues, etc. |
 | `Clock`, `IDGenerator`, `Logger` | ⛔ | Defaults provided | Override for deterministic tests or structured logging |

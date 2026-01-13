@@ -1,5 +1,11 @@
 # Changelog
 
+# [Unreleased]
+
+## <!-- 16 -->➕ Add
+
+- Optional preference repository cache support via `go-repository-cache`
+
 # [0.6.0](https://github.com/goliatone/go-users/compare/v0.5.0...v0.6.0) - (2026-01-12)
 
 ## <!-- 1 -->🐛 Bug Fixes
@@ -155,5 +161,4 @@
 - Update migrations ([6273dec](https://github.com/goliatone/go-users/commit/6273dec0eab9694f41b2fee8556ae7f0f0cd2739))  - (goliatone)
 - Add base tasks ([e0df1a4](https://github.com/goliatone/go-users/commit/e0df1a4300d4514583c208add5f5c4db0a3a8312))  - (goliatone)
 - Initial commit ([3fe70f1](https://github.com/goliatone/go-users/commit/3fe70f190ecbef534a75fb9135dada86ba5d473b))  - (goliatone)
-
 
