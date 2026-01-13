@@ -468,20 +468,66 @@ for _, trace := range snapshot.Traces {
 
 ---
 
-### Caching (placeholder)
+### Caching
 
-Preferences are read frequently in UI flows. We plan to support opt-in caching
-by wrapping the preference repository with `go-repository-cache` (and exposing
-constructor options once implemented). Cached repositories invalidate read
-caches on writes using method-prefix eviction (repository-wide), which is safe
-but coarse.
+Preferences are read frequently in UI flows. The repository can be wrapped with
+`go-repository-cache` by enabling caching at construction time. Reads are cached
+and writes invalidate cached reads using tag-based eviction (list/scope/id/identifier)
+when the default cache service is used; if tag support is unavailable, the
+decorator falls back to method-prefix eviction (repository-wide).
 
-Example wiring:
+Basic wiring:
 
 ```go
 repo, err := preferences.NewRepository(preferences.RepositoryConfig{
     DB: bunDB,
 }, preferences.WithCache(true))
+```
+
+Custom cache configuration:
+
+```go
+repo, err := preferences.NewRepository(preferences.RepositoryConfig{
+    DB: bunDB,
+}, preferences.WithCache(true),
+    preferences.WithCacheConfig(cache.Config{
+        TTL:                time.Minute,
+        Capacity:           10_000,
+        MissingRecordStorage: true,
+    }),
+)
+```
+
+Advanced customization (shared cache service or custom key serialization):
+
+```go
+cacheService, _ := cache.NewCacheService(cache.DefaultConfig())
+serializer := cache.NewDefaultKeySerializer()
+
+repo, err := preferences.NewRepository(preferences.RepositoryConfig{
+    DB: bunDB,
+}, preferences.WithCache(true),
+    preferences.WithCacheService(cacheService),
+    preferences.WithCacheKeySerializer(serializer),
+)
+```
+
+If your repository uses `GetByIdentifier` with custom unique fields, pass them
+so tag invalidation can target those identifiers:
+
+```go
+repo, err := preferences.NewRepository(preferences.RepositoryConfig{
+    DB: bunDB,
+}, preferences.WithCache(true),
+    preferences.WithCacheIdentifierFields("ExternalID", "Slug"),
+)
+```
+
+Custom tags can be attached to read paths to group invalidation:
+
+```go
+ctx := repositorycache.WithCacheTags(ctx, "preferences:tenant:"+tenantID.String())
+prefs, err := repo.ListPreferences(ctx, types.PreferenceFilter{ /* ... */ })
 ```
 
 ---
