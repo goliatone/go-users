@@ -87,13 +87,7 @@ func (c *UserCreateCommand) Execute(ctx context.Context, input UserCreateInput) 
 	}
 
 	user := normalizeAuthUser(input.User)
-	status := input.Status
-	if status == "" && user != nil {
-		status = user.Status
-	}
-	if status == "" {
-		status = types.LifecycleStateActive
-	}
+	status := resolveAuthUserStatus(user, input.Status)
 	if user != nil {
 		user.Status = status
 	}
@@ -103,22 +97,7 @@ func (c *UserCreateCommand) Execute(ctx context.Context, input UserCreateInput) 
 		return err
 	}
 
-	record := types.ActivityRecord{
-		UserID:     created.ID,
-		ActorID:    input.Actor.ID,
-		Verb:       "user.created",
-		ObjectType: "user",
-		ObjectID:   created.ID.String(),
-		Channel:    "users",
-		TenantID:   scopeFilter.TenantID,
-		OrgID:      scopeFilter.OrgID,
-		Data: map[string]any{
-			"email":  created.Email,
-			"role":   created.Role,
-			"status": created.Status,
-		},
-		OccurredAt: now(c.clock),
-	}
+	record := buildUserCreatedActivityRecord(created, input.Actor, scopeFilter, c.clock, false)
 	logActivity(ctx, c.sink, record)
 	emitActivityHook(ctx, c.hooks, record)
 
