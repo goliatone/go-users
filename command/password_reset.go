@@ -78,6 +78,9 @@ var _ gocommand.Commander[UserPasswordResetInput] = (*UserPasswordResetCommand)(
 
 // Execute resets the user's password hash and logs audit metadata.
 func (c *UserPasswordResetCommand) Execute(ctx context.Context, input UserPasswordResetInput) error {
+	if c == nil || c.repo == nil {
+		return types.ErrMissingAuthRepository
+	}
 	if err := input.Validate(); err != nil {
 		return err
 	}
