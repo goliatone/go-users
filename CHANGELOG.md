@@ -1,10 +1,31 @@
 # Changelog
 
-# [Unreleased]
+# [0.7.0](https://github.com/goliatone/go-users/compare/v0.6.0...v0.7.0) - (2026-01-13)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.7.0 ([85103ed](https://github.com/goliatone/go-users/commit/85103ed862c97e4fbb0a506f83e38dc2c6aeb0ea))  - (goliatone)
 
 ## <!-- 16 -->➕ Add
 
-- Optional preference repository cache support via `go-repository-cache`
+- New service command ([f03da03](https://github.com/goliatone/go-users/commit/f03da034d6618ae1f5d1ecb6b2f4c83a36ad64f8))  - (goliatone)
+- Resolve auth use status ([3231c77](https://github.com/goliatone/go-users/commit/3231c77fd73c47e0d0f8a1cc4e38bc6c9ff99812))  - (goliatone)
+- Bulk import command ([c31536a](https://github.com/goliatone/go-users/commit/c31536a95d62f72a3e69b7b56714a167af55e719))  - (goliatone)
+- Activity track for create ([6cedc0c](https://github.com/goliatone/go-users/commit/6cedc0c6990d3dcfdc20d539b2dce5890a0c120b))  - (goliatone)
+- Go bulk error ([c66d7a3](https://github.com/goliatone/go-users/commit/c66d7a305373888c0ca630b76fc89b64ad8f8c9f))  - (goliatone)
+- Repository cache support to prefs ([95059fa](https://github.com/goliatone/go-users/commit/95059fa05c911cc9a63b2f41aa2b41a474a37d2f))  - (goliatone)
+- Preferences options repository ([29705a9](https://github.com/goliatone/go-users/commit/29705a9f6771ee3d3c543dffc6f3f7f441082845))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.6.0 ([2b4d973](https://github.com/goliatone/go-users/commit/2b4d973f7a1428c1771cec7fc5010e8bdf17bed5))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update deps ([37cdca2](https://github.com/goliatone/go-users/commit/37cdca25dd8a2c0b4c18576430dd3a43baab3d40))  - (goliatone)
+- Update docs ([4ca853b](https://github.com/goliatone/go-users/commit/4ca853b8d30a34e2758b10e581838f62e70623e6))  - (goliatone)
+- Update guides ([a6e4612](https://github.com/goliatone/go-users/commit/a6e461240a91a925d966101f2d14df16baf3511c))  - (goliatone)
+- Update tests ([775d070](https://github.com/goliatone/go-users/commit/775d070da86e99b51263fec6eaf719f0af77dd4b))  - (goliatone)
 
 # [0.6.0](https://github.com/goliatone/go-users/compare/v0.5.0...v0.6.0) - (2026-01-12)
 
@@ -161,4 +182,5 @@
 - Update migrations ([6273dec](https://github.com/goliatone/go-users/commit/6273dec0eab9694f41b2fee8556ae7f0f0cd2739))  - (goliatone)
 - Add base tasks ([e0df1a4](https://github.com/goliatone/go-users/commit/e0df1a4300d4514583c208add5f5c4db0a3a8312))  - (goliatone)
 - Initial commit ([3fe70f1](https://github.com/goliatone/go-users/commit/3fe70f190ecbef534a75fb9135dada86ba5d473b))  - (goliatone)
+
 
