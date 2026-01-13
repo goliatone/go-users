@@ -157,11 +157,15 @@ func applyActivityFilter(q *bun.SelectQuery, filter types.ActivityFilter) *bun.S
 	if filter.Scope.OrgID != uuid.Nil {
 		q = q.Where("org_id = ?", filter.Scope.OrgID)
 	}
-	if filter.UserID != uuid.Nil {
-		q = q.Where("user_id = ?", filter.UserID)
-	}
-	if filter.ActorID != uuid.Nil {
-		q = q.Where("actor_id = ?", filter.ActorID)
+	if filter.UserID != uuid.Nil && filter.ActorID != uuid.Nil {
+		q = q.Where("(user_id = ? OR actor_id = ?)", filter.UserID, filter.ActorID)
+	} else {
+		if filter.UserID != uuid.Nil {
+			q = q.Where("user_id = ?", filter.UserID)
+		}
+		if filter.ActorID != uuid.Nil {
+			q = q.Where("actor_id = ?", filter.ActorID)
+		}
 	}
 	if len(filter.Verbs) > 0 {
 		q = q.Where("verb IN (?)", bun.In(filter.Verbs))
