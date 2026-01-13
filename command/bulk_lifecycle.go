@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	gocommand "github.com/goliatone/go-command"
+	goerrors "github.com/goliatone/go-errors"
 	"github.com/goliatone/go-users/pkg/types"
 	"github.com/google/uuid"
 )
@@ -64,6 +65,10 @@ var _ gocommand.Commander[BulkUserTransitionInput] = (*BulkUserTransitionCommand
 
 // Execute transitions each user sequentially. Errors are aggregated.
 func (c *BulkUserTransitionCommand) Execute(ctx context.Context, input BulkUserTransitionInput) error {
+	if c == nil || c.lifecycle == nil {
+		return goerrors.New("go-users: bulk user transition requires lifecycle command", goerrors.CategoryInternal).
+			WithCode(goerrors.CodeInternal)
+	}
 	if err := input.Validate(); err != nil {
 		return err
 	}
