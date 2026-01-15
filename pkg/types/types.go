@@ -420,6 +420,9 @@ type ActivityFilter struct {
 	ObjectType string
 	ObjectID   string
 	Channel    string
+	Channels   []string
+	// ChannelDenylist excludes channels after allow filtering is applied.
+	ChannelDenylist []string
 	Since      *time.Time
 	Until      *time.Time
 	Pagination Pagination
