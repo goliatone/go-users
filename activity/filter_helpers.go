@@ -7,6 +7,7 @@ import (
 	"github.com/goliatone/go-auth"
 	"github.com/goliatone/go-users/pkg/authctx"
 	"github.com/goliatone/go-users/pkg/types"
+	"github.com/google/uuid"
 )
 
 // FilterConfig controls how BuildFilterFromActor applies role and channel rules.
@@ -132,12 +133,21 @@ func BuildFilterFromActor(actor *auth.ActorContext, role string, req types.Activ
 	if isSuperadmin && cfg.SuperadminScope {
 		filter.Scope = req.Scope
 	} else {
-		filter.Scope = scope
+		filter.Scope, err = intersectScopeFilters(scope, req.Scope)
+		if err != nil {
+			return types.ActivityFilter{}, err
+		}
 	}
 
 	if !isAdmin {
 		filter.UserID = ref.ID
 		filter.ActorID = ref.ID
+	}
+
+	if !cfg.MachineActivityEnabled && !isSuperadmin {
+		filter.MachineActivityEnabled = boolPtr(false)
+		filter.MachineActorTypes = cloneStrings(cfg.MachineActorTypes)
+		filter.MachineDataKeys = cloneStrings(cfg.MachineDataKeys)
 	}
 
 	filter, err = applyChannelOptions(filter, cfg)
@@ -344,4 +354,45 @@ func cloneStrings(values []string) []string {
 	out := make([]string, len(values))
 	copy(out, values)
 	return out
+}
+
+func boolPtr(value bool) *bool {
+	return &value
+}
+
+func intersectScopeFilters(base, requested types.ScopeFilter) (types.ScopeFilter, error) {
+	out := base.Clone()
+	if requested.TenantID != uuid.Nil {
+		if base.TenantID != uuid.Nil && requested.TenantID != base.TenantID {
+			return types.ScopeFilter{}, errors.New("activity: requested tenant scope not permitted")
+		}
+		out.TenantID = requested.TenantID
+	}
+	if requested.OrgID != uuid.Nil {
+		if base.OrgID != uuid.Nil && requested.OrgID != base.OrgID {
+			return types.ScopeFilter{}, errors.New("activity: requested org scope not permitted")
+		}
+		out.OrgID = requested.OrgID
+	}
+	if len(requested.Labels) > 0 {
+		if out.Labels == nil {
+			out.Labels = make(map[string]uuid.UUID, len(requested.Labels))
+		}
+		for key, value := range requested.Labels {
+			if value == uuid.Nil {
+				continue
+			}
+			normalized := strings.ToLower(strings.TrimSpace(key))
+			if normalized == "" {
+				continue
+			}
+			if base.Labels != nil {
+				if baseValue, ok := base.Labels[normalized]; ok && baseValue != uuid.Nil && baseValue != value {
+					return types.ScopeFilter{}, errors.New("activity: requested label scope not permitted")
+				}
+			}
+			out.Labels[normalized] = value
+		}
+	}
+	return out, nil
 }
