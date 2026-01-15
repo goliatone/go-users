@@ -1,5 +1,42 @@
 # Changelog
 
+# [0.10.0](https://github.com/goliatone/go-users/compare/v0.9.0...v0.10.0) - (2026-01-15)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.10.0 ([12eb79e](https://github.com/goliatone/go-users/commit/12eb79e57fcdc3fec4e8166fb57fabe3e705cdd5))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- New filter fields ([fa8331a](https://github.com/goliatone/go-users/commit/fa8331a684045769de5b7cca9ab3f289e68fcb1c))  - (goliatone)
+- Crud accepts channels and channel deny list ([64cc9a9](https://github.com/goliatone/go-users/commit/64cc9a98bf09e4a4bb0ad7f5340fc305a940e229))  - (goliatone)
+- New masked words ([50ca4ad](https://github.com/goliatone/go-users/commit/50ca4ad2b4fce65b5294e6e0a94ac03538224256))  - (goliatone)
+- Role aware scope intersects with actor scope ([13312ef](https://github.com/goliatone/go-users/commit/13312ef30de1dd7400c0b981770226a3f862c7ec))  - (goliatone)
+- Machine activity exclusion run in sql ([fae4de8](https://github.com/goliatone/go-users/commit/fae4de8e804a627b0dff54d9b1431886f6eaa128))  - (goliatone)
+- New activity access policy ([abf0eaa](https://github.com/goliatone/go-users/commit/abf0eaaf88623be88978ed7633f7dd0a1928a7dd))  - (goliatone)
+- Activity access policy to queries ([2a03182](https://github.com/goliatone/go-users/commit/2a03182a292ede50507af085c4455f84450f0c16))  - (goliatone)
+- Channel deny list and channels allow ([4a97463](https://github.com/goliatone/go-users/commit/4a974630fe860635206a0e02bfbc0fb854ea68cb))  - (goliatone)
+- Policy to activity service ([bd4175e](https://github.com/goliatone/go-users/commit/bd4175e4101701cfc25e01ebaf0df6086eb9512b))  - (goliatone)
+- Activity filtering with deny list ([828e62f](https://github.com/goliatone/go-users/commit/828e62f72e5b29f9a5dbbe166719100886bc6f4b))  - (goliatone)
+- Activity filter helpers ([255d611](https://github.com/goliatone/go-users/commit/255d611acdb63889953cc18c728d5a0f8f1771fe))  - (goliatone)
+- Activity sanitizer ([ffc5a8f](https://github.com/goliatone/go-users/commit/ffc5a8fd48ac5f8f863a9c3975b852f67fe81763))  - (goliatone)
+- Activity cursor pagination ([a2a626c](https://github.com/goliatone/go-users/commit/a2a626c73ee361702a051fdfa8bdf0b311816740))  - (goliatone)
+- Activity access policy ([967a2c7](https://github.com/goliatone/go-users/commit/967a2c7d2672e6d4f03aed4b2e43badbc00e32a7))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.9.0 ([e5d6d9c](https://github.com/goliatone/go-users/commit/e5d6d9c8fed59d044b5c694f04327ab6101c825a))  - (goliatone)
+
+## <!-- 30 -->📝 Other
+
+- PR [#1](https://github.com/goliatone/go-users/pull/1): enforce role aware scope and machine filtering in feeds and stats ([ccd4268](https://github.com/goliatone/go-users/commit/ccd42680f1edb2b53e4e9c272f799ebb7cb22a9e))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update tests ([6bf40c4](https://github.com/goliatone/go-users/commit/6bf40c4021aab97b710d4e3ff457e36c27324df9))  - (goliatone)
+- Update deps ([d99f6c4](https://github.com/goliatone/go-users/commit/d99f6c4d69cb9a99a74c68655572d70d20f1bf36))  - (goliatone)
+- Update docs ([dfb5705](https://github.com/goliatone/go-users/commit/dfb57053a4cfb6a72040c9dc19e5d1c679a932f8))  - (goliatone)
+
 # [0.9.0](https://github.com/goliatone/go-users/compare/v0.8.0...v0.9.0) - (2026-01-13)
 
 ## <!-- 13 -->📦 Bumps
@@ -10,7 +47,6 @@
 
 - Cache service option ([f7485d9](https://github.com/goliatone/go-users/commit/f7485d947f31b5460129d88e1a2f7e63c5a01a45))  - (goliatone)
 - Use cache invalidation using tags ([767d28f](https://github.com/goliatone/go-users/commit/767d28f0440cd3aa67138782b793bf9d219d44ff))  - (goliatone)
-- Role-aware activity policy, sanitization, and cursor pagination helper. - (goliatone)
 
 ## <!-- 3 -->📚 Documentation
 
@@ -225,4 +261,5 @@
 - Update migrations ([6273dec](https://github.com/goliatone/go-users/commit/6273dec0eab9694f41b2fee8556ae7f0f0cd2739))  - (goliatone)
 - Add base tasks ([e0df1a4](https://github.com/goliatone/go-users/commit/e0df1a4300d4514583c208add5f5c4db0a3a8312))  - (goliatone)
 - Initial commit ([3fe70f1](https://github.com/goliatone/go-users/commit/3fe70f190ecbef534a75fb9135dada86ba5d473b))  - (goliatone)
+
 
