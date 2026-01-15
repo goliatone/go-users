@@ -72,6 +72,18 @@ func registerDefaultMaskFields(mask *masker.Masker) {
 	}
 	mask.RegisterMaskField("Secret", "filled4")
 	mask.RegisterMaskField("secret", "filled4")
+	mask.RegisterMaskField("Password", "filled4")
+	mask.RegisterMaskField("password", "filled4")
+	mask.RegisterMaskField("Token", "preserveEnds(4,4)")
+	mask.RegisterMaskField("token", "preserveEnds(4,4)")
+	mask.RegisterMaskField("ApiKey", "filled32")
+	mask.RegisterMaskField("api_key", "filled32")
+	mask.RegisterMaskField("AccessToken", "preserveEnds(4,4)")
+	mask.RegisterMaskField("access_token", "preserveEnds(4,4)")
+	mask.RegisterMaskField("RefreshToken", "preserveEnds(4,4)")
+	mask.RegisterMaskField("refresh_token", "preserveEnds(4,4)")
+	mask.RegisterMaskField("Authorization", "filled32")
+	mask.RegisterMaskField("authorization", "filled32")
 }
 
 func cloneStringMap(src map[string]any) map[string]any {
