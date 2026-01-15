@@ -77,7 +77,45 @@ stats, _ := svc.Queries().ActivityStats.Query(ctx, types.ActivityStatsFilter{
 })
 ```
 
-Filters include optional `ActorID`, `UserID`, `ObjectType`, `ObjectID`, `Verb`, `Channel`, `Since`, and `Until`.
+Filters include optional `ActorID`, `UserID`, `ObjectType`, `ObjectID`, `Verb`, `Channel`,
+`Channels`, `ChannelDenylist`, `Since`, and `Until`.
+
+## Role-aware filtering & sanitization
+
+Use `BuildFilterFromActor` for role-aware filters or attach the default access
+policy to activity queries:
+
+```go
+policy := activity.NewDefaultAccessPolicy(
+    activity.WithPolicyFilterOptions(
+        activity.WithChannelAllowlist("settings", "roles"),
+        activity.WithMachineActivityEnabled(false),
+        activity.WithSuperadminScope(true),
+    ),
+)
+
+feedQuery := query.NewActivityFeedQuery(store, scopeGuard, query.WithActivityAccessPolicy(policy))
+feed, _ := feedQuery.Query(ctx, types.ActivityFilter{
+    Actor:      actorRef,
+    Pagination: types.Pagination{Limit: 25},
+})
+```
+
+Defaults treat `system_admin`/`superadmin` as superadmins and `tenant_admin`/`admin`/`org_admin`
+as admins; you can override with `WithRoleAliases`. Sanitization uses go-masker defaults and
+redacts IPs for non-superadmins by default.
+
+## Optional cursor pagination
+
+For high-volume feeds, the cursor helper can paginate by `created_at` and `id`:
+
+```go
+cursor := &activity.ActivityCursor{
+    OccurredAt: lastRecord.OccurredAt,
+    ID:         lastRecord.ID,
+}
+query := activity.ApplyCursorPagination(db.NewSelect().Model(&rows), cursor, 50)
+```
 
 ## Conventions
 - Verbs/objects: `settings.updated` (`settings`), `export.completed` (`export.job`), `bulk.users.updated` (`bulk.job`), `media.uploaded` (`media.asset`).

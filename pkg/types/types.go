@@ -420,10 +420,19 @@ type ActivityFilter struct {
 	ObjectType string
 	ObjectID   string
 	Channel    string
-	Since      *time.Time
-	Until      *time.Time
-	Pagination Pagination
-	Keyword    string
+	Channels   []string
+	// ChannelDenylist excludes channels after allow filtering is applied.
+	ChannelDenylist []string
+	// MachineActivityEnabled toggles filtering of machine/system activity.
+	MachineActivityEnabled *bool
+	// MachineActorTypes enumerates actor types treated as machine/system.
+	MachineActorTypes []string
+	// MachineDataKeys enumerates data keys used to flag machine/system activity.
+	MachineDataKeys []string
+	Since           *time.Time
+	Until           *time.Time
+	Pagination      Pagination
+	Keyword         string
 }
 
 // Type implements gocommand.Message for query inputs.
@@ -449,11 +458,19 @@ type ActivityPage struct {
 
 // ActivityStatsFilter scopes aggregate activity queries.
 type ActivityStatsFilter struct {
-	Actor ActorRef
-	Scope ScopeFilter
-	Since *time.Time
-	Until *time.Time
-	Verbs []string
+	Actor   ActorRef
+	Scope   ScopeFilter
+	UserID  uuid.UUID
+	ActorID uuid.UUID
+	Since   *time.Time
+	Until   *time.Time
+	Verbs   []string
+	// MachineActivityEnabled toggles filtering of machine/system activity.
+	MachineActivityEnabled *bool
+	// MachineActorTypes enumerates actor types treated as machine/system.
+	MachineActorTypes []string
+	// MachineDataKeys enumerates data keys used to flag machine/system activity.
+	MachineDataKeys []string
 }
 
 // Type implements gocommand.Message for query inputs.

@@ -23,6 +23,34 @@ Metadata structure: prefer flat keys with clear units; always include `object_id
 
 Use the `channel` field for module-level filtering (e.g., `settings`, `media`, `export`, `bulk`). Keep channels lowercase, stable, and limited to the module name; reserve verb/object fields for finer-grained analysis. When emitting from shared helpers, set the channel via `activity.WithChannel("settings")`; omit it for legacy compatibility when a module tag is not needed.
 
+## Role-Aware Access Policy & Sanitization
+
+Use the role-aware helper and access policy when exposing activity feeds to admin clients:
+
+- `activity.BuildFilterFromActor` enforces scope and role visibility (non-admins are forced to self-only, admins stay tenant/org scoped, and superadmins can optionally widen scope).
+- `activity.ActivityAccessPolicy` provides a standard interface for applying filters and sanitizing records.
+- `activity.NewDefaultAccessPolicy` masks sensitive data via go-masker and redacts IPs for non-superadmins by default.
+
+```go
+policy := activity.NewDefaultAccessPolicy(
+    activity.WithPolicyFilterOptions(
+        activity.WithChannelDenylist("system"),
+        activity.WithMachineActivityEnabled(false),
+        activity.WithSuperadminScope(true),
+    ),
+)
+
+feedQuery := query.NewActivityFeedQuery(store, scopeGuard, query.WithActivityAccessPolicy(policy))
+statsQuery := query.NewActivityStatsQuery(store, scopeGuard, query.WithActivityAccessPolicy(policy))
+```
+
+Defaults:
+- Superadmin role aliases: `system_admin`, `superadmin`
+- Admin role aliases: `tenant_admin`, `admin`, `org_admin`
+- Machine activity markers: actor types (`system`, `machine`, `job`, `task`) and data keys (`system`, `machine`)
+
+The default policy also drops `Data` for support roles and allows custom maskers or IP redaction toggles via `WithPolicyMasker` and `WithIPRedaction`.
+
 ## Repository & Index Guidance
 
 Current SQLite/Postgres schema ships indexes for:
@@ -33,6 +61,29 @@ Current SQLite/Postgres schema ships indexes for:
 - `verb` – verb-specific filtering.
 
 Queries: prefer `ActivityFilter` and `ActivityStatsFilter` to leverage these indexes. When filtering by channel in high-volume modules, add an optional composite index `(tenant_id, channel, created_at)` (or `(org_id, channel, created_at)` for org-scoped deployments). For metadata-heavy use cases, Postgres consumers can add a GIN index on `data` to accelerate keyword searches.
+
+Retention & archiving guidance for high-volume deployments:
+
+- TTL: pick a retention window (e.g., 90 or 180 days) and schedule a daily purge for older records.
+- Partitioning: in Postgres, range-partition by month on `created_at` and drop old partitions to purge efficiently.
+- Archive: copy old partitions to cold storage (S3, BigQuery, or an archive DB) before deletion if audit trails require it.
+- Maintenance: run `VACUUM`/`ANALYZE` after large deletes to keep query plans stable.
+
+## Optional Cursor Pagination Helper
+
+For high-volume feeds, consumers can use the cursor helper without changing repository interfaces:
+
+```go
+cursor := &activity.ActivityCursor{
+    OccurredAt: lastRecord.OccurredAt,
+    ID:         lastRecord.ID,
+}
+
+var rows []activity.LogEntry
+err := activity.ApplyCursorPagination(db.NewSelect().Model(&rows), cursor, 50).Scan(ctx)
+```
+
+The helper orders by `created_at DESC, id DESC` and returns rows older than the cursor.
 
 ## Integration & Examples
 
@@ -122,7 +173,8 @@ stats, _ := svc.Queries().ActivityStats.Query(ctx, types.ActivityStatsFilter{
 })
 ```
 
-Filters accept optional `UserID`, `ActorID`, `Channel`, `Since`, `Until`, and keyword matching (`verb`, `object_type`, `object_id`).
+Filters accept optional `UserID`, `ActorID`, `Channel`, `Channels`, `ChannelDenylist`,
+`Since`, `Until`, and keyword matching (`verb`, `object_type`, `object_id`).
 
 ## Hooks and Commands
 

@@ -72,6 +72,80 @@ func TestRepository_Stats(t *testing.T) {
 	require.Equal(t, 1, stats.ByVerb["user.password.reset"])
 }
 
+func TestRepository_ChannelFilters(t *testing.T) {
+	ctx := context.Background()
+	db := newTestActivityDB(t)
+	applyActivityDDL(t, db)
+	store, err := NewRepository(RepositoryConfig{DB: db})
+	require.NoError(t, err)
+
+	channels := []string{"settings", "bulk", "export"}
+	for _, channel := range channels {
+		require.NoError(t, store.Log(ctx, types.ActivityRecord{
+			Verb:    "activity." + channel,
+			Channel: channel,
+		}))
+	}
+
+	page, err := store.ListActivity(ctx, types.ActivityFilter{
+		Channels:        []string{"settings", "bulk"},
+		ChannelDenylist: []string{"bulk"},
+		Pagination:      types.Pagination{Limit: 10},
+	})
+	require.NoError(t, err)
+	require.Len(t, page.Records, 1)
+	require.Equal(t, "settings", page.Records[0].Channel)
+
+	page, err = store.ListActivity(ctx, types.ActivityFilter{
+		Channel:         "export",
+		ChannelDenylist: []string{"export"},
+		Pagination:      types.Pagination{Limit: 10},
+	})
+	require.NoError(t, err)
+	require.Len(t, page.Records, 0)
+
+	page, err = store.ListActivity(ctx, types.ActivityFilter{
+		Channel:    "export",
+		Channels:   []string{"settings"},
+		Pagination: types.Pagination{Limit: 10},
+	})
+	require.NoError(t, err)
+	require.Len(t, page.Records, 1)
+	require.Equal(t, "settings", page.Records[0].Channel)
+}
+
+func TestRepository_MachineActivityFilter(t *testing.T) {
+	ctx := context.Background()
+	db := newTestActivityDB(t)
+	applyActivityDDL(t, db)
+	store, err := NewRepository(RepositoryConfig{DB: db})
+	require.NoError(t, err)
+
+	require.NoError(t, store.Log(ctx, types.ActivityRecord{
+		Verb: "activity.system",
+		Data: map[string]any{"system": true},
+	}))
+	require.NoError(t, store.Log(ctx, types.ActivityRecord{
+		Verb: "activity.job",
+		Data: map[string]any{"actor_type": "job"},
+	}))
+	require.NoError(t, store.Log(ctx, types.ActivityRecord{
+		Verb: "activity.user",
+		Data: map[string]any{"event": "user.login"},
+	}))
+
+	disabled := false
+	page, err := store.ListActivity(ctx, types.ActivityFilter{
+		MachineActivityEnabled: &disabled,
+		MachineActorTypes:      []string{"job"},
+		MachineDataKeys:        []string{"system", "machine"},
+		Pagination:             types.Pagination{Limit: 10},
+	})
+	require.NoError(t, err)
+	require.Len(t, page.Records, 1)
+	require.Equal(t, "activity.user", page.Records[0].Verb)
+}
+
 func newTestActivityDB(t *testing.T) *bun.DB {
 	sqldb, err := sql.Open("sqlite3", ":memory:?cache=shared")
 	require.NoError(t, err)

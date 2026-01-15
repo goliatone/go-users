@@ -10,6 +10,7 @@
 
 - Cache service option ([f7485d9](https://github.com/goliatone/go-users/commit/f7485d947f31b5460129d88e1a2f7e63c5a01a45))  - (goliatone)
 - Use cache invalidation using tags ([767d28f](https://github.com/goliatone/go-users/commit/767d28f0440cd3aa67138782b793bf9d219d44ff))  - (goliatone)
+- Role-aware activity policy, sanitization, and cursor pagination helper. - (goliatone)
 
 ## <!-- 3 -->📚 Documentation
 
@@ -224,5 +225,4 @@
 - Update migrations ([6273dec](https://github.com/goliatone/go-users/commit/6273dec0eab9694f41b2fee8556ae7f0f0cd2739))  - (goliatone)
 - Add base tasks ([e0df1a4](https://github.com/goliatone/go-users/commit/e0df1a4300d4514583c208add5f5c4db0a3a8312))  - (goliatone)
 - Initial commit ([3fe70f1](https://github.com/goliatone/go-users/commit/3fe70f190ecbef534a75fb9135dada86ba5d473b))  - (goliatone)
-
 
