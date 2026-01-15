@@ -140,9 +140,16 @@ func (s *ActivityService) Index(ctx crud.Context, _ []repository.SelectCriteria)
 		ObjectType: strings.TrimSpace(ctx.Query("object_type")),
 		ObjectID:   strings.TrimSpace(ctx.Query("object_id")),
 		Channel:    strings.TrimSpace(ctx.Query("channel")),
-		Since:      queryTime(ctx, "since"),
-		Until:      queryTime(ctx, "until"),
-		Keyword:    ctx.Query("q"),
+		Channels:   queryStringSlice(ctx, "channels"),
+		ChannelDenylist: func() []string {
+			if values := queryStringSlice(ctx, "channel_denylist"); len(values) > 0 {
+				return values
+			}
+			return queryStringSlice(ctx, "channelDenylist")
+		}(),
+		Since:   queryTime(ctx, "since"),
+		Until:   queryTime(ctx, "until"),
+		Keyword: ctx.Query("q"),
 		Pagination: types.Pagination{
 			Limit:  queryInt(ctx, "limit", 50),
 			Offset: queryInt(ctx, "offset", 0),
