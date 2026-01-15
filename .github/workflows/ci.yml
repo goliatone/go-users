@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Verify Go version
+        run: go version
+
+      - name: Lint
+        run: GO_BIN=$(which go) ./taskfile lint
+
+      - name: Test
+        run: GO_BIN=$(which go) ./taskfile test
+
+      - name: Migration smoke test
+        run: GO_BIN=$(which go) ./taskfile migrate
+
+      - name: Examples
+        run: GO_BIN=$(which go) ./taskfile example
