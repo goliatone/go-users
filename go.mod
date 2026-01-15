@@ -9,6 +9,7 @@ require (
 	github.com/goliatone/go-command v0.12.0
 	github.com/goliatone/go-crud v0.16.0
 	github.com/goliatone/go-errors v0.9.0
+	github.com/goliatone/go-masker v0.1.0
 	github.com/goliatone/go-options v0.7.0
 	github.com/goliatone/go-repository-bun v0.11.0
 	github.com/goliatone/go-repository-cache v0.6.0
@@ -51,7 +52,6 @@ require (
 	github.com/gofiber/utils v1.1.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
 	github.com/goliatone/go-composite-fs v0.0.1 // indirect
-	github.com/goliatone/go-masker v0.1.0 // indirect
 	github.com/goliatone/go-persistence-bun v0.9.0 // indirect
 	github.com/goliatone/go-print v0.4.1 // indirect
 	github.com/goliatone/hashid v0.1.1 // indirect
