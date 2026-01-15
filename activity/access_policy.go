@@ -12,6 +12,11 @@ type ActivityAccessPolicy interface {
 	Sanitize(actor *auth.ActorContext, role string, records []types.ActivityRecord) []types.ActivityRecord
 }
 
+// ActivityStatsPolicy applies role-aware constraints to activity stats.
+type ActivityStatsPolicy interface {
+	ApplyStats(actor *auth.ActorContext, role string, req types.ActivityStatsFilter) (types.ActivityStatsFilter, error)
+}
+
 // AccessPolicyOption customizes the default activity access policy.
 type AccessPolicyOption func(*DefaultAccessPolicy)
 
@@ -20,9 +25,11 @@ type DefaultAccessPolicy struct {
 	filterOptions []FilterOption
 	masker        *masker.Masker
 	redactIP      bool
+	statsSelfOnly bool
 }
 
 var _ ActivityAccessPolicy = (*DefaultAccessPolicy)(nil)
+var _ ActivityStatsPolicy = (*DefaultAccessPolicy)(nil)
 
 // NewDefaultAccessPolicy returns the default policy implementation.
 func NewDefaultAccessPolicy(opts ...AccessPolicyOption) *DefaultAccessPolicy {
@@ -71,9 +78,41 @@ func WithIPRedaction(enabled bool) AccessPolicyOption {
 	}
 }
 
+// WithPolicyStatsSelfOnly toggles self-only stats for non-admin roles.
+func WithPolicyStatsSelfOnly(enabled bool) AccessPolicyOption {
+	return func(policy *DefaultAccessPolicy) {
+		if policy == nil {
+			return
+		}
+		policy.statsSelfOnly = enabled
+	}
+}
+
 // Apply enforces role-aware scope/visibility rules on the requested filter.
 func (p *DefaultAccessPolicy) Apply(actor *auth.ActorContext, role string, req types.ActivityFilter) (types.ActivityFilter, error) {
 	return BuildFilterFromActor(actor, role, req, p.filterOptions...)
+}
+
+// ApplyStats enforces role-aware scope/visibility rules on stats filters.
+func (p *DefaultAccessPolicy) ApplyStats(actor *auth.ActorContext, role string, req types.ActivityStatsFilter) (types.ActivityStatsFilter, error) {
+	filter, err := BuildFilterFromActor(actor, role, types.ActivityFilter{
+		Actor: req.Actor,
+		Scope: req.Scope,
+	}, p.filterOptions...)
+	if err != nil {
+		return types.ActivityStatsFilter{}, err
+	}
+	out := req
+	out.Actor = filter.Actor
+	out.Scope = filter.Scope
+	if p.statsSelfOnly {
+		out.UserID = filter.UserID
+		out.ActorID = filter.ActorID
+	}
+	out.MachineActivityEnabled = filter.MachineActivityEnabled
+	out.MachineActorTypes = cloneStrings(filter.MachineActorTypes)
+	out.MachineDataKeys = cloneStrings(filter.MachineDataKeys)
+	return out, nil
 }
 
 // Sanitize applies masking rules and IP redaction to activity records.
@@ -90,13 +129,6 @@ func (p *DefaultAccessPolicy) Sanitize(actor *auth.ActorContext, role string, re
 	roleName := resolveRoleName(actor, role)
 	isSuperadmin := roleMatches(roleName, cfg.SuperadminRoleAliases)
 	isSupport := roleMatches(roleName, []string{types.ActorRoleSupport})
-
-	if !cfg.MachineActivityEnabled && !isSuperadmin {
-		records = filterMachineRecords(records, cfg)
-		if len(records) == 0 {
-			return records
-		}
-	}
 
 	mask := p.masker
 	if mask == nil {
