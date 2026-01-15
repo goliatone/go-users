@@ -176,8 +176,13 @@ func applyActivityFilter(q *bun.SelectQuery, filter types.ActivityFilter) *bun.S
 	if filter.ObjectID != "" {
 		q = q.Where("object_id = ?", filter.ObjectID)
 	}
-	if filter.Channel != "" {
+	if len(filter.Channels) > 0 {
+		q = q.Where("channel IN (?)", bun.In(filter.Channels))
+	} else if filter.Channel != "" {
 		q = q.Where("channel = ?", filter.Channel)
+	}
+	if len(filter.ChannelDenylist) > 0 {
+		q = q.Where("channel NOT IN (?)", bun.In(filter.ChannelDenylist))
 	}
 	if filter.Since != nil && !filter.Since.IsZero() {
 		q = q.Where("created_at >= ?", filter.Since)
