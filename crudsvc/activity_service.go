@@ -11,6 +11,7 @@ import (
 	"github.com/goliatone/go-users/activity"
 	"github.com/goliatone/go-users/command"
 	"github.com/goliatone/go-users/crudguard"
+	"github.com/goliatone/go-users/pkg/authctx"
 	"github.com/goliatone/go-users/pkg/types"
 	"github.com/google/uuid"
 )
@@ -20,6 +21,7 @@ type ActivityServiceConfig struct {
 	Guard      GuardAdapter
 	LogCommand gocommand.Commander[command.ActivityLogInput]
 	FeedQuery  gocommand.Querier[types.ActivityFilter, types.ActivityPage]
+	Policy     activity.ActivityAccessPolicy
 }
 
 // ActivityService adapts the go-users activity command/query layer to a go-crud
@@ -28,6 +30,7 @@ type ActivityService struct {
 	guard   GuardAdapter
 	logCmd  gocommand.Commander[command.ActivityLogInput]
 	feed    gocommand.Querier[types.ActivityFilter, types.ActivityPage]
+	policy  activity.ActivityAccessPolicy
 	emitter ActivityEmitter
 	logger  types.Logger
 }
@@ -35,10 +38,15 @@ type ActivityService struct {
 // NewActivityService constructs the adapter.
 func NewActivityService(cfg ActivityServiceConfig, opts ...ServiceOption) *ActivityService {
 	options := applyOptions(opts)
+	policy := cfg.Policy
+	if policy == nil {
+		policy = activity.NewDefaultAccessPolicy()
+	}
 	service := &ActivityService{
 		guard:   cfg.Guard,
 		logCmd:  cfg.LogCommand,
 		feed:    cfg.FeedQuery,
+		policy:  policy,
 		emitter: options.emitter,
 		logger:  options.logger,
 	}
@@ -119,6 +127,10 @@ func (s *ActivityService) Index(ctx crud.Context, _ []repository.SelectCriteria)
 		return nil, 0, err
 	}
 
+	actorCtx, err := authctx.ResolveActorContext(ctx.UserContext())
+	if err != nil {
+		return nil, 0, err
+	}
 	filter := types.ActivityFilter{
 		Actor:      res.Actor,
 		Scope:      res.Scope,
@@ -136,17 +148,25 @@ func (s *ActivityService) Index(ctx crud.Context, _ []repository.SelectCriteria)
 			Offset: queryInt(ctx, "offset", 0),
 		},
 	}
-	applyActivityRowPolicy(&filter, res.Actor)
+	if s.policy != nil {
+		filter, err = s.policy.Apply(actorCtx, res.Actor.Type, filter)
+		if err != nil {
+			return nil, 0, err
+		}
+	}
 	page, err := s.feed.Query(ctx.UserContext(), filter)
 	if err != nil {
 		return nil, 0, err
 	}
-	filtered := filterActivityRecords(page.Records, res.Actor)
-	records := make([]*activity.LogEntry, 0, len(filtered))
-	for _, record := range filtered {
-		records = append(records, applyActivityFieldPolicy(activity.FromActivityRecord(record), res.Actor))
+	records := page.Records
+	if s.policy != nil {
+		records = s.policy.Sanitize(actorCtx, res.Actor.Type, records)
 	}
-	return records, page.Total, nil
+	entries := make([]*activity.LogEntry, 0, len(records))
+	for _, record := range records {
+		entries = append(entries, activity.FromActivityRecord(record))
+	}
+	return entries, page.Total, nil
 }
 
 func (s *ActivityService) Show(crud.Context, string, []repository.SelectCriteria) (*activity.LogEntry, error) {
@@ -160,42 +180,6 @@ func (s *ActivityService) emit(ctx context.Context, record types.ActivityRecord)
 	if err := s.emitter.Emit(ctx, record); err != nil && s.logger != nil {
 		s.logger.Error("activity emitter failed", err)
 	}
-}
-
-func applyActivityRowPolicy(filter *types.ActivityFilter, actor types.ActorRef) {
-	if filter == nil {
-		return
-	}
-	if actor.IsSupport() {
-		filter.UserID = actor.ID
-		filter.ActorID = actor.ID
-	}
-}
-
-func filterActivityRecords(records []types.ActivityRecord, actor types.ActorRef) []types.ActivityRecord {
-	if !actor.IsSupport() {
-		return records
-	}
-	filtered := make([]types.ActivityRecord, 0, len(records))
-	for _, record := range records {
-		if record.UserID == actor.ID || record.ActorID == actor.ID {
-			filtered = append(filtered, record)
-		}
-	}
-	return filtered
-}
-
-func applyActivityFieldPolicy(entry *activity.LogEntry, actor types.ActorRef) *activity.LogEntry {
-	if entry == nil {
-		return nil
-	}
-	if !actor.IsSystemAdmin() {
-		entry.IP = ""
-	}
-	if actor.IsSupport() && len(entry.Data) > 0 {
-		entry.Data = nil
-	}
-	return entry
 }
 
 func enforceActivityOwnership(actor types.ActorRef, target uuid.UUID) error {
