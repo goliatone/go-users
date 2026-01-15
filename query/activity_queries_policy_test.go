@@ -109,6 +109,48 @@ func TestActivityFeedQueryPolicyAllowsSuperadminScopeWidening(t *testing.T) {
 	require.Equal(t, tenantB, page.Records[0].TenantID)
 }
 
+func TestActivityStatsQueryPolicySelfOnlyWhenEnabled(t *testing.T) {
+	t.Helper()
+	ctx := context.Background()
+	db := newActivityQueryDB(t)
+	applyActivityQueryDDL(t, db)
+	store, err := activity.NewRepository(activity.RepositoryConfig{DB: db})
+	require.NoError(t, err)
+
+	tenantID := uuid.New()
+	actorID := uuid.New()
+	otherID := uuid.New()
+
+	require.NoError(t, store.Log(ctx, types.ActivityRecord{
+		UserID:   actorID,
+		ActorID:  actorID,
+		TenantID: tenantID,
+		Verb:     "user.login",
+	}))
+	require.NoError(t, store.Log(ctx, types.ActivityRecord{
+		UserID:   otherID,
+		ActorID:  otherID,
+		TenantID: tenantID,
+		Verb:     "user.login",
+	}))
+
+	actorCtx := &auth.ActorContext{
+		ActorID:  actorID.String(),
+		Role:     types.ActorRoleSupport,
+		TenantID: tenantID.String(),
+	}
+	policy := activity.NewDefaultAccessPolicy(activity.WithPolicyStatsSelfOnly(true))
+	statsQuery := NewActivityStatsQuery(store, nil, WithActivityAccessPolicy(policy))
+
+	queryCtx := auth.WithActorContext(ctx, actorCtx)
+	stats, err := statsQuery.Query(queryCtx, types.ActivityStatsFilter{
+		Actor: types.ActorRef{ID: actorID},
+		Scope: types.ScopeFilter{TenantID: tenantID},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, stats.Total)
+}
+
 func newActivityQueryDB(t *testing.T) *bun.DB {
 	sqlDB, err := sql.Open("sqlite3", ":memory:?cache=shared")
 	require.NoError(t, err)

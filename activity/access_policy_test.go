@@ -47,7 +47,7 @@ func TestBuildFilterFromActorChannelAllowDeny(t *testing.T) {
 	require.ElementsMatch(t, []string{"audit", "bulk"}, filter.ChannelDenylist)
 }
 
-func TestDefaultAccessPolicyFiltersMachineActivity(t *testing.T) {
+func TestDefaultAccessPolicyApplySetsMachineFilterForAdmins(t *testing.T) {
 	t.Helper()
 	policy := NewDefaultAccessPolicy(WithPolicyFilterOptions(WithMachineActivityEnabled(false)))
 	actor := &auth.ActorContext{
@@ -55,17 +55,15 @@ func TestDefaultAccessPolicyFiltersMachineActivity(t *testing.T) {
 		Role:    types.ActorRoleTenantAdmin,
 	}
 
-	records := []types.ActivityRecord{
-		{ID: uuid.New(), Data: map[string]any{"system": true}},
-		{ID: uuid.New(), Data: map[string]any{"actor_type": "job"}},
-		{ID: uuid.New(), Data: map[string]any{"event": "user.login"}},
-	}
-	out := policy.Sanitize(actor, "", records)
-	require.Len(t, out, 1)
-	require.Equal(t, records[2].ID, out[0].ID)
+	filter, err := policy.Apply(actor, "", types.ActivityFilter{})
+	require.NoError(t, err)
+	require.NotNil(t, filter.MachineActivityEnabled)
+	require.False(t, *filter.MachineActivityEnabled)
+	require.ElementsMatch(t, DefaultMachineActorTypes(), filter.MachineActorTypes)
+	require.ElementsMatch(t, DefaultMachineDataKeys(), filter.MachineDataKeys)
 }
 
-func TestDefaultAccessPolicyMachineActivityAllowsSuperadmin(t *testing.T) {
+func TestDefaultAccessPolicyApplySkipsMachineFilterForSuperadmin(t *testing.T) {
 	t.Helper()
 	policy := NewDefaultAccessPolicy(WithPolicyFilterOptions(WithMachineActivityEnabled(false)))
 	actor := &auth.ActorContext{
@@ -73,13 +71,29 @@ func TestDefaultAccessPolicyMachineActivityAllowsSuperadmin(t *testing.T) {
 		Role:    types.ActorRoleSystemAdmin,
 	}
 
-	records := []types.ActivityRecord{
-		{ID: uuid.New(), Data: map[string]any{"system": true}},
-		{ID: uuid.New(), Data: map[string]any{"actor_type": "task"}},
-		{ID: uuid.New(), Data: map[string]any{"event": "user.login"}},
+	filter, err := policy.Apply(actor, "", types.ActivityFilter{})
+	require.NoError(t, err)
+	require.Nil(t, filter.MachineActivityEnabled)
+	require.Empty(t, filter.MachineActorTypes)
+	require.Empty(t, filter.MachineDataKeys)
+}
+
+func TestDefaultAccessPolicyApplyStatsSelfOnly(t *testing.T) {
+	t.Helper()
+	actorID := uuid.New()
+	tenantID := uuid.New()
+	policy := NewDefaultAccessPolicy(WithPolicyStatsSelfOnly(true))
+	actor := &auth.ActorContext{
+		ActorID:  actorID.String(),
+		Role:     types.ActorRoleSupport,
+		TenantID: tenantID.String(),
 	}
-	out := policy.Sanitize(actor, "", records)
-	require.Len(t, out, len(records))
+
+	filter, err := policy.ApplyStats(actor, "", types.ActivityStatsFilter{})
+	require.NoError(t, err)
+	require.Equal(t, actorID, filter.UserID)
+	require.Equal(t, actorID, filter.ActorID)
+	require.Equal(t, tenantID, filter.Scope.TenantID)
 }
 
 func TestSanitizeRecordMasksDefaultFields(t *testing.T) {
