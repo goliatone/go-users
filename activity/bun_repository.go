@@ -9,6 +9,7 @@ import (
 	"github.com/goliatone/go-users/pkg/types"
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect"
 )
 
 // RepositoryConfig wires the Bun-backed activity repository.
@@ -184,6 +185,7 @@ func applyActivityFilter(q *bun.SelectQuery, filter types.ActivityFilter) *bun.S
 	if len(filter.ChannelDenylist) > 0 {
 		q = q.Where("channel NOT IN (?)", bun.In(filter.ChannelDenylist))
 	}
+	q = applyMachineActivityFilter(q, filter.MachineActivityEnabled, filter.MachineActorTypes, filter.MachineDataKeys)
 	if filter.Since != nil && !filter.Since.IsZero() {
 		q = q.Where("created_at >= ?", filter.Since)
 	}
@@ -204,6 +206,16 @@ func applyActivityStatsFilter(q *bun.SelectQuery, filter types.ActivityStatsFilt
 	if filter.Scope.OrgID != uuid.Nil {
 		q = q.Where("org_id = ?", filter.Scope.OrgID)
 	}
+	if filter.UserID != uuid.Nil && filter.ActorID != uuid.Nil {
+		q = q.Where("(user_id = ? OR actor_id = ?)", filter.UserID, filter.ActorID)
+	} else {
+		if filter.UserID != uuid.Nil {
+			q = q.Where("user_id = ?", filter.UserID)
+		}
+		if filter.ActorID != uuid.Nil {
+			q = q.Where("actor_id = ?", filter.ActorID)
+		}
+	}
 	if filter.Since != nil && !filter.Since.IsZero() {
 		q = q.Where("created_at >= ?", filter.Since)
 	}
@@ -213,7 +225,78 @@ func applyActivityStatsFilter(q *bun.SelectQuery, filter types.ActivityStatsFilt
 	if len(filter.Verbs) > 0 {
 		q = q.Where("verb IN (?)", bun.In(filter.Verbs))
 	}
+	q = applyMachineActivityFilter(q, filter.MachineActivityEnabled, filter.MachineActorTypes, filter.MachineDataKeys)
 	return q
+}
+
+func applyMachineActivityFilter(q *bun.SelectQuery, enabled *bool, actorTypes, dataKeys []string) *bun.SelectQuery {
+	if q == nil || enabled == nil || *enabled {
+		return q
+	}
+	actorTypes = normalizeIdentifiers(actorTypes)
+	dataKeys = normalizeIdentifiers(dataKeys)
+	if len(actorTypes) == 0 && len(dataKeys) == 0 {
+		return q
+	}
+	switch q.Dialect().Name() {
+	case dialect.PG:
+		return applyMachineActivityFilterPostgres(q, actorTypes, dataKeys)
+	default:
+		return applyMachineActivityFilterLike(q, actorTypes, dataKeys)
+	}
+}
+
+func applyMachineActivityFilterPostgres(q *bun.SelectQuery, actorTypes, dataKeys []string) *bun.SelectQuery {
+	conditions := make([]string, 0, len(dataKeys)+3)
+	args := make([]any, 0, len(dataKeys)+3)
+	for _, key := range dataKeys {
+		if key == "" {
+			continue
+		}
+		conditions = append(conditions, "data ->> ? = 'true'")
+		args = append(args, key)
+	}
+	if len(actorTypes) > 0 {
+		conditions = append(conditions, "data ->> 'actor_type' IN (?)")
+		args = append(args, bun.In(actorTypes))
+		conditions = append(conditions, "data ->> 'actorType' IN (?)")
+		args = append(args, bun.In(actorTypes))
+		conditions = append(conditions, "data -> 'actor' ->> 'type' IN (?)")
+		args = append(args, bun.In(actorTypes))
+	}
+	if len(conditions) == 0 {
+		return q
+	}
+	return q.Where("NOT ("+strings.Join(conditions, " OR ")+")", args...)
+}
+
+func applyMachineActivityFilterLike(q *bun.SelectQuery, actorTypes, dataKeys []string) *bun.SelectQuery {
+	conditions := make([]string, 0, (len(dataKeys)*2)+(len(actorTypes)*3))
+	args := make([]any, 0, (len(dataKeys)*2)+(len(actorTypes)*3))
+	for _, key := range dataKeys {
+		if key == "" {
+			continue
+		}
+		conditions = append(conditions, "data LIKE ?")
+		args = append(args, "%\""+key+"\":true%")
+		conditions = append(conditions, "data LIKE ?")
+		args = append(args, "%\""+key+"\":\"true\"%")
+	}
+	for _, actorType := range actorTypes {
+		if actorType == "" {
+			continue
+		}
+		conditions = append(conditions, "data LIKE ?")
+		args = append(args, "%\"actor_type\":\""+actorType+"\"%")
+		conditions = append(conditions, "data LIKE ?")
+		args = append(args, "%\"actorType\":\""+actorType+"\"%")
+		conditions = append(conditions, "data LIKE ?")
+		args = append(args, "%\"actor\":{\"type\":\""+actorType+"\"%")
+	}
+	if len(conditions) == 0 {
+		return q
+	}
+	return q.Where("NOT ("+strings.Join(conditions, " OR ")+")", args...)
 }
 
 func toLogEntry(record types.ActivityRecord) *LogEntry {
