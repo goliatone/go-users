@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/goliatone/go-auth"
 	"github.com/goliatone/go-crud"
 	repository "github.com/goliatone/go-repository-bun"
 	"github.com/goliatone/go-users/command"
@@ -116,6 +117,10 @@ func TestPreferenceServiceSupportRestrictions(t *testing.T) {
 func TestActivityServiceMasksIPForTenantAdmin(t *testing.T) {
 	t.Helper()
 	actorID := uuid.New()
+	actorCtx := &auth.ActorContext{
+		ActorID: actorID.String(),
+		Role:    types.ActorRoleTenantAdmin,
+	}
 	svc := NewActivityService(ActivityServiceConfig{
 		Guard: &stubGuardAdapter{
 			result: crudguard.GuardResult{
@@ -131,7 +136,7 @@ func TestActivityServiceMasksIPForTenantAdmin(t *testing.T) {
 			},
 		},
 	})
-	ctx := newTestCrudContext(context.Background())
+	ctx := newTestCrudContext(auth.WithActorContext(context.Background(), actorCtx))
 	records, total, err := svc.Index(ctx, nil)
 	require.NoError(t, err)
 	require.Equal(t, 1, total)
