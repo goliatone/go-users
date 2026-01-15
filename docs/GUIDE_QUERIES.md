@@ -465,6 +465,8 @@ type ActivityFilter struct {
     ObjectType string         // Filter by object type
     ObjectID   string         // Filter by object ID
     Channel    string         // Filter by channel
+    Channels   []string       // Filter by channel allowlist (IN)
+    ChannelDenylist []string  // Exclude channels after allow filtering
     Since      *time.Time     // Start time
     Until      *time.Time     // End time
     Pagination Pagination

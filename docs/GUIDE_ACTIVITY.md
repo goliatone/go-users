@@ -255,6 +255,20 @@ feed, err = svc.Queries().ActivityFeed.Query(ctx, types.ActivityFilter{
 })
 ```
 
+For multi-channel feeds, use `Channels` for an allowlist and `ChannelDenylist`
+to exclude channels after allow filtering.
+
+```go
+feed, err := svc.Queries().ActivityFeed.Query(ctx, types.ActivityFilter{
+    Actor:           actor,
+    Channels:        []string{"settings", "roles", "export"},
+    ChannelDenylist: []string{"export"},
+})
+```
+
+If both `Channels` and `Channel` are set, `Channels` wins. `ChannelDenylist` is
+always applied after allow filtering.
+
 ### Filter by Object
 
 ```go
@@ -327,6 +341,48 @@ if page1.HasMore {
         Pagination: types.Pagination{Limit: 20, Offset: page1.NextOffset},
     })
 }
+```
+
+### Role-aware access policy
+
+For admin-facing feeds, attach the default access policy to enforce role-aware
+visibility and sanitize payloads:
+
+```go
+policy := activity.NewDefaultAccessPolicy(
+    activity.WithPolicyFilterOptions(
+        activity.WithMachineActivityEnabled(false),
+        activity.WithChannelDenylist("system"),
+        activity.WithSuperadminScope(true),
+    ),
+)
+
+feedQuery := query.NewActivityFeedQuery(store, scopeGuard, query.WithActivityAccessPolicy(policy))
+feed, err := feedQuery.Query(ctx, types.ActivityFilter{
+    Actor:      actor,
+    Pagination: types.Pagination{Limit: 25},
+})
+```
+
+If you are using the `users.Service` helpers, build a policy-aware query where
+you wire your handlers (the default service queries do not attach a policy).
+
+Defaults treat `system_admin`/`superadmin` as superadmins and `tenant_admin`/`admin`/`org_admin`
+as admins (override with `WithRoleAliases`). The policy masks sensitive data via go-masker
+and redacts IPs for non-superadmins; customize with `WithPolicyMasker` or `WithIPRedaction`.
+
+### Cursor pagination (optional)
+
+For high-volume feeds, use the cursor helper (orders by `created_at DESC, id DESC`):
+
+```go
+cursor := &activity.ActivityCursor{
+    OccurredAt: page1.Records[len(page1.Records)-1].OccurredAt,
+    ID:         page1.Records[len(page1.Records)-1].ID,
+}
+
+var rows []activity.LogEntry
+err := activity.ApplyCursorPagination(db.NewSelect().Model(&rows), cursor, 50).Scan(ctx)
 ```
 
 ## Activity Statistics
@@ -633,6 +689,15 @@ CREATE INDEX idx_activity_channel ON user_activity(tenant_id, channel, created_a
 -- Metadata search (PostgreSQL only)
 CREATE INDEX idx_activity_data ON user_activity USING GIN(data);
 ```
+
+### Retention & Archiving
+
+Activity tables grow quickly. Plan a retention strategy early:
+
+- TTL: pick a window (e.g., 90/180 days) and schedule a daily purge of older rows.
+- Partitioning: in Postgres, range-partition by `created_at` (monthly) and drop old partitions for fast deletes.
+- Archive: copy expired partitions to cold storage or an audit warehouse before deletion if required.
+- Maintenance: run `VACUUM`/`ANALYZE` after large purges to keep query plans stable.
 
 ## Error Handling
 
