@@ -170,7 +170,7 @@ The go-auth schema is already solid. Only need to add optional custom roles tabl
 
 -- Add custom roles table for admin UI (optional)
 CREATE TABLE custom_roles (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY,
     name VARCHAR(100) UNIQUE NOT NULL,
     "order" INT NOT NULL DEFAULT 0,
     description TEXT,
@@ -181,8 +181,8 @@ CREATE TABLE custom_roles (
 );
 
 CREATE TABLE user_custom_roles (
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    role_id UUID REFERENCES custom_roles(id) ON DELETE CASCADE,
+    user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+    role_id TEXT REFERENCES custom_roles(id) ON DELETE CASCADE,
     assigned_at TIMESTAMP NOT NULL DEFAULT NOW(),
     PRIMARY KEY (user_id, role_id)
 );
