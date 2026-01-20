@@ -2,6 +2,7 @@ package crudsvc
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -39,11 +40,18 @@ func TestUserServiceIntegrationCreateModesAndBulkDelete(t *testing.T) {
 		Repository: repo,
 		ScopeGuard: scope.NopGuard(),
 	})
+	tokenRepo := newMemoryTokenRepo()
+	secureLinks := &stubSecureLinkManager{
+		token:      "invite-token",
+		expiration: time.Hour,
+	}
 	inviteCmd := command.NewUserInviteCommand(command.InviteCommandConfig{
-		Repository: repo,
-		Clock:      fixedClock{t: time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)},
-		IDGen:      fixedIDGenerator{id: uuid.MustParse("2b3f0b8e-2c2d-4ce0-8b5e-f72b48f0c11d")},
-		ScopeGuard: scope.NopGuard(),
+		Repository:      repo,
+		TokenRepository: tokenRepo,
+		SecureLinks:     secureLinks,
+		Clock:           fixedClock{t: time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)},
+		IDGen:           fixedIDGenerator{id: uuid.MustParse("2b3f0b8e-2c2d-4ce0-8b5e-f72b48f0c11d")},
+		ScopeGuard:      scope.NopGuard(),
 	})
 
 	svc := NewUserService(UserServiceConfig{
@@ -147,6 +155,69 @@ func (r *integrationAuthRepo) AllowedTransitions(context.Context, uuid.UUID) ([]
 }
 
 func (r *integrationAuthRepo) ResetPassword(context.Context, uuid.UUID, string) error {
+	return nil
+}
+
+type stubSecureLinkManager struct {
+	token      string
+	expiration time.Duration
+}
+
+func (s *stubSecureLinkManager) Generate(string, ...types.SecureLinkPayload) (string, error) {
+	if s.token == "" {
+		return "token", nil
+	}
+	return s.token, nil
+}
+
+func (s *stubSecureLinkManager) Validate(string) (map[string]any, error) {
+	return map[string]any{}, nil
+}
+
+func (s *stubSecureLinkManager) GetAndValidate(fn func(string) string) (types.SecureLinkPayload, error) {
+	if fn != nil {
+		_ = fn("")
+	}
+	return types.SecureLinkPayload{}, nil
+}
+
+func (s *stubSecureLinkManager) GetExpiration() time.Duration {
+	return s.expiration
+}
+
+type memoryTokenRepo struct {
+	tokens map[string]*types.UserToken
+}
+
+func newMemoryTokenRepo() *memoryTokenRepo {
+	return &memoryTokenRepo{tokens: map[string]*types.UserToken{}}
+}
+
+func (m *memoryTokenRepo) CreateToken(_ context.Context, token types.UserToken) (*types.UserToken, error) {
+	copy := token
+	if copy.ID == uuid.Nil {
+		copy.ID = uuid.New()
+	}
+	m.tokens[copy.JTI] = &copy
+	return &copy, nil
+}
+
+func (m *memoryTokenRepo) GetTokenByJTI(_ context.Context, _ types.UserTokenType, jti string) (*types.UserToken, error) {
+	if token, ok := m.tokens[jti]; ok {
+		return token, nil
+	}
+	return nil, errors.New("not found")
+}
+
+func (m *memoryTokenRepo) UpdateTokenStatus(_ context.Context, _ types.UserTokenType, jti string, status types.UserTokenStatus, usedAt time.Time) error {
+	token, ok := m.tokens[jti]
+	if !ok {
+		return errors.New("not found")
+	}
+	token.Status = status
+	if !usedAt.IsZero() {
+		token.UsedAt = usedAt
+	}
 	return nil
 }
 
