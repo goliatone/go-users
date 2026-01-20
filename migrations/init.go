@@ -5,5 +5,5 @@ import (
 )
 
 func init() {
-	Register(users.GetMigrationsFS())
+	Register(users.GetCoreMigrationsFS())
 }
