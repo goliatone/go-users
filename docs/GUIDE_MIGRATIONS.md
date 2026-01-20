@@ -61,6 +61,10 @@ This guide covers database migrations for `go-users`, including the migration ar
 │   │ │   ├── 00001_users.up.sql      (PostgreSQL)            │   │
 │   │ │   ├── 00001_users.down.sql                            │   │
 │   │ │   └── sqlite/               (SQLite overrides)        │   │
+│   │ ├── auth_extras/                                         │   │
+│   │ │   ├── 00010_social_accounts.up.sql                    │   │
+│   │ │   ├── 00010_social_accounts.down.sql                  │   │
+│   │ │   └── sqlite/               (SQLite overrides)        │   │
 │   │ ├── 00003_custom_roles.up.sql                          │   │
 │   │ ├── sqlite/               (core SQLite overrides)       │   │
 │   │ └── ...                                                 │   │
@@ -76,11 +80,13 @@ This guide covers database migrations for `go-users`, including the migration ar
 var MigrationsFS embed.FS           // All migrations (legacy all-in-one)
 var CoreMigrationsFS embed.FS       // go-users core tables only
 var AuthBootstrapMigrationsFS embed.FS // users/password_reset + auth columns
+var AuthExtrasMigrationsFS embed.FS    // social_accounts/user_identifiers
 
 // 2. Optional: Use migrations.Register for centralized registration
 import "github.com/goliatone/go-users/migrations"
 // init() automatically calls migrations.Register(users.GetCoreMigrationsFS())
 // import _ "github.com/goliatone/go-users/migrations/bootstrap" for auth bootstrap
+// import _ "github.com/goliatone/go-users/migrations/extras" for auth extras
 
 // 3. Retrieve all registered filesystems
 filesystems := migrations.Filesystems()
@@ -111,6 +117,16 @@ data/sql/migrations/
 │       ├── 00002_user_status.down.sql
 │       ├── 00009_user_external_ids.up.sql
 │       └── 00009_user_external_ids.down.sql
+├── auth_extras/
+│   ├── 00010_social_accounts.up.sql
+│   ├── 00010_social_accounts.down.sql
+│   ├── 00011_user_identifiers.up.sql
+│   ├── 00011_user_identifiers.down.sql
+│   └── sqlite/
+│       ├── 00010_social_accounts.up.sql
+│       ├── 00010_social_accounts.down.sql
+│       ├── 00011_user_identifiers.up.sql
+│       └── 00011_user_identifiers.down.sql
 ├── 00003_custom_roles.up.sql
 ├── 00003_custom_roles.down.sql
 ├── 00004_user_activity.up.sql
@@ -130,12 +146,15 @@ data/sql/migrations/
 ```
 
 Auth bootstrap migrations live under `data/sql/migrations/auth`, with SQLite
-overrides in `data/sql/migrations/auth/sqlite`.
+overrides in `data/sql/migrations/auth/sqlite`. Auth extras live under
+`data/sql/migrations/auth_extras` (SQLite overrides in
+`data/sql/migrations/auth_extras/sqlite`).
 
-Register auth bootstrap (or go-auth) before core so dependent tables exist.
+Register auth bootstrap (and auth extras, if used) before core so dependent tables exist.
 
-If you use `GetMigrationsFS()`, register two sub-filesystems:
-`data/sql/migrations/auth` and `data/sql/migrations` (core), since the dialect
+If you use `GetMigrationsFS()`, register three sub-filesystems:
+`data/sql/migrations/auth`, `data/sql/migrations/auth_extras`, and
+`data/sql/migrations` (core), since the dialect
 loader does not scan nested subfolders.
 
 ### Naming Convention
@@ -317,6 +336,72 @@ func main() {
 }
 ```
 
+### Standalone Example (No go-auth)
+
+```go
+package main
+
+import (
+    "context"
+    "database/sql"
+    "io/fs"
+    "log"
+
+    "github.com/goliatone/go-persistence-bun"
+    users "github.com/goliatone/go-users"
+    "github.com/goliatone/go-users/migrations"
+    "github.com/uptrace/bun/dialect/pgdialect"
+    _ "github.com/lib/pq"
+)
+
+func main() {
+    ctx := context.Background()
+    db, err := sql.Open("postgres", "postgres://user:pass@localhost/mydb?sslmode=disable")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    cfg := &persistence.Config{
+        Driver: "postgres",
+    }
+    client, err := persistence.New(cfg, db, pgdialect.New())
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    authFS, err := fs.Sub(users.GetAuthBootstrapMigrationsFS(), "data/sql/migrations/auth")
+    if err != nil {
+        log.Fatal(err)
+    }
+    extrasFS, err := fs.Sub(users.GetAuthExtrasMigrationsFS(), "data/sql/migrations/auth_extras")
+    if err != nil {
+        log.Fatal(err)
+    }
+    coreFS, err := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    client.RegisterDialectMigrations(authFS, persistence.WithDialectSourceLabel("."))
+    client.RegisterDialectMigrations(extrasFS, persistence.WithDialectSourceLabel("."))
+    client.RegisterDialectMigrations(coreFS, persistence.WithDialectSourceLabel("."))
+
+    if err := client.Migrate(ctx); err != nil {
+        log.Fatal(err)
+    }
+
+    if err := migrations.ValidateAuthSchema(ctx, db, "postgres"); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+#### Auth Schema Validation
+
+`migrations.ValidateAuthSchema` validates that auth-owned tables expose the
+columns go-users relies on. Override the defaults with
+`migrations.WithAuthSchemaChecks` if you have a custom schema.
+
 ### SQLite Example
 
 ```go
@@ -394,6 +479,7 @@ import (
 func init() {
     // Core migrations automatically registered via migrations package init()
     // import _ "github.com/goliatone/go-users/migrations/bootstrap" for auth bootstrap
+    // import _ "github.com/goliatone/go-users/migrations/extras" for auth extras
     // You can also register additional migration filesystems:
     migrations.Register(myCustomMigrationsFS)
 }
@@ -507,6 +593,48 @@ ALTER TABLE users
 CREATE UNIQUE INDEX users_external_id_unique
     ON users (external_id_provider, external_id)
     WHERE external_id IS NOT NULL;
+```
+
+### Social Accounts (00010)
+
+Optional social profile links for external providers:
+
+```sql
+CREATE TABLE social_accounts (
+    id UUID PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL,
+    provider_user_id TEXT NOT NULL,
+    email TEXT,
+    name TEXT,
+    username TEXT,
+    avatar_url TEXT,
+    access_token TEXT,
+    refresh_token TEXT,
+    token_expires_at TIMESTAMP,
+    profile_data JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP,
+    CONSTRAINT uq_social_accounts_provider_id UNIQUE (provider, provider_user_id),
+    CONSTRAINT uq_social_accounts_user_provider UNIQUE (user_id, provider)
+);
+```
+
+### User Identifiers (00011)
+
+Secondary identifiers for auth providers:
+
+```sql
+CREATE TABLE user_identifiers (
+    id UUID PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL,
+    identifier TEXT NOT NULL,
+    metadata JSONB NOT NULL DEFAULT '{}',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP,
+    CONSTRAINT uq_user_identifiers_provider_id UNIQUE (provider, identifier)
+);
 ```
 
 ### Custom Roles (00003)
@@ -752,6 +880,14 @@ func TestMigrationsApplyToSQLite(t *testing.T) {
         t.Fatalf("failed to apply auth bootstrap migrations: %v", err)
     }
 
+    extrasFS, err := fs.Sub(users.GetAuthExtrasMigrationsFS(), "data/sql/migrations/auth_extras/sqlite")
+    if err != nil {
+        t.Fatalf("failed to load auth extras migrations: %v", err)
+    }
+    if err := applyFilesystem(ctx, db, extrasFS); err != nil {
+        t.Fatalf("failed to apply auth extras migrations: %v", err)
+    }
+
     coreFS, err := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations/sqlite")
     if err != nil {
         t.Fatalf("failed to load core migrations: %v", err)
@@ -761,7 +897,7 @@ func TestMigrationsApplyToSQLite(t *testing.T) {
     }
 
     // Verify tables exist
-    tables := []string{"users", "password_reset", "user_tokens", "custom_roles", "user_activity", "user_profiles", "user_preferences"}
+    tables := []string{"users", "password_reset", "user_tokens", "custom_roles", "user_activity", "user_profiles", "user_preferences", "social_accounts", "user_identifiers"}
     for _, table := range tables {
         var name string
         err := db.QueryRowContext(ctx,

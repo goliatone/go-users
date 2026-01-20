@@ -432,6 +432,8 @@ func TestFullSchema_Integration(t *testing.T) {
         "../data/sql/migrations/sqlite/00007_custom_roles_order.up.sql",
         "../data/sql/migrations/sqlite/00008_user_tokens.up.sql",
         "../data/sql/migrations/auth/sqlite/00009_user_external_ids.up.sql",
+        "../data/sql/migrations/auth_extras/sqlite/00010_social_accounts.up.sql",
+        "../data/sql/migrations/auth_extras/sqlite/00011_user_identifiers.up.sql",
     }
 
     for _, path := range migrations {
@@ -440,7 +442,7 @@ func TestFullSchema_Integration(t *testing.T) {
 
     // Verify tables exist
     tables := []string{"users", "password_reset", "user_tokens", "custom_roles", "user_custom_roles",
-        "user_activity", "user_profiles", "user_preferences"}
+        "user_activity", "user_profiles", "user_preferences", "social_accounts", "user_identifiers"}
 
     for _, table := range tables {
         var name string
