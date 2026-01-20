@@ -1,10 +1,16 @@
 package bootstrap
 
 import (
+	"io/fs"
+
 	users "github.com/goliatone/go-users"
 	"github.com/goliatone/go-users/migrations"
 )
 
 func init() {
-	migrations.Register(users.GetAuthBootstrapMigrationsFS())
+	authFS, err := fs.Sub(users.GetAuthBootstrapMigrationsFS(), "data/sql/migrations/auth")
+	if err != nil {
+		return
+	}
+	migrations.Register(authFS)
 }
