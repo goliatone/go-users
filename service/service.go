@@ -27,22 +27,27 @@ type Service struct {
 
 // Commands exposes the service command handlers.
 type Commands struct {
-	UserLifecycleTransition *command.UserLifecycleTransitionCommand
-	BulkUserTransition      *command.BulkUserTransitionCommand
-	BulkUserImport          *command.BulkUserImportCommand
-	UserCreate              *command.UserCreateCommand
-	UserUpdate              *command.UserUpdateCommand
-	UserInvite              *command.UserInviteCommand
-	UserPasswordReset       *command.UserPasswordResetCommand
-	CreateRole              *command.CreateRoleCommand
-	UpdateRole              *command.UpdateRoleCommand
-	DeleteRole              *command.DeleteRoleCommand
-	AssignRole              *command.AssignRoleCommand
-	UnassignRole            *command.UnassignRoleCommand
-	LogActivity             *command.ActivityLogCommand
-	ProfileUpsert           *command.ProfileUpsertCommand
-	PreferenceUpsert        *command.PreferenceUpsertCommand
-	PreferenceDelete        *command.PreferenceDeleteCommand
+	UserLifecycleTransition  *command.UserLifecycleTransitionCommand
+	BulkUserTransition       *command.BulkUserTransitionCommand
+	BulkUserImport           *command.BulkUserImportCommand
+	UserCreate               *command.UserCreateCommand
+	UserUpdate               *command.UserUpdateCommand
+	UserInvite               *command.UserInviteCommand
+	UserRegistrationRequest  *command.UserRegistrationRequestCommand
+	UserTokenValidate        *command.UserTokenValidateCommand
+	UserTokenConsume         *command.UserTokenConsumeCommand
+	UserPasswordResetRequest *command.UserPasswordResetRequestCommand
+	UserPasswordResetConfirm *command.UserPasswordResetConfirmCommand
+	UserPasswordReset        *command.UserPasswordResetCommand
+	CreateRole               *command.CreateRoleCommand
+	UpdateRole               *command.UpdateRoleCommand
+	DeleteRole               *command.DeleteRoleCommand
+	AssignRole               *command.AssignRoleCommand
+	UnassignRole             *command.UnassignRoleCommand
+	LogActivity              *command.ActivityLogCommand
+	ProfileUpsert            *command.ProfileUpsertCommand
+	PreferenceUpsert         *command.PreferenceUpsertCommand
+	PreferenceDelete         *command.PreferenceDeleteCommand
 }
 
 // Queries exposes read-model helpers.
@@ -60,22 +65,29 @@ type Queries struct {
 // Config captures all required dependencies so callers can provide their own
 // instances (bun.DB, cached repositories, hooks, etc.).
 type Config struct {
-	AuthRepository       types.AuthRepository
-	InventoryRepository  types.UserInventoryRepository
-	ActivityRepository   types.ActivityRepository
-	RoleRegistry         types.RoleRegistry
-	ActivitySink         types.ActivitySink
-	Hooks                types.Hooks
-	Clock                types.Clock
-	IDGenerator          types.IDGenerator
-	Logger               types.Logger
-	TransitionPolicy     types.TransitionPolicy
-	InviteTokenTTL       time.Duration
-	ProfileRepository    types.ProfileRepository
-	PreferenceRepository types.PreferenceRepository
-	PreferenceResolver   PreferenceResolver
-	ScopeResolver        types.ScopeResolver
-	AuthorizationPolicy  types.AuthorizationPolicy
+	AuthRepository          types.AuthRepository
+	InventoryRepository     types.UserInventoryRepository
+	ActivityRepository      types.ActivityRepository
+	RoleRegistry            types.RoleRegistry
+	ActivitySink            types.ActivitySink
+	Hooks                   types.Hooks
+	Clock                   types.Clock
+	IDGenerator             types.IDGenerator
+	Logger                  types.Logger
+	TransitionPolicy        types.TransitionPolicy
+	InviteTokenTTL          time.Duration
+	SecureLinkManager       types.SecureLinkManager
+	UserTokenRepository     types.UserTokenRepository
+	PasswordResetRepository types.PasswordResetRepository
+	InviteLinkRoute         string
+	RegistrationLinkRoute   string
+	PasswordResetLinkRoute  string
+	TokenScopeEnforcer      types.ScopeEnforcer
+	ProfileRepository       types.ProfileRepository
+	PreferenceRepository    types.PreferenceRepository
+	PreferenceResolver      PreferenceResolver
+	ScopeResolver           types.ScopeResolver
+	AuthorizationPolicy     types.AuthorizationPolicy
 }
 
 // PreferenceResolver resolves scoped preferences for queries.
@@ -234,6 +246,73 @@ func (s *Service) buildCommands() Commands {
 		Logger:     s.cfg.Logger,
 		ScopeGuard: s.scopeGuard,
 	})
+	userPasswordReset := command.NewUserPasswordResetCommand(command.PasswordResetCommandConfig{
+		Repository: s.cfg.AuthRepository,
+		Clock:      s.cfg.Clock,
+		Activity:   s.cfg.ActivitySink,
+		Hooks:      s.cfg.Hooks,
+		Logger:     s.cfg.Logger,
+		ScopeGuard: s.scopeGuard,
+	})
+	userInvite := command.NewUserInviteCommand(command.InviteCommandConfig{
+		Repository:      s.cfg.AuthRepository,
+		TokenRepository: s.cfg.UserTokenRepository,
+		SecureLinks:     s.cfg.SecureLinkManager,
+		Clock:           s.cfg.Clock,
+		IDGen:           s.cfg.IDGenerator,
+		Activity:        s.cfg.ActivitySink,
+		Hooks:           s.cfg.Hooks,
+		Logger:          s.cfg.Logger,
+		TokenTTL:        s.cfg.InviteTokenTTL,
+		ScopeGuard:      s.scopeGuard,
+		Route:           s.cfg.InviteLinkRoute,
+	})
+	registrationRequest := command.NewUserRegistrationRequestCommand(command.RegistrationRequestConfig{
+		Repository:      s.cfg.AuthRepository,
+		TokenRepository: s.cfg.UserTokenRepository,
+		SecureLinks:     s.cfg.SecureLinkManager,
+		Clock:           s.cfg.Clock,
+		IDGen:           s.cfg.IDGenerator,
+		Activity:        s.cfg.ActivitySink,
+		Hooks:           s.cfg.Hooks,
+		Logger:          s.cfg.Logger,
+		TokenTTL:        s.cfg.InviteTokenTTL,
+		ScopeGuard:      s.scopeGuard,
+		Route:           s.cfg.RegistrationLinkRoute,
+	})
+	tokenValidate := command.NewUserTokenValidateCommand(command.TokenValidateConfig{
+		TokenRepository: s.cfg.UserTokenRepository,
+		SecureLinks:     s.cfg.SecureLinkManager,
+		Clock:           s.cfg.Clock,
+		ScopeEnforcer:   s.cfg.TokenScopeEnforcer,
+	})
+	tokenConsume := command.NewUserTokenConsumeCommand(command.TokenConsumeConfig{
+		TokenRepository: s.cfg.UserTokenRepository,
+		SecureLinks:     s.cfg.SecureLinkManager,
+		Clock:           s.cfg.Clock,
+		ScopeEnforcer:   s.cfg.TokenScopeEnforcer,
+		Activity:        s.cfg.ActivitySink,
+		Hooks:           s.cfg.Hooks,
+	})
+	resetRequest := command.NewUserPasswordResetRequestCommand(command.PasswordResetRequestConfig{
+		Repository:      s.cfg.AuthRepository,
+		ResetRepository: s.cfg.PasswordResetRepository,
+		SecureLinks:     s.cfg.SecureLinkManager,
+		Clock:           s.cfg.Clock,
+		IDGen:           s.cfg.IDGenerator,
+		Activity:        s.cfg.ActivitySink,
+		Hooks:           s.cfg.Hooks,
+		Logger:          s.cfg.Logger,
+		Route:           s.cfg.PasswordResetLinkRoute,
+	})
+	resetConfirm := command.NewUserPasswordResetConfirmCommand(command.PasswordResetConfirmConfig{
+		ResetRepository: s.cfg.PasswordResetRepository,
+		SecureLinks:     s.cfg.SecureLinkManager,
+		ResetCommand:    userPasswordReset,
+		Clock:           s.cfg.Clock,
+		ScopeEnforcer:   s.cfg.TokenScopeEnforcer,
+		Logger:          s.cfg.Logger,
+	})
 	return Commands{
 		UserLifecycleTransition: lifecycle,
 		BulkUserTransition:      command.NewBulkUserTransitionCommand(lifecycle),
@@ -248,29 +327,18 @@ func (s *Service) buildCommands() Commands {
 			Logger:     s.cfg.Logger,
 			ScopeGuard: s.scopeGuard,
 		}),
-		UserInvite: command.NewUserInviteCommand(command.InviteCommandConfig{
-			Repository: s.cfg.AuthRepository,
-			Clock:      s.cfg.Clock,
-			IDGen:      s.cfg.IDGenerator,
-			Activity:   s.cfg.ActivitySink,
-			Hooks:      s.cfg.Hooks,
-			Logger:     s.cfg.Logger,
-			TokenTTL:   s.cfg.InviteTokenTTL,
-			ScopeGuard: s.scopeGuard,
-		}),
-		UserPasswordReset: command.NewUserPasswordResetCommand(command.PasswordResetCommandConfig{
-			Repository: s.cfg.AuthRepository,
-			Clock:      s.cfg.Clock,
-			Activity:   s.cfg.ActivitySink,
-			Hooks:      s.cfg.Hooks,
-			Logger:     s.cfg.Logger,
-			ScopeGuard: s.scopeGuard,
-		}),
-		CreateRole:   command.NewCreateRoleCommand(s.cfg.RoleRegistry, s.scopeGuard),
-		UpdateRole:   command.NewUpdateRoleCommand(s.cfg.RoleRegistry, s.scopeGuard),
-		DeleteRole:   command.NewDeleteRoleCommand(s.cfg.RoleRegistry, s.scopeGuard),
-		AssignRole:   command.NewAssignRoleCommand(s.cfg.RoleRegistry, s.scopeGuard),
-		UnassignRole: command.NewUnassignRoleCommand(s.cfg.RoleRegistry, s.scopeGuard),
+		UserInvite:               userInvite,
+		UserRegistrationRequest:  registrationRequest,
+		UserTokenValidate:        tokenValidate,
+		UserTokenConsume:         tokenConsume,
+		UserPasswordReset:        userPasswordReset,
+		UserPasswordResetRequest: resetRequest,
+		UserPasswordResetConfirm: resetConfirm,
+		CreateRole:               command.NewCreateRoleCommand(s.cfg.RoleRegistry, s.scopeGuard),
+		UpdateRole:               command.NewUpdateRoleCommand(s.cfg.RoleRegistry, s.scopeGuard),
+		DeleteRole:               command.NewDeleteRoleCommand(s.cfg.RoleRegistry, s.scopeGuard),
+		AssignRole:               command.NewAssignRoleCommand(s.cfg.RoleRegistry, s.scopeGuard),
+		UnassignRole:             command.NewUnassignRoleCommand(s.cfg.RoleRegistry, s.scopeGuard),
 		LogActivity: command.NewActivityLogCommand(command.ActivityLogConfig{
 			Sink:  s.cfg.ActivitySink,
 			Hooks: s.cfg.Hooks,
