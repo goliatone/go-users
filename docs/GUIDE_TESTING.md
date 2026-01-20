@@ -233,11 +233,18 @@ func TestUserLifecycleTransitionCommand_EmitsHook(t *testing.T) {
 func TestUserInviteCommand_ReturnsResult(t *testing.T) {
     repo := newFakeAuthRepo()
     fixedToken := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+    tokenRepo := newMemoryTokenRepo()
+    secureLinks := &stubSecureLinkManager{
+        token:      "secure-link",
+        expiration: time.Hour,
+    }
 
     cmd := command.NewUserInviteCommand(command.InviteCommandConfig{
-        Repository: repo,
-        IDGen:      fixedIDGenerator{id: fixedToken},
-        TokenTTL:   time.Hour,
+        Repository:      repo,
+        TokenRepository: tokenRepo,
+        SecureLinks:     secureLinks,
+        IDGen:           fixedIDGenerator{id: fixedToken},
+        TokenTTL:        time.Hour,
     })
 
     result := &command.UserInviteResult{}
@@ -249,7 +256,7 @@ func TestUserInviteCommand_ReturnsResult(t *testing.T) {
     })
 
     require.NoError(t, err)
-    require.Equal(t, fixedToken.String(), result.Token)
+    require.Equal(t, "secure-link", result.Token)
     require.Equal(t, "new@example.com", result.User.Email)
     require.Equal(t, types.LifecycleStatePending, result.User.Status)
 }
@@ -423,6 +430,7 @@ func TestFullSchema_Integration(t *testing.T) {
         "../data/sql/migrations/sqlite/00005_profiles_preferences.up.sql",
         "../data/sql/migrations/sqlite/00006_custom_roles_metadata.up.sql",
         "../data/sql/migrations/sqlite/00007_custom_roles_order.up.sql",
+        "../data/sql/migrations/sqlite/00008_user_tokens.up.sql",
     }
 
     for _, path := range migrations {
@@ -430,7 +438,7 @@ func TestFullSchema_Integration(t *testing.T) {
     }
 
     // Verify tables exist
-    tables := []string{"users", "password_reset", "custom_roles", "user_custom_roles",
+    tables := []string{"users", "password_reset", "user_tokens", "custom_roles", "user_custom_roles",
         "user_activity", "user_profiles", "user_preferences"}
 
     for _, table := range tables {
@@ -538,6 +546,73 @@ func TestCommand_LogsActivity(t *testing.T) {
 }
 ```
 
+### SecureLink Stubs
+
+```go
+type stubSecureLinkManager struct {
+    token      string
+    expiration time.Duration
+}
+
+func (s *stubSecureLinkManager) Generate(string, ...types.SecureLinkPayload) (string, error) {
+    if s.token == "" {
+        return "token", nil
+    }
+    return s.token, nil
+}
+
+func (s *stubSecureLinkManager) Validate(string) (map[string]any, error) {
+    return map[string]any{}, nil
+}
+
+func (s *stubSecureLinkManager) GetAndValidate(fn func(string) string) (types.SecureLinkPayload, error) {
+    if fn != nil {
+        _ = fn("")
+    }
+    return types.SecureLinkPayload{}, nil
+}
+
+func (s *stubSecureLinkManager) GetExpiration() time.Duration {
+    return s.expiration
+}
+
+type memoryTokenRepo struct {
+    tokens map[string]*types.UserToken
+}
+
+func newMemoryTokenRepo() *memoryTokenRepo {
+    return &memoryTokenRepo{tokens: map[string]*types.UserToken{}}
+}
+
+func (m *memoryTokenRepo) CreateToken(_ context.Context, token types.UserToken) (*types.UserToken, error) {
+    copy := token
+    if copy.ID == uuid.Nil {
+        copy.ID = uuid.New()
+    }
+    m.tokens[copy.JTI] = &copy
+    return &copy, nil
+}
+
+func (m *memoryTokenRepo) GetTokenByJTI(_ context.Context, _ types.UserTokenType, jti string) (*types.UserToken, error) {
+    if token, ok := m.tokens[jti]; ok {
+        return token, nil
+    }
+    return nil, errors.New("not found")
+}
+
+func (m *memoryTokenRepo) UpdateTokenStatus(_ context.Context, _ types.UserTokenType, jti string, status types.UserTokenStatus, usedAt time.Time) error {
+    token, ok := m.tokens[jti]
+    if !ok {
+        return errors.New("not found")
+    }
+    token.Status = status
+    if !usedAt.IsZero() {
+        token.UsedAt = usedAt
+    }
+    return nil
+}
+```
+
 ### Fixed Time and ID Generators
 
 ```go
@@ -560,11 +635,18 @@ func (f fixedIDGenerator) UUID() uuid.UUID {
 }
 
 // Usage:
+tokenRepo := newMemoryTokenRepo()
+secureLinks := &stubSecureLinkManager{
+    token:      "secure-link",
+    expiration: time.Hour,
+}
 cmd := command.NewUserInviteCommand(command.InviteCommandConfig{
-    Repository: repo,
-    Clock:      fixedClock{t: time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC)},
-    IDGen:      fixedIDGenerator{id: uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")},
-    TokenTTL:   time.Hour,
+    Repository:      repo,
+    TokenRepository: tokenRepo,
+    SecureLinks:     secureLinks,
+    Clock:           fixedClock{t: time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC)},
+    IDGen:           fixedIDGenerator{id: uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")},
+    TokenTTL:        time.Hour,
 })
 ```
 

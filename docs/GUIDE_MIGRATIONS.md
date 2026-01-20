@@ -393,9 +393,34 @@ CREATE TABLE password_reset (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     email TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'unknown',  -- unknown, requested, expired, changed
+    jti TEXT,
+    issued_at TIMESTAMP,
+    expires_at TIMESTAMP,
+    used_at TIMESTAMP,
+    scope_tenant_id UUID,
+    scope_org_id UUID,
     reseted_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP,
+    updated_at TIMESTAMP
+);
+```
+
+### User Tokens Table (00008)
+
+Invite and registration token registry:
+
+```sql
+CREATE TABLE user_tokens (
+    id UUID PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_type TEXT NOT NULL,
+    jti TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'issued',  -- issued, used, expired
+    issued_at TIMESTAMP,
+    expires_at TIMESTAMP,
+    used_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP
 );
 ```
@@ -655,7 +680,7 @@ func TestMigrationsApplyToSQLite(t *testing.T) {
     }
 
     // Verify tables exist
-    tables := []string{"users", "password_reset", "custom_roles", "user_activity", "user_profiles", "user_preferences"}
+    tables := []string{"users", "password_reset", "user_tokens", "custom_roles", "user_activity", "user_profiles", "user_preferences"}
     for _, table := range tables {
         var name string
         err := db.QueryRowContext(ctx,
@@ -948,6 +973,7 @@ The `go-users` migration system provides:
 Key tables created:
 - `users` - Core user identity
 - `password_reset` - Password reset tokens
+- `user_tokens` - Invite and registration token registry
 - `custom_roles` - Role definitions
 - `user_custom_roles` - Role assignments
 - `user_activity` - Audit logging
