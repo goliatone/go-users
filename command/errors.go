@@ -15,6 +15,8 @@ var (
 	ErrActorRequired = types.ErrActorRequired
 	// ErrUserRequired indicates a user payload was not supplied.
 	ErrUserRequired = errors.New("go-users: user payload required")
+	// ErrUserNotFound indicates the requested user was not found.
+	ErrUserNotFound = errors.New("go-users: user not found")
 	// ErrUserEmailRequired indicates a user email address was missing.
 	ErrUserEmailRequired = errors.New("go-users: user email required")
 	// ErrInviteEmailRequired occurs when an invite omits the email address.
@@ -37,4 +39,22 @@ var (
 	ErrPreferenceKeyRequired = errors.New("go-users: preference key required")
 	// ErrPreferenceValueRequired indicates the preference value payload was missing.
 	ErrPreferenceValueRequired = errors.New("go-users: preference value required")
+	// ErrTokenRequired indicates a securelink token was missing.
+	ErrTokenRequired = errors.New("go-users: token required")
+	// ErrTokenTypeRequired indicates a token type was missing.
+	ErrTokenTypeRequired = errors.New("go-users: token type required")
+	// ErrTokenJTIRequired indicates the token payload lacked a JTI.
+	ErrTokenJTIRequired = errors.New("go-users: token jti required")
+	// ErrTokenNotFound indicates the token registry has no matching record.
+	ErrTokenNotFound = errors.New("go-users: token not found")
+	// ErrTokenExpired indicates the token has expired.
+	ErrTokenExpired = errors.New("go-users: token expired")
+	// ErrTokenAlreadyUsed indicates the token has already been consumed.
+	ErrTokenAlreadyUsed = errors.New("go-users: token already used")
+	// ErrTokenUserMismatch indicates the token user id mismatch.
+	ErrTokenUserMismatch = errors.New("go-users: token user mismatch")
+	// ErrResetIdentifierRequired indicates a reset identifier was missing.
+	ErrResetIdentifierRequired = errors.New("go-users: password reset requires identifier")
+	// ErrResetCommandRequired indicates the reset command dependency is missing.
+	ErrResetCommandRequired = errors.New("go-users: password reset command required")
 )

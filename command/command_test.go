@@ -3,6 +3,7 @@ package command
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -106,9 +107,12 @@ func TestUserPasswordResetCommand_LogsActivity(t *testing.T) {
 		Activity:   sink,
 	})
 
+	expiresAt := time.Date(2024, 2, 2, 3, 4, 5, 0, time.UTC)
 	err := cmd.Execute(context.Background(), UserPasswordResetInput{
 		UserID:          userID,
 		NewPasswordHash: "hashed-secret",
+		TokenJTI:        "reset-jti",
+		TokenExpiresAt:  expiresAt,
 		Actor: types.ActorRef{
 			ID: uuid.New(),
 		},
@@ -119,12 +123,23 @@ func TestUserPasswordResetCommand_LogsActivity(t *testing.T) {
 	require.Equal(t, "hashed-secret", repo.lastResetHash)
 	require.Equal(t, "user.password.reset", recorded.Verb)
 	require.Equal(t, userID, recorded.UserID)
+	require.Equal(t, "reset-jti", recorded.Data["jti"])
+	require.Equal(t, expiresAt, recorded.Data["expires_at"])
 }
 
 func TestUserInviteCommand_GeneratesTokenAndActivity(t *testing.T) {
 	repo := newFakeAuthRepo()
+	tokenRepo := newMemoryTokenRepo()
+	manager := &stubSecureLinkManager{
+		token:      "secure-link",
+		expiration: time.Hour,
+	}
 	expectedToken := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 	fixedTime := time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC)
+	scope := types.ScopeFilter{
+		TenantID: uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-000000000001"),
+		OrgID:    uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-000000000002"),
+	}
 	var recorded types.ActivityRecord
 	sink := &recordingActivitySink{
 		onLog: func(r types.ActivityRecord) {
@@ -133,11 +148,13 @@ func TestUserInviteCommand_GeneratesTokenAndActivity(t *testing.T) {
 	}
 
 	cmd := NewUserInviteCommand(InviteCommandConfig{
-		Repository: repo,
-		Clock:      fixedClock{t: fixedTime},
-		IDGen:      fixedIDGenerator{id: expectedToken},
-		Activity:   sink,
-		TokenTTL:   time.Hour,
+		Repository:      repo,
+		TokenRepository: tokenRepo,
+		SecureLinks:     manager,
+		Clock:           fixedClock{t: fixedTime},
+		IDGen:           fixedIDGenerator{id: expectedToken},
+		Activity:        sink,
+		TokenTTL:        time.Hour,
 	})
 
 	result := &UserInviteResult{}
@@ -147,16 +164,206 @@ func TestUserInviteCommand_GeneratesTokenAndActivity(t *testing.T) {
 		Actor: types.ActorRef{
 			ID: uuid.New(),
 		},
+		Scope:  scope,
 		Result: result,
 	})
 
 	require.NoError(t, err)
-	require.Equal(t, expectedToken.String(), result.Token)
-	require.Equal(t, "new@example.com", recorded.Data["email"])
-	require.Equal(t, "user.invite", recorded.Verb)
+	require.Equal(t, "secure-link", result.Token)
 	require.NotNil(t, result.User)
 	require.Equal(t, "new-user", result.User.Username)
 	require.Equal(t, types.LifecycleStatePending, result.User.Status)
+	require.Equal(t, SecureLinkRouteInviteAccept, manager.lastRoute)
+
+	require.NotNil(t, tokenRepo.lastCreated)
+	require.Equal(t, types.UserTokenInvite, tokenRepo.lastCreated.Type)
+	require.Equal(t, expectedToken.String(), tokenRepo.lastCreated.JTI)
+	require.Equal(t, fixedTime.Add(time.Hour), tokenRepo.lastCreated.ExpiresAt)
+
+	require.Len(t, manager.lastPayloads, 1)
+	payload := manager.lastPayloads[0]
+	require.Equal(t, SecureLinkActionInvite, payload["action"])
+	require.Equal(t, expectedToken.String(), payload["jti"])
+	require.Equal(t, result.User.ID.String(), payload["user_id"])
+	require.Equal(t, result.User.Email, payload["email"])
+	require.Equal(t, scope.TenantID.String(), payload["tenant_id"])
+	require.Equal(t, scope.OrgID.String(), payload["org_id"])
+	require.Equal(t, fixedTime.Format(time.RFC3339Nano), payload["issued_at"])
+	require.Equal(t, fixedTime.Add(time.Hour).Format(time.RFC3339Nano), payload["expires_at"])
+
+	require.Equal(t, "user.invite", recorded.Verb)
+	require.Equal(t, expectedToken.String(), recorded.Data["jti"])
+	_, hasToken := recorded.Data["token"]
+	require.False(t, hasToken)
+}
+
+func TestUserPasswordResetRequestCommand_IssuesTokenAndLogsActivity(t *testing.T) {
+	userID := uuid.New()
+	repo := newFakeAuthRepo()
+	repo.users[userID] = &types.AuthUser{
+		ID:       userID,
+		Email:    "reset@example.com",
+		Username: "reset-user",
+	}
+	resetRepo := newMemoryResetRepo()
+	manager := &stubSecureLinkManager{
+		token:      "reset-link",
+		expiration: time.Hour,
+	}
+	fixedTime := time.Date(2024, 6, 7, 8, 9, 10, 0, time.UTC)
+	expectedToken := uuid.MustParse("bbbbbbbb-cccc-dddd-eeee-ffffffffffff")
+	scope := types.ScopeFilter{
+		TenantID: uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-000000000003"),
+		OrgID:    uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-000000000004"),
+	}
+	var recorded types.ActivityRecord
+	sink := &recordingActivitySink{
+		onLog: func(r types.ActivityRecord) {
+			recorded = r
+		},
+	}
+
+	cmd := NewUserPasswordResetRequestCommand(PasswordResetRequestConfig{
+		Repository:      repo,
+		ResetRepository: resetRepo,
+		SecureLinks:     manager,
+		Clock:           fixedClock{t: fixedTime},
+		IDGen:           fixedIDGenerator{id: expectedToken},
+		Activity:        sink,
+		TokenTTL:        time.Hour,
+	})
+
+	result := &UserPasswordResetRequestResult{}
+	err := cmd.Execute(context.Background(), UserPasswordResetRequestInput{
+		Identifier: "reset@example.com",
+		Scope:      scope,
+		Result:     result,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "reset-link", result.Token)
+	require.NotNil(t, result.User)
+	require.Equal(t, userID, result.User.ID)
+
+	require.Len(t, manager.lastPayloads, 1)
+	payload := manager.lastPayloads[0]
+	require.Equal(t, SecureLinkActionPasswordReset, payload["action"])
+	require.Equal(t, expectedToken.String(), payload["jti"])
+	require.Equal(t, userID.String(), payload["user_id"])
+	require.Equal(t, "reset@example.com", payload["email"])
+	require.Equal(t, scope.TenantID.String(), payload["tenant_id"])
+	require.Equal(t, scope.OrgID.String(), payload["org_id"])
+	require.Equal(t, fixedTime.Format(time.RFC3339Nano), payload["issued_at"])
+	require.Equal(t, fixedTime.Add(time.Hour).Format(time.RFC3339Nano), payload["expires_at"])
+
+	resetRecord := resetRepo.resets[expectedToken.String()]
+	require.NotNil(t, resetRecord)
+	require.Equal(t, types.PasswordResetStatusRequested, resetRecord.Status)
+	require.Equal(t, fixedTime, resetRecord.IssuedAt)
+	require.Equal(t, fixedTime.Add(time.Hour), resetRecord.ExpiresAt)
+
+	require.Equal(t, "user.password.reset.requested", recorded.Verb)
+	require.Equal(t, expectedToken.String(), recorded.Data["jti"])
+	_, hasToken := recorded.Data["token"]
+	require.False(t, hasToken)
+}
+
+func TestUserTokenConsumeCommand_PreventsReplayAndLogsActivity(t *testing.T) {
+	userID := uuid.New()
+	issuedAt := time.Date(2024, 3, 4, 5, 6, 7, 0, time.UTC)
+	tokenRepo := newMemoryTokenRepo()
+	_, err := tokenRepo.CreateToken(context.Background(), types.UserToken{
+		UserID:    userID,
+		Type:      types.UserTokenInvite,
+		JTI:       "token-jti",
+		Status:    types.UserTokenStatusIssued,
+		IssuedAt:  issuedAt,
+		ExpiresAt: issuedAt.Add(time.Hour),
+	})
+	require.NoError(t, err)
+
+	manager := &stubSecureLinkManager{
+		validatePayload: types.SecureLinkPayload{
+			"jti":        "token-jti",
+			"user_id":    userID.String(),
+			"expires_at": issuedAt.Add(time.Hour).Format(time.RFC3339Nano),
+			"email":      "invitee@example.com",
+		},
+	}
+	var recorded types.ActivityRecord
+	sink := &recordingActivitySink{
+		onLog: func(r types.ActivityRecord) {
+			recorded = r
+		},
+	}
+
+	cmd := NewUserTokenConsumeCommand(TokenConsumeConfig{
+		TokenRepository: tokenRepo,
+		SecureLinks:     manager,
+		Clock:           fixedClock{t: issuedAt},
+		Activity:        sink,
+	})
+
+	err = cmd.Execute(context.Background(), UserTokenConsumeInput{
+		Token:     "secure-token",
+		TokenType: types.UserTokenInvite,
+	})
+	require.NoError(t, err)
+	require.Equal(t, types.UserTokenStatusUsed, tokenRepo.tokens[tokenKey(types.UserTokenInvite, "token-jti")].Status)
+	require.Equal(t, "user.invite.consumed", recorded.Verb)
+	_, hasToken := recorded.Data["token"]
+	require.False(t, hasToken)
+
+	err = cmd.Execute(context.Background(), UserTokenConsumeInput{
+		Token:     "secure-token",
+		TokenType: types.UserTokenInvite,
+	})
+	require.ErrorIs(t, err, ErrTokenAlreadyUsed)
+}
+
+func TestUserPasswordResetConfirmCommand_ConsumesToken(t *testing.T) {
+	userID := uuid.New()
+	repo := newFakeAuthRepo()
+	repo.users[userID] = &types.AuthUser{
+		ID:    userID,
+		Email: "user@example.com",
+	}
+	resetRepo := newMemoryResetRepo()
+	issuedAt := time.Date(2024, 4, 5, 6, 7, 8, 0, time.UTC)
+	_, err := resetRepo.CreateReset(context.Background(), types.PasswordResetRecord{
+		UserID:    userID,
+		Email:     "user@example.com",
+		Status:    types.PasswordResetStatusRequested,
+		JTI:       "reset-jti",
+		IssuedAt:  issuedAt,
+		ExpiresAt: issuedAt.Add(time.Hour),
+	})
+	require.NoError(t, err)
+
+	manager := &stubSecureLinkManager{
+		validatePayload: types.SecureLinkPayload{
+			"jti":        "reset-jti",
+			"user_id":    userID.String(),
+			"expires_at": issuedAt.Add(time.Hour).Format(time.RFC3339Nano),
+		},
+	}
+	resetCmd := NewUserPasswordResetCommand(PasswordResetCommandConfig{
+		Repository: repo,
+	})
+	confirmCmd := NewUserPasswordResetConfirmCommand(PasswordResetConfirmConfig{
+		ResetRepository: resetRepo,
+		SecureLinks:     manager,
+		ResetCommand:    resetCmd,
+		Clock:           fixedClock{t: issuedAt},
+	})
+
+	err = confirmCmd.Execute(context.Background(), UserPasswordResetConfirmInput{
+		Token:           "reset-token",
+		NewPasswordHash: "hashed-reset",
+	})
+	require.NoError(t, err)
+	require.Equal(t, types.PasswordResetStatusChanged, resetRepo.resets["reset-jti"].Status)
+	require.Equal(t, userID, repo.lastResetUserID)
 }
 
 func TestUserCreateCommand_DefaultsStatusAndLogsActivity(t *testing.T) {
@@ -384,8 +591,18 @@ func (f *fakeAuthRepo) GetByID(_ context.Context, id uuid.UUID) (*types.AuthUser
 	return user, nil
 }
 
-func (f *fakeAuthRepo) GetByIdentifier(context.Context, string) (*types.AuthUser, error) {
-	return nil, errors.New("not implemented")
+func (f *fakeAuthRepo) GetByIdentifier(_ context.Context, identifier string) (*types.AuthUser, error) {
+	needle := strings.TrimSpace(identifier)
+	if needle == "" {
+		return nil, errors.New("not found")
+	}
+	for _, user := range f.users {
+		if strings.EqualFold(strings.TrimSpace(user.Email), needle) ||
+			strings.EqualFold(strings.TrimSpace(user.Username), needle) {
+			return user, nil
+		}
+	}
+	return nil, errors.New("not found")
 }
 
 func (f *fakeAuthRepo) Create(_ context.Context, input *types.AuthUser) (*types.AuthUser, error) {
@@ -510,4 +727,130 @@ type fixedClock struct {
 
 func (f fixedClock) Now() time.Time {
 	return f.t
+}
+
+type stubSecureLinkManager struct {
+	token           string
+	expiration      time.Duration
+	lastRoute       string
+	lastPayloads    []types.SecureLinkPayload
+	validatePayload types.SecureLinkPayload
+}
+
+func (s *stubSecureLinkManager) Generate(route string, payloads ...types.SecureLinkPayload) (string, error) {
+	s.lastRoute = route
+	s.lastPayloads = payloads
+	if s.token == "" {
+		return "token", nil
+	}
+	return s.token, nil
+}
+
+func (s *stubSecureLinkManager) Validate(string) (map[string]any, error) {
+	if s.validatePayload == nil {
+		return map[string]any{}, nil
+	}
+	return map[string]any(s.validatePayload), nil
+}
+
+func (s *stubSecureLinkManager) GetAndValidate(fn func(string) string) (types.SecureLinkPayload, error) {
+	return s.validatePayload, nil
+}
+
+func (s *stubSecureLinkManager) GetExpiration() time.Duration {
+	return s.expiration
+}
+
+type memoryTokenRepo struct {
+	tokens      map[string]*types.UserToken
+	lastCreated *types.UserToken
+}
+
+func newMemoryTokenRepo() *memoryTokenRepo {
+	return &memoryTokenRepo{tokens: map[string]*types.UserToken{}}
+}
+
+func (m *memoryTokenRepo) CreateToken(_ context.Context, token types.UserToken) (*types.UserToken, error) {
+	copy := token
+	if copy.ID == uuid.Nil {
+		copy.ID = uuid.New()
+	}
+	m.tokens[tokenKey(copy.Type, copy.JTI)] = &copy
+	m.lastCreated = &copy
+	return &copy, nil
+}
+
+func (m *memoryTokenRepo) GetTokenByJTI(_ context.Context, tokenType types.UserTokenType, jti string) (*types.UserToken, error) {
+	if token, ok := m.tokens[tokenKey(tokenType, jti)]; ok {
+		return token, nil
+	}
+	return nil, errors.New("not found")
+}
+
+func (m *memoryTokenRepo) UpdateTokenStatus(_ context.Context, tokenType types.UserTokenType, jti string, status types.UserTokenStatus, usedAt time.Time) error {
+	token, ok := m.tokens[tokenKey(tokenType, jti)]
+	if !ok {
+		return errors.New("not found")
+	}
+	token.Status = status
+	if !usedAt.IsZero() {
+		token.UsedAt = usedAt
+	}
+	return nil
+}
+
+func tokenKey(tokenType types.UserTokenType, jti string) string {
+	return string(tokenType) + ":" + jti
+}
+
+type memoryResetRepo struct {
+	resets map[string]*types.PasswordResetRecord
+}
+
+func newMemoryResetRepo() *memoryResetRepo {
+	return &memoryResetRepo{resets: map[string]*types.PasswordResetRecord{}}
+}
+
+func (m *memoryResetRepo) CreateReset(_ context.Context, record types.PasswordResetRecord) (*types.PasswordResetRecord, error) {
+	copy := record
+	if copy.ID == uuid.Nil {
+		copy.ID = uuid.New()
+	}
+	m.resets[copy.JTI] = &copy
+	return &copy, nil
+}
+
+func (m *memoryResetRepo) GetResetByJTI(_ context.Context, jti string) (*types.PasswordResetRecord, error) {
+	if rec, ok := m.resets[jti]; ok {
+		return rec, nil
+	}
+	return nil, errors.New("not found")
+}
+
+func (m *memoryResetRepo) ConsumeReset(_ context.Context, jti string, usedAt time.Time) error {
+	rec, ok := m.resets[jti]
+	if !ok {
+		return errors.New("not found")
+	}
+	if rec.Status == types.PasswordResetStatusExpired || rec.Status == types.PasswordResetStatusChanged || !rec.UsedAt.IsZero() {
+		return errors.New("already used")
+	}
+	if usedAt.IsZero() {
+		usedAt = time.Now().UTC()
+	}
+	rec.UsedAt = usedAt
+	return nil
+}
+
+func (m *memoryResetRepo) UpdateResetStatus(_ context.Context, jti string, status types.PasswordResetStatus, usedAt time.Time) error {
+	rec, ok := m.resets[jti]
+	if !ok {
+		return errors.New("not found")
+	}
+	rec.Status = status
+	if !usedAt.IsZero() {
+		rec.UsedAt = usedAt
+		rec.ResetAt = usedAt
+	}
+	return nil
 }

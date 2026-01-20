@@ -2,6 +2,8 @@ package command
 
 import (
 	"context"
+	"strings"
+	"time"
 
 	gocommand "github.com/goliatone/go-command"
 	"github.com/goliatone/go-users/pkg/types"
@@ -13,6 +15,8 @@ import (
 type UserPasswordResetInput struct {
 	UserID          uuid.UUID
 	NewPasswordHash string
+	TokenJTI        string
+	TokenExpiresAt  time.Time
 	Actor           types.ActorRef
 	Scope           types.ScopeFilter
 	Result          *UserPasswordResetResult
@@ -98,6 +102,16 @@ func (c *UserPasswordResetCommand) Execute(ctx context.Context, input UserPasswo
 		return err
 	}
 
+	data := map[string]any{
+		"user_email": user.Email,
+	}
+	if strings.TrimSpace(input.TokenJTI) != "" {
+		data["jti"] = strings.TrimSpace(input.TokenJTI)
+	}
+	if !input.TokenExpiresAt.IsZero() {
+		data["expires_at"] = input.TokenExpiresAt
+	}
+
 	record := types.ActivityRecord{
 		UserID:     input.UserID,
 		ActorID:    input.Actor.ID,
@@ -107,9 +121,7 @@ func (c *UserPasswordResetCommand) Execute(ctx context.Context, input UserPasswo
 		Channel:    "password",
 		TenantID:   scope.TenantID,
 		OrgID:      scope.OrgID,
-		Data: map[string]any{
-			"user_email": user.Email,
-		},
+		Data:       data,
 		OccurredAt: now(c.clock),
 	}
 	logActivity(ctx, c.sink, record)

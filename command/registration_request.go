@@ -11,10 +11,10 @@ import (
 	"github.com/google/uuid"
 )
 
-const defaultInviteTTL = 72 * time.Hour
+const defaultRegistrationTTL = 72 * time.Hour
 
-// UserInviteInput carries the data required to invite a new user.
-type UserInviteInput struct {
+// UserRegistrationRequestInput carries the data required to request self-registration.
+type UserRegistrationRequestInput struct {
 	Email     string
 	Username  string
 	FirstName string
@@ -23,35 +23,33 @@ type UserInviteInput struct {
 	Metadata  map[string]any
 	Actor     types.ActorRef
 	Scope     types.ScopeFilter
-	Result    *UserInviteResult
+	Result    *UserRegistrationRequestResult
 }
 
 // Type implements gocommand.Message.
-func (UserInviteInput) Type() string {
-	return "command.user.invite"
+func (UserRegistrationRequestInput) Type() string {
+	return "command.user.registration.request"
 }
 
 // Validate implements gocommand.Message.
-func (input UserInviteInput) Validate() error {
+func (input UserRegistrationRequestInput) Validate() error {
 	switch {
 	case strings.TrimSpace(input.Email) == "":
 		return ErrInviteEmailRequired
-	case input.Actor.ID == uuid.Nil:
-		return ErrActorRequired
 	default:
 		return nil
 	}
 }
 
-// UserInviteResult exposes the creation output and invite token details.
-type UserInviteResult struct {
+// UserRegistrationRequestResult exposes the creation output and registration token details.
+type UserRegistrationRequestResult struct {
 	User      *types.AuthUser
 	Token     string
 	ExpiresAt time.Time
 }
 
-// UserInviteCommand creates pending users and records invite metadata.
-type UserInviteCommand struct {
+// UserRegistrationRequestCommand creates pending users and records registration metadata.
+type UserRegistrationRequestCommand struct {
 	repo     types.AuthRepository
 	tokens   types.UserTokenRepository
 	manager  types.SecureLinkManager
@@ -65,8 +63,8 @@ type UserInviteCommand struct {
 	route    string
 }
 
-// InviteCommandConfig holds dependencies for the invite flow.
-type InviteCommandConfig struct {
+// RegistrationRequestConfig holds dependencies for the registration flow.
+type RegistrationRequestConfig struct {
 	Repository      types.AuthRepository
 	TokenRepository types.UserTokenRepository
 	SecureLinks     types.SecureLinkManager
@@ -80,14 +78,14 @@ type InviteCommandConfig struct {
 	Route           string
 }
 
-// NewUserInviteCommand constructs the invite handler.
-func NewUserInviteCommand(cfg InviteCommandConfig) *UserInviteCommand {
+// NewUserRegistrationRequestCommand constructs the registration handler.
+func NewUserRegistrationRequestCommand(cfg RegistrationRequestConfig) *UserRegistrationRequestCommand {
 	ttl := cfg.TokenTTL
 	if ttl == 0 && cfg.SecureLinks != nil {
 		ttl = cfg.SecureLinks.GetExpiration()
 	}
 	if ttl == 0 {
-		ttl = defaultInviteTTL
+		ttl = defaultRegistrationTTL
 	}
 	idGen := cfg.IDGen
 	if idGen == nil {
@@ -95,9 +93,9 @@ func NewUserInviteCommand(cfg InviteCommandConfig) *UserInviteCommand {
 	}
 	route := strings.TrimSpace(cfg.Route)
 	if route == "" {
-		route = SecureLinkRouteInviteAccept
+		route = SecureLinkRouteRegister
 	}
-	return &UserInviteCommand{
+	return &UserRegistrationRequestCommand{
 		repo:     cfg.Repository,
 		tokens:   cfg.TokenRepository,
 		manager:  cfg.SecureLinks,
@@ -112,10 +110,10 @@ func NewUserInviteCommand(cfg InviteCommandConfig) *UserInviteCommand {
 	}
 }
 
-var _ gocommand.Commander[UserInviteInput] = (*UserInviteCommand)(nil)
+var _ gocommand.Commander[UserRegistrationRequestInput] = (*UserRegistrationRequestCommand)(nil)
 
-// Execute creates the pending user record and registers invite metadata.
-func (c *UserInviteCommand) Execute(ctx context.Context, input UserInviteInput) error {
+// Execute creates the pending user record and registers registration metadata.
+func (c *UserRegistrationRequestCommand) Execute(ctx context.Context, input UserRegistrationRequestInput) error {
 	if c.repo == nil {
 		return types.ErrMissingAuthRepository
 	}
@@ -128,9 +126,13 @@ func (c *UserInviteCommand) Execute(ctx context.Context, input UserInviteInput) 
 	if err := input.Validate(); err != nil {
 		return err
 	}
-	scope, err := c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionUsersWrite, uuid.Nil)
-	if err != nil {
-		return err
+	scope := input.Scope.Clone()
+	if input.Actor.ID != uuid.Nil {
+		var err error
+		scope, err = c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionUsersWrite, uuid.Nil)
+		if err != nil {
+			return err
+		}
 	}
 
 	metadata := cloneMap(input.Metadata)
@@ -153,7 +155,7 @@ func (c *UserInviteCommand) Execute(ctx context.Context, input UserInviteInput) 
 	jti := c.idGen.UUID().String()
 
 	payload := buildSecureLinkPayload(
-		SecureLinkActionInvite,
+		SecureLinkActionRegister,
 		created,
 		scope,
 		jti,
@@ -168,7 +170,7 @@ func (c *UserInviteCommand) Execute(ctx context.Context, input UserInviteInput) 
 
 	if _, err := c.tokens.CreateToken(ctx, types.UserToken{
 		UserID:    created.ID,
-		Type:      types.UserTokenInvite,
+		Type:      types.UserTokenRegistration,
 		JTI:       jti,
 		Status:    types.UserTokenStatusIssued,
 		IssuedAt:  issuedAt,
@@ -177,20 +179,24 @@ func (c *UserInviteCommand) Execute(ctx context.Context, input UserInviteInput) 
 		return err
 	}
 
-	attachTokenMetadata(created, "invite", tokenMetadata(jti, issuedAt, expiresAt, input.Actor, scope))
+	attachTokenMetadata(created, "registration", tokenMetadata(jti, issuedAt, expiresAt, input.Actor, scope))
 	if updated, err := c.repo.Update(ctx, created); err != nil {
 		return err
 	} else if updated != nil {
 		created = updated
 	}
 
+	actor := input.Actor
+	if actor.ID == uuid.Nil {
+		actor = types.ActorRef{ID: created.ID, Type: "user"}
+	}
 	record := types.ActivityRecord{
 		UserID:     created.ID,
-		ActorID:    input.Actor.ID,
-		Verb:       "user.invite",
+		ActorID:    actor.ID,
+		Verb:       "user.registration.requested",
 		ObjectType: "user",
 		ObjectID:   created.ID.String(),
-		Channel:    "invites",
+		Channel:    "registration",
 		TenantID:   scope.TenantID,
 		OrgID:      scope.OrgID,
 		Data: map[string]any{
@@ -205,7 +211,7 @@ func (c *UserInviteCommand) Execute(ctx context.Context, input UserInviteInput) 
 	emitActivityHook(ctx, c.hooks, record)
 
 	if input.Result != nil {
-		*input.Result = UserInviteResult{
+		*input.Result = UserRegistrationRequestResult{
 			User:      created,
 			Token:     token,
 			ExpiresAt: expiresAt,
@@ -213,15 +219,4 @@ func (c *UserInviteCommand) Execute(ctx context.Context, input UserInviteInput) 
 	}
 
 	return nil
-}
-
-func cloneMap(src map[string]any) map[string]any {
-	if len(src) == 0 {
-		return map[string]any{}
-	}
-	out := make(map[string]any, len(src))
-	for k, v := range src {
-		out[k] = v
-	}
-	return out
 }
