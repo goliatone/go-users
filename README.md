@@ -107,6 +107,7 @@ More details live in `docs/MULTITENANCY.md` and `docs/WORKSPACES.md`.
 
 - SQL definitions live under `data/sql/migrations`. Files are numbered and include `.up.sql` and `.down.sql`.
 - Register migrations through `migrations.Register(fsys)` and feed the returned filesystems to your runner.
+- Standalone installs should register auth bootstrap + auth extras (social accounts/identifiers) before core; go-auth installs should register core only.
 - `migrations.TestMigrationsApplyToSQLite` verifies that the SQL stack applies cleanly to SQLite.
 - Bun repositories under `activity`, `preferences`, and `registry` are thin wrappers around `bun.DB` and match the interfaces in `pkg/types`.
 - You can replace any repository with your own implementation as long as it satisfies the interface.
