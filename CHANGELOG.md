@@ -1,5 +1,32 @@
 # Changelog
 
+# [0.11.0](https://github.com/goliatone/go-users/compare/v0.10.0...v0.11.0) - (2026-01-20)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.11.0 ([1733ded](https://github.com/goliatone/go-users/commit/1733deddf794ea228eb981bf7fffda84a9bb2bd9))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- Password reset handler ([cd34ebd](https://github.com/goliatone/go-users/commit/cd34ebd7a1a78f71961510ef4a406d9d8a6ba743))  - (goliatone)
+- Tokens models ([4c4a716](https://github.com/goliatone/go-users/commit/4c4a7169784c151ae48983affc1af69b810f6ec6))  - (goliatone)
+- Securelink adapter ([19c0c52](https://github.com/goliatone/go-users/commit/19c0c523ea692cfda7227b80020f7a1709ba9e6a))  - (goliatone)
+- Commands for password reset and registration ([3d3696f](https://github.com/goliatone/go-users/commit/3d3696fea50fb7951f69473c364085dc69d0c08d))  - (goliatone)
+- Migrations for tokens ([5dc725b](https://github.com/goliatone/go-users/commit/5dc725b59247e4e4194c397aa481098520267a29))  - (goliatone)
+- Types for secure link and tokens ([909abcd](https://github.com/goliatone/go-users/commit/909abcdb2ebb9184cfad6c0211f2c66d982b87d5))  - (goliatone)
+- Test workflow ([c1e0949](https://github.com/goliatone/go-users/commit/c1e0949362f0f37e2ab4473fa9d6673ca4209f03))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.10.0 ([ce76fd7](https://github.com/goliatone/go-users/commit/ce76fd7632c2c296e08ba7d4efaa76d327944c14))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update guides ([d8e6f37](https://github.com/goliatone/go-users/commit/d8e6f3720bc80da1de074f37f6065b865d3e9159))  - (goliatone)
+- Update deps ([0a6f69c](https://github.com/goliatone/go-users/commit/0a6f69c944d98c40178bc672573a3b747b0cc534))  - (goliatone)
+- Update tasks ([dab719c](https://github.com/goliatone/go-users/commit/dab719c198e9d8795aedc6c6be2d8cd0c4025e5b))  - (goliatone)
+- Update tests ([7f86145](https://github.com/goliatone/go-users/commit/7f861451a638323c47395f221c8c11e88bca5649))  - (goliatone)
+
 # [0.10.0](https://github.com/goliatone/go-users/compare/v0.9.0...v0.10.0) - (2026-01-15)
 
 ## <!-- 13 -->📦 Bumps
