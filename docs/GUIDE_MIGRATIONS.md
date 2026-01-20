@@ -48,20 +48,21 @@ This guide covers database migrations for `go-users`, including the migration ar
 │           │              └─────────────────────────────────┘   │
 │           │                            │                        │
 │           ▼                            ▼                        │
-│   ┌─────────────────┐    ┌─────────────────────────────────┐   │
-│   │ users.Migrations│    │  Database                       │   │
-│   │       FS        │    │  • PostgreSQL                   │   │
-│   │                 │    │  • SQLite                       │   │
-│   └─────────────────┘    └─────────────────────────────────┘   │
+│   ┌─────────────────────┐  ┌─────────────────────────────────┐ │
+│   │ users.Core/Auth FS  │  │  Database                       │ │
+│   │ (embedded SQL)      │  │  • PostgreSQL                   │ │
+│   │                     │  │  • SQLite                       │ │
+│   └─────────────────────┘  └─────────────────────────────────┘ │
 │           │                                                     │
 │           ▼                                                     │
 │   ┌─────────────────────────────────────────────────────────┐   │
 │   │ data/sql/migrations/                                     │   │
-│   │ ├── 00001_users.up.sql          (PostgreSQL)            │   │
-│   │ ├── 00001_users.down.sql                                │   │
-│   │ ├── sqlite/                                             │   │
-│   │ │   ├── 00001_users.up.sql      (SQLite override)       │   │
-│   │ │   └── 00001_users.down.sql                            │   │
+│   │ ├── auth/                                                │   │
+│   │ │   ├── 00001_users.up.sql      (PostgreSQL)            │   │
+│   │ │   ├── 00001_users.down.sql                            │   │
+│   │ │   └── sqlite/               (SQLite overrides)        │   │
+│   │ ├── 00003_custom_roles.up.sql                          │   │
+│   │ ├── sqlite/               (core SQLite overrides)       │   │
 │   │ └── ...                                                 │   │
 │   └─────────────────────────────────────────────────────────┘   │
 │                                                                 │
@@ -96,10 +97,20 @@ Migrations follow a numbered naming convention that ensures consistent execution
 
 ```
 data/sql/migrations/
-├── 00001_users.up.sql
-├── 00001_users.down.sql
-├── 00002_user_status.up.sql
-├── 00002_user_status.down.sql
+├── auth/
+│   ├── 00001_users.up.sql
+│   ├── 00001_users.down.sql
+│   ├── 00002_user_status.up.sql
+│   ├── 00002_user_status.down.sql
+│   ├── 00009_user_external_ids.up.sql
+│   ├── 00009_user_external_ids.down.sql
+│   └── sqlite/
+│       ├── 00001_users.up.sql
+│       ├── 00001_users.down.sql
+│       ├── 00002_user_status.up.sql
+│       ├── 00002_user_status.down.sql
+│       ├── 00009_user_external_ids.up.sql
+│       └── 00009_user_external_ids.down.sql
 ├── 00003_custom_roles.up.sql
 ├── 00003_custom_roles.down.sql
 ├── 00004_user_activity.up.sql
@@ -112,13 +123,14 @@ data/sql/migrations/
 ├── 00007_custom_roles_order.down.sql
 ├── 00008_user_tokens.up.sql
 ├── 00008_user_tokens.down.sql
-├── 00009_user_external_ids.up.sql
-├── 00009_user_external_ids.down.sql
 └── sqlite/
-    ├── 00001_users.up.sql
-    ├── 00001_users.down.sql
+    ├── 00003_custom_roles.up.sql
+    ├── 00003_custom_roles.down.sql
     └── ... (SQLite-specific versions)
 ```
+
+Auth bootstrap migrations live under `data/sql/migrations/auth`, with SQLite
+overrides in `data/sql/migrations/auth/sqlite`.
 
 ### Naming Convention
 
@@ -135,7 +147,7 @@ data/sql/migrations/
 Use `---bun:split` to separate multiple statements within a single migration file:
 
 ```sql
--- 00001_users.up.sql
+-- auth/00001_users.up.sql
 CREATE TABLE users (
     id UUID NOT NULL PRIMARY KEY,
     ...
@@ -167,7 +179,7 @@ CREATE TABLE password_reset (
 ### PostgreSQL Migration Example
 
 ```sql
--- 00001_users.up.sql (PostgreSQL)
+-- auth/00001_users.up.sql (PostgreSQL)
 CREATE TABLE users (
     id UUID NOT NULL PRIMARY KEY,
     user_role TEXT NOT NULL DEFAULT 'guest',
@@ -179,7 +191,7 @@ CREATE TABLE users (
 ### SQLite Migration Example
 
 ```sql
--- sqlite/00001_users.up.sql (SQLite)
+-- auth/sqlite/00001_users.up.sql (SQLite)
 CREATE TABLE users (
     id TEXT NOT NULL PRIMARY KEY,
     user_role TEXT NOT NULL DEFAULT 'guest',
@@ -719,7 +731,7 @@ func TestMigrationsApplyToSQLite(t *testing.T) {
     ctx := context.Background()
 
     // Load SQLite-specific migrations
-    authFS, err := fs.Sub(users.GetAuthBootstrapMigrationsFS(), "data/sql/migrations/sqlite")
+    authFS, err := fs.Sub(users.GetAuthBootstrapMigrationsFS(), "data/sql/migrations/auth/sqlite")
     if err != nil {
         t.Fatalf("failed to load auth bootstrap migrations: %v", err)
     }

@@ -423,15 +423,15 @@ func TestFullSchema_Integration(t *testing.T) {
 
     // Apply all migrations in order
     migrations := []string{
-        "../data/sql/migrations/sqlite/00001_users.up.sql",
-        "../data/sql/migrations/sqlite/00002_user_status.up.sql",
+        "../data/sql/migrations/auth/sqlite/00001_users.up.sql",
+        "../data/sql/migrations/auth/sqlite/00002_user_status.up.sql",
         "../data/sql/migrations/sqlite/00003_custom_roles.up.sql",
         "../data/sql/migrations/sqlite/00004_user_activity.up.sql",
         "../data/sql/migrations/sqlite/00005_profiles_preferences.up.sql",
         "../data/sql/migrations/sqlite/00006_custom_roles_metadata.up.sql",
         "../data/sql/migrations/sqlite/00007_custom_roles_order.up.sql",
         "../data/sql/migrations/sqlite/00008_user_tokens.up.sql",
-        "../data/sql/migrations/sqlite/00009_user_external_ids.up.sql",
+        "../data/sql/migrations/auth/sqlite/00009_user_external_ids.up.sql",
     }
 
     for _, path := range migrations {
