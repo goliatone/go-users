@@ -324,15 +324,23 @@ func WithPersistence(ctx context.Context, app *App) error {
 
 	bunClient.SetLogger(app.GetLogger("persistence"))
 
-	// Register dialect-aware migrations (supports both PostgreSQL and SQLite)
-	// Create a sub-FS rooted at data/sql/migrations so the loader can find the files
-	migrationsFS, err := fs.Sub(users.MigrationsFS, "data/sql/migrations")
+	// Register dialect-aware migrations (auth bootstrap + go-users core).
+	authFS, err := fs.Sub(auth.GetMigrationsFS(), "data/sql/migrations")
+	if err != nil {
+		return err
+	}
+	coreFS, err := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
 	if err != nil {
 		return err
 	}
 
 	bunClient.RegisterDialectMigrations(
-		migrationsFS,
+		authFS,
+		persistence.WithDialectSourceLabel("."),
+		persistence.WithValidationTargets("postgres", "sqlite"),
+	)
+	bunClient.RegisterDialectMigrations(
+		coreFS,
 		persistence.WithDialectSourceLabel("."),
 		persistence.WithValidationTargets("postgres", "sqlite"),
 	)
