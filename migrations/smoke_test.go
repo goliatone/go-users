@@ -30,12 +30,20 @@ func TestMigrationsApplyToSQLite(t *testing.T) {
 		t.Fatalf("no migration filesystems registered")
 	}
 
-	sqliteFS, err := fs.Sub(users.MigrationsFS, "data/sql/migrations/sqlite")
+	authFS, err := fs.Sub(users.GetAuthBootstrapMigrationsFS(), "data/sql/migrations/sqlite")
 	if err != nil {
-		t.Fatalf("failed to load sqlite migrations: %v", err)
+		t.Fatalf("failed to load auth bootstrap migrations: %v", err)
 	}
-	if err := applyFilesystem(ctx, db, sqliteFS); err != nil {
-		t.Fatalf("failed to apply migrations: %v", err)
+	if err := applyFilesystem(ctx, db, authFS); err != nil {
+		t.Fatalf("failed to apply auth bootstrap migrations: %v", err)
+	}
+
+	coreFS, err := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations/sqlite")
+	if err != nil {
+		t.Fatalf("failed to load core migrations: %v", err)
+	}
+	if err := applyFilesystem(ctx, db, coreFS); err != nil {
+		t.Fatalf("failed to apply core migrations: %v", err)
 	}
 
 	var tableName string
