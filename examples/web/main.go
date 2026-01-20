@@ -324,32 +324,33 @@ func WithPersistence(ctx context.Context, app *App) error {
 
 	bunClient.SetLogger(app.GetLogger("persistence"))
 
-	// Register dialect-aware migrations (auth bootstrap + go-users core).
+	// Register dialect-aware migrations in two steps to avoid cross-source ordering issues.
 	authFS, err := fs.Sub(auth.GetMigrationsFS(), "data/sql/migrations")
 	if err != nil {
 		return err
 	}
-	coreFS, err := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
-	if err != nil {
-		return err
-	}
-
 	bunClient.RegisterDialectMigrations(
 		authFS,
 		persistence.WithDialectSourceLabel("."),
 		persistence.WithValidationTargets("postgres", "sqlite"),
 	)
+	if err := bunClient.Migrate(ctx); err != nil {
+		return err
+	}
+
+	coreFS, err := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
+	if err != nil {
+		return err
+	}
 	bunClient.RegisterDialectMigrations(
 		coreFS,
 		persistence.WithDialectSourceLabel("."),
 		persistence.WithValidationTargets("postgres", "sqlite"),
 	)
-
 	// Optional: Validate that both dialects have complete migration sets
 	if err := bunClient.ValidateDialects(ctx); err != nil {
 		log.Printf("Warning: dialect validation failed: %v", err)
 	}
-
 	if err := bunClient.Migrate(ctx); err != nil {
 		return err
 	}
