@@ -431,6 +431,7 @@ func TestFullSchema_Integration(t *testing.T) {
         "../data/sql/migrations/sqlite/00006_custom_roles_metadata.up.sql",
         "../data/sql/migrations/sqlite/00007_custom_roles_order.up.sql",
         "../data/sql/migrations/sqlite/00008_user_tokens.up.sql",
+        "../data/sql/migrations/sqlite/00009_user_external_ids.up.sql",
     }
 
     for _, path := range migrations {

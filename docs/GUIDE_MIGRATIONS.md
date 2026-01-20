@@ -71,18 +71,21 @@ This guide covers database migrations for `go-users`, including the migration ar
 ### Registration Flow
 
 ```go
-// 1. go-users exports embedded filesystem
-var MigrationsFS embed.FS  // Contains data/sql/migrations/**/*.sql
+// 1. go-users exports embedded filesystems
+var MigrationsFS embed.FS           // All migrations (legacy all-in-one)
+var CoreMigrationsFS embed.FS       // go-users core tables only
+var AuthBootstrapMigrationsFS embed.FS // users/password_reset + auth columns
 
 // 2. Optional: Use migrations.Register for centralized registration
 import "github.com/goliatone/go-users/migrations"
-// init() automatically calls migrations.Register(users.GetMigrationsFS())
+// init() automatically calls migrations.Register(users.GetCoreMigrationsFS())
+// import _ "github.com/goliatone/go-users/migrations/bootstrap" for auth bootstrap
 
 // 3. Retrieve all registered filesystems
 filesystems := migrations.Filesystems()
 
 // 4. Or access directly for go-persistence-bun
-migrationsFS, _ := fs.Sub(users.MigrationsFS, "data/sql/migrations")
+coreFS, _ := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
 ```
 
 ---
@@ -192,16 +195,23 @@ The `go-persistence-bun` migration runner automatically selects the correct dial
 ```go
 import (
     "io/fs"
+    auth "github.com/goliatone/go-auth"
     users "github.com/goliatone/go-users"
     persistence "github.com/goliatone/go-persistence-bun"
 )
 
 // Create sub-FS rooted at data/sql/migrations
-migrationsFS, _ := fs.Sub(users.MigrationsFS, "data/sql/migrations")
+authFS, _ := fs.Sub(auth.GetMigrationsFS(), "data/sql/migrations")
+coreFS, _ := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
 
 // Register with dialect awareness
 client.RegisterDialectMigrations(
-    migrationsFS,
+    authFS,
+    persistence.WithDialectSourceLabel("."),           // Root = PostgreSQL
+    persistence.WithValidationTargets("postgres", "sqlite"),
+)
+client.RegisterDialectMigrations(
+    coreFS,
     persistence.WithDialectSourceLabel("."),           // Root = PostgreSQL
     persistence.WithValidationTargets("postgres", "sqlite"),
 )
@@ -222,6 +232,7 @@ import (
     "io/fs"
     "log"
 
+    auth "github.com/goliatone/go-auth"
     "github.com/goliatone/go-persistence-bun"
     users "github.com/goliatone/go-users"
     "github.com/uptrace/bun/dialect/pgdialect"
@@ -246,14 +257,23 @@ func main() {
         log.Fatal(err)
     }
 
-    // Register go-users migrations
-    migrationsFS, err := fs.Sub(users.MigrationsFS, "data/sql/migrations")
+    // Register go-auth + go-users core migrations
+    authFS, err := fs.Sub(auth.GetMigrationsFS(), "data/sql/migrations")
+    if err != nil {
+        log.Fatal(err)
+    }
+    coreFS, err := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
     if err != nil {
         log.Fatal(err)
     }
 
     client.RegisterDialectMigrations(
-        migrationsFS,
+        authFS,
+        persistence.WithDialectSourceLabel("."),
+        persistence.WithValidationTargets("postgres", "sqlite"),
+    )
+    client.RegisterDialectMigrations(
+        coreFS,
         persistence.WithDialectSourceLabel("."),
         persistence.WithValidationTargets("postgres", "sqlite"),
     )
@@ -286,6 +306,7 @@ import (
     "io/fs"
     "log"
 
+    auth "github.com/goliatone/go-auth"
     "github.com/goliatone/go-persistence-bun"
     users "github.com/goliatone/go-users"
     "github.com/uptrace/bun/dialect/sqlitedialect"
@@ -310,13 +331,22 @@ func main() {
         log.Fatal(err)
     }
 
-    migrationsFS, err := fs.Sub(users.MigrationsFS, "data/sql/migrations")
+    authFS, err := fs.Sub(auth.GetMigrationsFS(), "data/sql/migrations")
+    if err != nil {
+        log.Fatal(err)
+    }
+    coreFS, err := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
     if err != nil {
         log.Fatal(err)
     }
 
     client.RegisterDialectMigrations(
-        migrationsFS,
+        authFS,
+        persistence.WithDialectSourceLabel("."),
+        persistence.WithValidationTargets("postgres", "sqlite"),
+    )
+    client.RegisterDialectMigrations(
+        coreFS,
         persistence.WithDialectSourceLabel("."),
         persistence.WithValidationTargets("postgres", "sqlite"),
     )
@@ -337,7 +367,8 @@ import (
 )
 
 func init() {
-    // Automatically registered via migrations package init()
+    // Core migrations automatically registered via migrations package init()
+    // import _ "github.com/goliatone/go-users/migrations/bootstrap" for auth bootstrap
     // You can also register additional migration filesystems:
     migrations.Register(myCustomMigrationsFS)
 }
@@ -637,9 +668,9 @@ import (
 )
 
 func setupMigrations(client *persistence.Client) error {
-    // Register go-users migrations first
-    usersFS, _ := fs.Sub(users.MigrationsFS, "data/sql/migrations")
-    client.RegisterDialectMigrations(usersFS,
+    // Register go-users core migrations (go-auth migrations should be registered first)
+    coreFS, _ := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
+    client.RegisterDialectMigrations(coreFS,
         persistence.WithDialectSourceLabel("."),
         persistence.WithValidationTargets("postgres", "sqlite"),
     )
@@ -688,13 +719,20 @@ func TestMigrationsApplyToSQLite(t *testing.T) {
     ctx := context.Background()
 
     // Load SQLite-specific migrations
-    sqliteFS, err := fs.Sub(users.MigrationsFS, "data/sql/migrations/sqlite")
+    authFS, err := fs.Sub(users.GetAuthBootstrapMigrationsFS(), "data/sql/migrations/sqlite")
     if err != nil {
-        t.Fatalf("failed to load sqlite migrations: %v", err)
+        t.Fatalf("failed to load auth bootstrap migrations: %v", err)
+    }
+    if err := applyFilesystem(ctx, db, authFS); err != nil {
+        t.Fatalf("failed to apply auth bootstrap migrations: %v", err)
     }
 
-    if err := applyFilesystem(ctx, db, sqliteFS); err != nil {
-        t.Fatalf("failed to apply migrations: %v", err)
+    coreFS, err := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations/sqlite")
+    if err != nil {
+        t.Fatalf("failed to load core migrations: %v", err)
+    }
+    if err := applyFilesystem(ctx, db, coreFS); err != nil {
+        t.Fatalf("failed to apply core migrations: %v", err)
     }
 
     // Verify tables exist
@@ -766,8 +804,13 @@ func TestMigrationsWithPersistence(t *testing.T) {
         t.Fatal(err)
     }
 
-    migrationsFS, _ := fs.Sub(users.MigrationsFS, "data/sql/migrations")
-    client.RegisterDialectMigrations(migrationsFS,
+    authFS, _ := fs.Sub(auth.GetMigrationsFS(), "data/sql/migrations")
+    coreFS, _ := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
+    client.RegisterDialectMigrations(authFS,
+        persistence.WithDialectSourceLabel("."),
+        persistence.WithValidationTargets("postgres", "sqlite"),
+    )
+    client.RegisterDialectMigrations(coreFS,
         persistence.WithDialectSourceLabel("."),
         persistence.WithValidationTargets("postgres", "sqlite"),
     )
@@ -797,8 +840,12 @@ func TestMigrationRollback(t *testing.T) {
     cfg := &persistence.Config{Driver: "sqlite"}
     client, _ := persistence.New(cfg, db, sqlitedialect.New())
 
-    migrationsFS, _ := fs.Sub(users.MigrationsFS, "data/sql/migrations")
-    client.RegisterDialectMigrations(migrationsFS,
+    authFS, _ := fs.Sub(auth.GetMigrationsFS(), "data/sql/migrations")
+    coreFS, _ := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
+    client.RegisterDialectMigrations(authFS,
+        persistence.WithDialectSourceLabel("."),
+    )
+    client.RegisterDialectMigrations(coreFS,
         persistence.WithDialectSourceLabel("."),
     )
 
@@ -891,8 +938,13 @@ func safeRollback(ctx context.Context, client *persistence.Client) error {
 
 ```go
 func runMigrations(ctx context.Context, client *persistence.Client, env string) error {
-    migrationsFS, _ := fs.Sub(users.MigrationsFS, "data/sql/migrations")
-    client.RegisterDialectMigrations(migrationsFS,
+    authFS, _ := fs.Sub(auth.GetMigrationsFS(), "data/sql/migrations")
+    coreFS, _ := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
+    client.RegisterDialectMigrations(authFS,
+        persistence.WithDialectSourceLabel("."),
+        persistence.WithValidationTargets("postgres", "sqlite"),
+    )
+    client.RegisterDialectMigrations(coreFS,
         persistence.WithDialectSourceLabel("."),
         persistence.WithValidationTargets("postgres", "sqlite"),
     )
@@ -955,8 +1007,8 @@ func registerAllMigrations(client *persistence.Client) error {
         fsys fs.FS
         path string
     }{
-        {"go-users", users.MigrationsFS, "data/sql/migrations"},
-        {"go-auth", auth.MigrationsFS, "data/sql/migrations"},
+        {"go-auth", auth.GetMigrationsFS(), "data/sql/migrations"},
+        {"go-users-core", users.GetCoreMigrationsFS(), "data/sql/migrations"},
         {"custom", customMigrationsFS, "sql"},
     }
 
