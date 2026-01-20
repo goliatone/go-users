@@ -174,15 +174,15 @@ Use `---bun:split` to separate multiple statements within a single migration fil
 ```sql
 -- auth/00001_users.up.sql
 CREATE TABLE users (
-    id UUID NOT NULL PRIMARY KEY,
+    id TEXT NOT NULL PRIMARY KEY,
     ...
 );
 
 ---bun:split
 
 CREATE TABLE password_reset (
-    id UUID NOT NULL PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(id),
+    id TEXT NOT NULL PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
     ...
 );
 ```
@@ -195,7 +195,7 @@ CREATE TABLE password_reset (
 
 | Feature | PostgreSQL | SQLite |
 |---------|------------|--------|
-| UUID type | `UUID` | `TEXT` |
+| ID type | `TEXT` (UUID strings) | `TEXT` (UUID strings) |
 | JSON type | `JSONB` | `TEXT` |
 | Timestamp | `TIMESTAMP` | `TIMESTAMP` |
 | Boolean | `BOOLEAN` | `BOOLEAN` (0/1) |
@@ -206,7 +206,7 @@ CREATE TABLE password_reset (
 ```sql
 -- auth/00001_users.up.sql (PostgreSQL)
 CREATE TABLE users (
-    id UUID NOT NULL PRIMARY KEY,
+    id TEXT NOT NULL PRIMARY KEY,
     user_role TEXT NOT NULL DEFAULT 'guest',
     metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -503,7 +503,7 @@ Core user identity and authentication data:
 
 ```sql
 CREATE TABLE users (
-    id UUID PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     user_role TEXT NOT NULL DEFAULT 'guest',  -- guest, member, admin, owner
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
@@ -535,16 +535,16 @@ Password reset token management:
 
 ```sql
 CREATE TABLE password_reset (
-    id UUID PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     email TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'unknown',  -- unknown, requested, expired, changed
     jti TEXT,
     issued_at TIMESTAMP,
     expires_at TIMESTAMP,
     used_at TIMESTAMP,
-    scope_tenant_id UUID,
-    scope_org_id UUID,
+    scope_tenant_id TEXT,
+    scope_org_id TEXT,
     reseted_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP,
@@ -558,8 +558,8 @@ Invite and registration token registry:
 
 ```sql
 CREATE TABLE user_tokens (
-    id UUID PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token_type TEXT NOT NULL,
     jti TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'issued',  -- issued, used, expired
@@ -601,8 +601,8 @@ Optional social profile links for external providers:
 
 ```sql
 CREATE TABLE social_accounts (
-    id UUID PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     provider TEXT NOT NULL,
     provider_user_id TEXT NOT NULL,
     email TEXT,
@@ -626,8 +626,8 @@ Secondary identifiers for auth providers:
 
 ```sql
 CREATE TABLE user_identifiers (
-    id UUID PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     provider TEXT NOT NULL,
     identifier TEXT NOT NULL,
     metadata JSONB NOT NULL DEFAULT '{}',
@@ -643,26 +643,26 @@ Role definitions with tenant/org scoping:
 
 ```sql
 CREATE TABLE custom_roles (
-    id UUID PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
     permissions JSONB NOT NULL DEFAULT '[]',
     is_system BOOLEAN NOT NULL DEFAULT FALSE,
-    tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
-    org_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    tenant_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    org_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID NOT NULL,
-    updated_by UUID NOT NULL
+    created_by TEXT NOT NULL,
+    updated_by TEXT NOT NULL
 );
 
 CREATE TABLE user_custom_roles (
-    user_id UUID NOT NULL,
-    role_id UUID NOT NULL REFERENCES custom_roles(id) ON DELETE CASCADE,
-    tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
-    org_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    user_id TEXT NOT NULL,
+    role_id TEXT NOT NULL REFERENCES custom_roles(id) ON DELETE CASCADE,
+    tenant_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    org_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
     assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    assigned_by UUID NOT NULL,
+    assigned_by TEXT NOT NULL,
     PRIMARY KEY (user_id, role_id, tenant_id, org_id)
 );
 ```
@@ -680,11 +680,11 @@ Audit logging and activity feeds:
 
 ```sql
 CREATE TABLE user_activity (
-    id UUID PRIMARY KEY,
-    user_id UUID,
-    actor_id UUID,
-    tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
-    org_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    actor_id TEXT,
+    tenant_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    org_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
     verb TEXT NOT NULL,
     object_type TEXT,
     object_id TEXT,
@@ -707,7 +707,7 @@ User profiles and hierarchical preferences:
 
 ```sql
 CREATE TABLE user_profiles (
-    user_id UUID PRIMARY KEY,
+    user_id TEXT PRIMARY KEY,
     display_name TEXT,
     avatar_url TEXT,
     locale TEXT,
@@ -715,27 +715,27 @@ CREATE TABLE user_profiles (
     bio TEXT,
     contact JSONB NOT NULL DEFAULT '{}',
     metadata JSONB NOT NULL DEFAULT '{}',
-    tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
-    org_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    tenant_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    org_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID NOT NULL,
+    created_by TEXT NOT NULL,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_by UUID NOT NULL
+    updated_by TEXT NOT NULL
 );
 
 CREATE TABLE user_preferences (
-    id UUID PRIMARY KEY,
-    user_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
-    tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
-    org_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    tenant_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    org_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
     scope_level TEXT NOT NULL DEFAULT 'user',  -- system, tenant, org, user
     key TEXT NOT NULL,
     value JSONB NOT NULL DEFAULT '{}',
     version INT NOT NULL DEFAULT 1,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID NOT NULL,
+    created_by TEXT NOT NULL,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_by UUID NOT NULL
+    updated_by TEXT NOT NULL
 );
 ```
 
