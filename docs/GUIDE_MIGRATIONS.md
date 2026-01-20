@@ -30,6 +30,7 @@ This guide covers database migrations for `go-users`, including the migration ar
 - **Versioned** - Sequential numbering ensures consistent ordering
 - **Reversible** - Each migration includes both up and down scripts
 - **Integration-ready** - Works with `go-persistence-bun` migration runner
+- **go-auth aware** - When `go-auth` is present, register only go-users core; standalone installs register auth bootstrap + auth extras.
 
 ---
 
@@ -151,6 +152,8 @@ overrides in `data/sql/migrations/auth/sqlite`. Auth extras live under
 `data/sql/migrations/auth_extras/sqlite`).
 
 Register auth bootstrap (and auth extras, if used) before core so dependent tables exist.
+When `go-auth` migrations are already registered, skip auth bootstrap/auth extras
+to avoid duplicate tables.
 
 If you use `GetMigrationsFS()`, register three sub-filesystems:
 `data/sql/migrations/auth`, `data/sql/migrations/auth_extras`, and
@@ -257,6 +260,10 @@ client.RegisterDialectMigrations(
 ---
 
 ## Running Migrations
+
+When running alongside `go-auth`, register `go-auth` migrations first and then
+go-users core only. Do not register auth bootstrap or auth extras in that
+setup.
 
 ### With go-persistence-bun
 
