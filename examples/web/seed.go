@@ -117,6 +117,8 @@ func seedDemoUsers(ctx context.Context, app *App) error {
 			Email:          acct.Email,
 			PasswordHash:   passwordHash,
 			EmailValidated: true,
+			ExternalID:     acct.Email,
+			ExternalIDProvider: "seed",
 		}
 
 		user.AddMetadata(tenantMetadataKey, acct.TenantID.String())

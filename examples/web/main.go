@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"testing/fstest"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/goliatone/go-auth"
@@ -325,7 +326,11 @@ func WithPersistence(ctx context.Context, app *App) error {
 	bunClient.SetLogger(app.GetLogger("persistence"))
 
 	// Register dialect-aware migrations in two steps to avoid cross-source ordering issues.
-	authFS, err := fs.Sub(auth.GetMigrationsFS(), "data/sql/migrations")
+	authRoot, err := fs.Sub(auth.GetMigrationsFS(), "data/sql/migrations")
+	if err != nil {
+		return err
+	}
+	authFS, err := filterAuthMigrations(authRoot)
 	if err != nil {
 		return err
 	}
@@ -368,6 +373,41 @@ func WithPersistence(ctx context.Context, app *App) error {
 	}
 
 	return nil
+}
+
+// filterAuthMigrations skips legacy auth0 migrations that sort before users table creation.
+func filterAuthMigrations(root fs.FS) (fs.FS, error) {
+	exclude := map[string]struct{}{
+		"0001_auth0_identifiers.up.sql":       {},
+		"0001_auth0_identifiers.down.sql":     {},
+		"sqlite/0001_auth0_identifiers.up.sql":   {},
+		"sqlite/0001_auth0_identifiers.down.sql": {},
+	}
+	filtered := fstest.MapFS{}
+	err := fs.WalkDir(root, ".", func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if _, skip := exclude[path]; skip {
+			return nil
+		}
+		data, err := fs.ReadFile(root, path)
+		if err != nil {
+			return err
+		}
+		filtered[path] = &fstest.MapFile{
+			Data: data,
+			Mode: 0o644,
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return filtered, nil
 }
 
 func WithHTTPAuth(ctx context.Context, app *App) error {
