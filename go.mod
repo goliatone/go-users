@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.11
 
 require (
-	github.com/goliatone/go-auth v0.23.0
+	github.com/goliatone/go-auth v0.25.0
 	github.com/goliatone/go-command v0.13.0
 	github.com/goliatone/go-crud v0.17.0
 	github.com/goliatone/go-errors v0.10.0
