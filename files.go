@@ -18,3 +18,8 @@ func GetCoreMigrationsFS() embed.FS {
 func GetAuthBootstrapMigrationsFS() embed.FS {
 	return AuthBootstrapMigrationsFS
 }
+
+// GetAuthExtrasMigrationsFS exposes optional auth migrations for social identities.
+func GetAuthExtrasMigrationsFS() embed.FS {
+	return AuthExtrasMigrationsFS
+}
