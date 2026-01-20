@@ -38,6 +38,14 @@ func TestMigrationsApplyToSQLite(t *testing.T) {
 		t.Fatalf("failed to apply auth bootstrap migrations: %v", err)
 	}
 
+	extrasFS, err := fs.Sub(users.GetAuthExtrasMigrationsFS(), "data/sql/migrations/auth_extras/sqlite")
+	if err != nil {
+		t.Fatalf("failed to load auth extras migrations: %v", err)
+	}
+	if err := applyFilesystem(ctx, db, extrasFS); err != nil {
+		t.Fatalf("failed to apply auth extras migrations: %v", err)
+	}
+
 	coreFS, err := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations/sqlite")
 	if err != nil {
 		t.Fatalf("failed to load core migrations: %v", err)
@@ -52,6 +60,20 @@ func TestMigrationsApplyToSQLite(t *testing.T) {
 	}
 	if tableName != "custom_roles" {
 		t.Fatalf("expected custom_roles table, got %q", tableName)
+	}
+
+	if err := db.QueryRowContext(ctx, "SELECT name FROM sqlite_master WHERE type='table' AND name='social_accounts'").Scan(&tableName); err != nil {
+		t.Fatalf("failed to verify social_accounts table: %v", err)
+	}
+	if tableName != "social_accounts" {
+		t.Fatalf("expected social_accounts table, got %q", tableName)
+	}
+
+	if err := db.QueryRowContext(ctx, "SELECT name FROM sqlite_master WHERE type='table' AND name='user_identifiers'").Scan(&tableName); err != nil {
+		t.Fatalf("failed to verify user_identifiers table: %v", err)
+	}
+	if tableName != "user_identifiers" {
+		t.Fatalf("expected user_identifiers table, got %q", tableName)
 	}
 }
 
