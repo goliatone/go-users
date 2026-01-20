@@ -1,22 +1,24 @@
 module github.com/goliatone/go-users/examples/web
 
-go 1.23.4
+go 1.24.0
+
+toolchain go1.24.12
 
 replace github.com/goliatone/go-users => ../..
 
 require (
 	github.com/gofiber/fiber/v2 v2.52.9
-	github.com/goliatone/go-auth v0.19.0
-	github.com/goliatone/go-composite-fs v0.0.1
+	github.com/goliatone/go-auth v0.25.0
+	github.com/goliatone/go-composite-fs v0.3.0
 	github.com/goliatone/go-config v0.5.0
-	github.com/goliatone/go-crud v0.12.0
-	github.com/goliatone/go-errors v0.9.0
+	github.com/goliatone/go-crud v0.17.0
+	github.com/goliatone/go-errors v0.10.0
 	github.com/goliatone/go-logger v0.4.0
-	github.com/goliatone/go-persistence-bun v0.6.0
+	github.com/goliatone/go-persistence-bun v0.10.0
 	github.com/goliatone/go-print v0.4.1
-	github.com/goliatone/go-repository-bun v0.9.0
-	github.com/goliatone/go-router v0.23.0
-	github.com/goliatone/go-users v0.0.0-00010101000000-000000000000
+	github.com/goliatone/go-repository-bun v0.12.0
+	github.com/goliatone/go-router v0.42.0
+	github.com/goliatone/go-users v0.5.0
 	github.com/google/uuid v1.6.0
 	github.com/uptrace/bun v1.2.15
 	github.com/uptrace/bun/dialect/sqlitedialect v1.2.15
@@ -32,6 +34,7 @@ require (
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/dop251/goja v0.0.0-20251008123653-cf18d89f3cf6 // indirect
@@ -54,10 +57,11 @@ require (
 	github.com/gofiber/template v1.8.3 // indirect
 	github.com/gofiber/template/django/v3 v3.1.13 // indirect
 	github.com/gofiber/utils v1.1.0 // indirect
-	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
-	github.com/goliatone/go-command v0.5.0 // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
+	github.com/goliatone/go-command v0.13.0 // indirect
 	github.com/goliatone/go-masker v0.1.0 // indirect
-	github.com/goliatone/go-options v0.4.0 // indirect
+	github.com/goliatone/go-options v0.7.0 // indirect
+	github.com/goliatone/go-repository-cache v0.6.0 // indirect
 	github.com/goliatone/hashid v0.1.1 // indirect
 	github.com/goodsign/monday v1.0.2 // indirect
 	github.com/google/cel-go v0.26.1 // indirect
@@ -107,17 +111,18 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.54.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
+	github.com/viccon/sturdyc v1.1.5 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/otel v1.37.0 // indirect
 	go.opentelemetry.io/otel/metric v1.37.0 // indirect
 	go.opentelemetry.io/otel/trace v1.37.0 // indirect
-	golang.org/x/crypto v0.31.0 // indirect
+	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc // indirect
-	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/sys v0.34.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
+	golang.org/x/net v0.47.0 // indirect
+	golang.org/x/sys v0.39.0 // indirect
+	golang.org/x/text v0.32.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240826202546-f6391c0de4c7 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240826202546-f6391c0de4c7 // indirect
