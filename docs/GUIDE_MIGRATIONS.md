@@ -107,6 +107,10 @@ data/sql/migrations/
 ├── 00006_custom_roles_metadata.down.sql
 ├── 00007_custom_roles_order.up.sql
 ├── 00007_custom_roles_order.down.sql
+├── 00008_user_tokens.up.sql
+├── 00008_user_tokens.down.sql
+├── 00009_user_external_ids.up.sql
+├── 00009_user_external_ids.down.sql
 └── sqlite/
     ├── 00001_users.up.sql
     ├── 00001_users.down.sql
@@ -433,6 +437,20 @@ Adds lifecycle state management:
 ALTER TABLE users
     ADD COLUMN status TEXT NOT NULL DEFAULT 'active',  -- pending, active, suspended, disabled, archived
     ADD COLUMN suspended_at TIMESTAMP;
+```
+
+### External IDs (00009)
+
+Adds optional external identity mapping columns and a unique index:
+
+```sql
+ALTER TABLE users
+    ADD COLUMN external_id TEXT,
+    ADD COLUMN external_id_provider TEXT;
+
+CREATE UNIQUE INDEX users_external_id_unique
+    ON users (external_id_provider, external_id)
+    WHERE external_id IS NOT NULL;
 ```
 
 ### Custom Roles (00003)
