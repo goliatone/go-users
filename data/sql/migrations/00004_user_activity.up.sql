@@ -2,11 +2,11 @@
 -- Activity log table powering go-admin dashboards and audit exports.
 
 CREATE TABLE IF NOT EXISTS user_activity (
-    id UUID PRIMARY KEY,
-    user_id UUID,
-    actor_id UUID,
-    tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
-    org_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    actor_id TEXT,
+    tenant_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    org_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
     verb TEXT NOT NULL,
     object_type TEXT,
     object_id TEXT,

@@ -1,6 +1,6 @@
 -- 00001_users.up.sql (SQLite version)
 -- Creates users and password_reset tables for SQLite
--- Changes from PostgreSQL: UUID -> TEXT, JSONB -> TEXT
+-- Changes from PostgreSQL: JSONB -> TEXT
 
 CREATE TABLE users (
 	id TEXT NOT NULL PRIMARY KEY,

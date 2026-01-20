@@ -1,6 +1,6 @@
 -- 00003_custom_roles.up.sql (SQLite version)
 -- Introduces custom roles and assignment tables with tenant/org scope columns.
--- Changes from PostgreSQL: UUID -> TEXT, JSONB -> TEXT
+-- Changes from PostgreSQL: JSONB -> TEXT
 
 CREATE TABLE IF NOT EXISTS custom_roles (
     id TEXT PRIMARY KEY,

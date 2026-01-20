@@ -2,8 +2,8 @@
 -- Adds social_accounts for auth provider links.
 
 CREATE TABLE IF NOT EXISTS social_accounts (
-    id UUID NOT NULL PRIMARY KEY,
-    user_id UUID NOT NULL,
+    id TEXT NOT NULL PRIMARY KEY,
+    user_id TEXT NOT NULL,
     provider TEXT NOT NULL,
     provider_user_id TEXT NOT NULL,
     email TEXT,

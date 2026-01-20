@@ -2,8 +2,8 @@
 -- Adds user_tokens table and securelink lifecycle fields to password_reset.
 
 CREATE TABLE IF NOT EXISTS user_tokens (
-    id UUID NOT NULL PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    id TEXT NOT NULL PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token_type TEXT NOT NULL CHECK (
         token_type IN ('invite', 'register', 'password_reset')
     ),
@@ -26,8 +26,8 @@ ALTER TABLE password_reset ADD COLUMN IF NOT EXISTS jti TEXT;
 ALTER TABLE password_reset ADD COLUMN IF NOT EXISTS issued_at TIMESTAMP;
 ALTER TABLE password_reset ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;
 ALTER TABLE password_reset ADD COLUMN IF NOT EXISTS used_at TIMESTAMP;
-ALTER TABLE password_reset ADD COLUMN IF NOT EXISTS scope_tenant_id UUID;
-ALTER TABLE password_reset ADD COLUMN IF NOT EXISTS scope_org_id UUID;
+ALTER TABLE password_reset ADD COLUMN IF NOT EXISTS scope_tenant_id TEXT;
+ALTER TABLE password_reset ADD COLUMN IF NOT EXISTS scope_org_id TEXT;
 
 CREATE UNIQUE INDEX IF NOT EXISTS password_reset_jti_unique ON password_reset (jti);
 CREATE INDEX IF NOT EXISTS password_reset_expiry_status_index ON password_reset (status, expires_at);

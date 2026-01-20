@@ -2,7 +2,7 @@
 -- Creates users and password_reset tables for PostgreSQL
 
 CREATE TABLE users (
-	id UUID NOT NULL PRIMARY KEY,
+	id TEXT NOT NULL PRIMARY KEY,
 	user_role TEXT NOT NULL DEFAULT 'guest' CHECK (
 		user_role IN ('guest', 'member', 'admin', 'owner')
 	),
@@ -33,8 +33,8 @@ CREATE INDEX users_is_email_verified_index ON users(is_email_verified);
 ---bun:split
 
 CREATE TABLE password_reset (
-	id UUID NOT NULL PRIMARY KEY,
-	user_id UUID NOT NULL,
+	id TEXT NOT NULL PRIMARY KEY,
+	user_id TEXT NOT NULL,
 	email TEXT NOT NULL,
 	status TEXT NOT NULL DEFAULT 'unknown' CHECK (
 		status IN ('unknown', 'requested', 'expired', 'changed')

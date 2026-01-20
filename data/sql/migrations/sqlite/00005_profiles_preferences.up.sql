@@ -1,6 +1,6 @@
 -- 00005_profiles_preferences.up.sql (SQLite version)
 -- Adds profile and preference tables with tenant/org scoping plus metadata.
--- Changes from PostgreSQL: UUID -> TEXT, JSONB -> TEXT, INT -> INTEGER
+-- Changes from PostgreSQL: JSONB -> TEXT, INT -> INTEGER
 
 CREATE TABLE IF NOT EXISTS user_profiles (
     user_id TEXT PRIMARY KEY,

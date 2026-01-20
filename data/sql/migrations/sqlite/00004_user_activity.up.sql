@@ -1,6 +1,6 @@
 -- 00004_user_activity.up.sql (SQLite version)
 -- Activity log table powering go-admin dashboards and audit exports.
--- Changes from PostgreSQL: UUID -> TEXT, JSONB -> TEXT
+-- Changes from PostgreSQL: JSONB -> TEXT
 
 CREATE TABLE IF NOT EXISTS user_activity (
     id TEXT PRIMARY KEY,

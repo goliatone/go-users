@@ -2,17 +2,17 @@
 -- Introduces custom roles and assignment tables with tenant/org scope columns.
 
 CREATE TABLE IF NOT EXISTS custom_roles (
-    id UUID PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
     permissions JSONB NOT NULL DEFAULT '[]',
     is_system BOOLEAN NOT NULL DEFAULT FALSE,
-    tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
-    org_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    tenant_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    org_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID NOT NULL,
-    updated_by UUID NOT NULL
+    created_by TEXT NOT NULL,
+    updated_by TEXT NOT NULL
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS custom_roles_scope_name_idx
@@ -22,12 +22,12 @@ CREATE INDEX IF NOT EXISTS custom_roles_scope_idx
     ON custom_roles (tenant_id, org_id);
 
 CREATE TABLE IF NOT EXISTS user_custom_roles (
-    user_id UUID NOT NULL,
-    role_id UUID NOT NULL REFERENCES custom_roles(id) ON DELETE CASCADE,
-    tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
-    org_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    user_id TEXT NOT NULL,
+    role_id TEXT NOT NULL REFERENCES custom_roles(id) ON DELETE CASCADE,
+    tenant_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    org_id TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
     assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    assigned_by UUID NOT NULL,
+    assigned_by TEXT NOT NULL,
     PRIMARY KEY (user_id, role_id, tenant_id, org_id)
 );
 
