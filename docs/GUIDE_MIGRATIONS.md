@@ -222,7 +222,7 @@ import (
 authFS, _ := fs.Sub(auth.GetMigrationsFS(), "data/sql/migrations")
 coreFS, _ := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
 
-// Register with dialect awareness
+// Register auth first, then core (migration ordering is lexicographic)
 client.RegisterDialectMigrations(
     authFS,
     persistence.WithDialectSourceLabel("."),           // Root = PostgreSQL
@@ -275,21 +275,25 @@ func main() {
         log.Fatal(err)
     }
 
-    // Register go-auth + go-users core migrations
+    // Register go-auth migrations and apply them first.
     authFS, err := fs.Sub(auth.GetMigrationsFS(), "data/sql/migrations")
     if err != nil {
         log.Fatal(err)
     }
-    coreFS, err := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
-    if err != nil {
-        log.Fatal(err)
-    }
-
     client.RegisterDialectMigrations(
         authFS,
         persistence.WithDialectSourceLabel("."),
         persistence.WithValidationTargets("postgres", "sqlite"),
     )
+    if err := client.Migrate(ctx); err != nil {
+        log.Fatal(err)
+    }
+
+    // Register go-users core migrations next.
+    coreFS, err := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
+    if err != nil {
+        log.Fatal(err)
+    }
     client.RegisterDialectMigrations(
         coreFS,
         persistence.WithDialectSourceLabel("."),
@@ -301,7 +305,7 @@ func main() {
         log.Printf("Warning: dialect validation failed: %v", err)
     }
 
-    // Run migrations
+    // Run migrations (core)
     if err := client.Migrate(ctx); err != nil {
         log.Fatal(err)
     }
@@ -353,16 +357,19 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
-    coreFS, err := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
-    if err != nil {
-        log.Fatal(err)
-    }
-
     client.RegisterDialectMigrations(
         authFS,
         persistence.WithDialectSourceLabel("."),
         persistence.WithValidationTargets("postgres", "sqlite"),
     )
+    if err := client.Migrate(ctx); err != nil {
+        log.Fatal(err)
+    }
+
+    coreFS, err := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
+    if err != nil {
+        log.Fatal(err)
+    }
     client.RegisterDialectMigrations(
         coreFS,
         persistence.WithDialectSourceLabel("."),
@@ -823,16 +830,19 @@ func TestMigrationsWithPersistence(t *testing.T) {
     }
 
     authFS, _ := fs.Sub(auth.GetMigrationsFS(), "data/sql/migrations")
-    coreFS, _ := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
     client.RegisterDialectMigrations(authFS,
         persistence.WithDialectSourceLabel("."),
         persistence.WithValidationTargets("postgres", "sqlite"),
     )
+    if err := client.Migrate(ctx); err != nil {
+        t.Fatalf("migration failed: %v", err)
+    }
+
+    coreFS, _ := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
     client.RegisterDialectMigrations(coreFS,
         persistence.WithDialectSourceLabel("."),
         persistence.WithValidationTargets("postgres", "sqlite"),
     )
-
     if err := client.Migrate(ctx); err != nil {
         t.Fatalf("migration failed: %v", err)
     }
@@ -859,15 +869,17 @@ func TestMigrationRollback(t *testing.T) {
     client, _ := persistence.New(cfg, db, sqlitedialect.New())
 
     authFS, _ := fs.Sub(auth.GetMigrationsFS(), "data/sql/migrations")
-    coreFS, _ := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
     client.RegisterDialectMigrations(authFS,
         persistence.WithDialectSourceLabel("."),
     )
+    if err := client.Migrate(ctx); err != nil {
+        t.Fatal(err)
+    }
+
+    coreFS, _ := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
     client.RegisterDialectMigrations(coreFS,
         persistence.WithDialectSourceLabel("."),
     )
-
-    // Apply all migrations
     if err := client.Migrate(ctx); err != nil {
         t.Fatal(err)
     }
@@ -956,38 +968,45 @@ func safeRollback(ctx context.Context, client *persistence.Client) error {
 
 ```go
 func runMigrations(ctx context.Context, client *persistence.Client, env string) error {
-    authFS, _ := fs.Sub(auth.GetMigrationsFS(), "data/sql/migrations")
-    coreFS, _ := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
-    client.RegisterDialectMigrations(authFS,
-        persistence.WithDialectSourceLabel("."),
-        persistence.WithValidationTargets("postgres", "sqlite"),
-    )
-    client.RegisterDialectMigrations(coreFS,
-        persistence.WithDialectSourceLabel("."),
-        persistence.WithValidationTargets("postgres", "sqlite"),
-    )
+    migrateAll := func(ctx context.Context) error {
+        authFS, _ := fs.Sub(auth.GetMigrationsFS(), "data/sql/migrations")
+        client.RegisterDialectMigrations(authFS,
+            persistence.WithDialectSourceLabel("."),
+            persistence.WithValidationTargets("postgres", "sqlite"),
+        )
+        if err := client.Migrate(ctx); err != nil {
+            return err
+        }
+
+        coreFS, _ := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
+        client.RegisterDialectMigrations(coreFS,
+            persistence.WithDialectSourceLabel("."),
+            persistence.WithValidationTargets("postgres", "sqlite"),
+        )
+        return client.Migrate(ctx)
+    }
 
     switch env {
     case "development":
         // Always migrate in development
-        return client.Migrate(ctx)
+        return migrateAll(ctx)
 
     case "testing":
         // Fresh database for each test run
         if err := client.Reset(ctx); err != nil {
             return err
         }
-        return client.Migrate(ctx)
+        return migrateAll(ctx)
 
     case "production":
         // Validate before migrating
         if err := client.ValidateDialects(ctx); err != nil {
             return fmt.Errorf("dialect validation failed: %w", err)
         }
-        return client.Migrate(ctx)
+        return migrateAll(ctx)
 
     default:
-        return client.Migrate(ctx)
+        return migrateAll(ctx)
     }
 }
 ```
