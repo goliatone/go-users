@@ -132,6 +132,12 @@ data/sql/migrations/
 Auth bootstrap migrations live under `data/sql/migrations/auth`, with SQLite
 overrides in `data/sql/migrations/auth/sqlite`.
 
+Register auth bootstrap (or go-auth) before core so dependent tables exist.
+
+If you use `GetMigrationsFS()`, register two sub-filesystems:
+`data/sql/migrations/auth` and `data/sql/migrations` (core), since the dialect
+loader does not scan nested subfolders.
+
 ### Naming Convention
 
 ```
