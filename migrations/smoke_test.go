@@ -30,7 +30,7 @@ func TestMigrationsApplyToSQLite(t *testing.T) {
 		t.Fatalf("no migration filesystems registered")
 	}
 
-	authFS, err := fs.Sub(users.GetAuthBootstrapMigrationsFS(), "data/sql/migrations/sqlite")
+	authFS, err := fs.Sub(users.GetAuthBootstrapMigrationsFS(), "data/sql/migrations/auth/sqlite")
 	if err != nil {
 		t.Fatalf("failed to load auth bootstrap migrations: %v", err)
 	}
