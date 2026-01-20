@@ -116,7 +116,7 @@ More details live in `docs/MULTITENANCY.md` and `docs/WORKSPACES.md`.
 
 `users` stores core auth identities and lifecycle state. Use `user_role` for the built-in auth tier; use custom roles for app-specific capabilities.
 
-- `id`: UUID primary key.
+- `id`: TEXT primary key (UUID string).
 - `user_role`: core auth tier (`guest`, `member`, `admin`, `owner`).
 - `first_name`/`last_name`: required user display names.
 - `username`: unique login handle.
@@ -135,7 +135,7 @@ More details live in `docs/MULTITENANCY.md` and `docs/WORKSPACES.md`.
 
 `password_reset` tracks reset requests and their lifecycle.
 
-- `id`: UUID primary key.
+- `id`: TEXT primary key (UUID string).
 - `user_id`: user receiving the reset.
 - `email`: email used for the reset flow.
 - `status`: reset lifecycle (`unknown`, `requested`, `expired`, `changed`).
@@ -146,7 +146,7 @@ More details live in `docs/MULTITENANCY.md` and `docs/WORKSPACES.md`.
 
 `user_activity` stores audit log entries and feed events.
 
-- `id`: UUID primary key.
+- `id`: TEXT primary key (UUID string).
 - `user_id`: target user (optional).
 - `actor_id`: actor who performed the action.
 - `tenant_id`/`org_id`: scope identifiers.
@@ -174,7 +174,7 @@ More details live in `docs/MULTITENANCY.md` and `docs/WORKSPACES.md`.
 
 `user_preferences` stores scoped preference values.
 
-- `id`: UUID primary key.
+- `id`: TEXT primary key (UUID string).
 - `user_id`: user receiving the preference.
 - `tenant_id`/`org_id`: scope identifiers.
 - `scope_level`: preference tier (`system`, `tenant`, `org`, `user`).
@@ -187,7 +187,7 @@ More details live in `docs/MULTITENANCY.md` and `docs/WORKSPACES.md`.
 
 `custom_roles` stores role definitions scoped by tenant and org. Use `name` as the short display label, `description` as the longer admin facing explanation, and `role_key` as the stable machine key for grouping/filtering.
 
-- `id`: UUID primary key.
+- `id`: TEXT primary key (UUID string).
 - `name`: short display label shown in admin UIs, unique per scope.
 - `description`: longer help text for admins, not intended for filtering.
 - `role_key`: optional, stable key for app level grouping (e.g. editor).
