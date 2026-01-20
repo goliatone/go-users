@@ -38,3 +38,9 @@ var CoreMigrationsFS embed.FS
 //
 //go:embed data/sql/migrations/auth
 var AuthBootstrapMigrationsFS embed.FS
+
+// AuthExtrasMigrationsFS contains optional auth tables used by go-users when
+// running without go-auth (social_accounts, user_identifiers).
+//
+//go:embed data/sql/migrations/auth_extras
+var AuthExtrasMigrationsFS embed.FS
