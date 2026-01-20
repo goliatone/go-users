@@ -1,5 +1,42 @@
 # Changelog
 
+# [0.12.0](https://github.com/goliatone/go-users/compare/v0.11.0...v0.12.0) - (2026-01-20)
+
+## <!-- 1 -->🐛 Bug Fixes
+
+- Aling types with go-auth ([0311c9d](https://github.com/goliatone/go-users/commit/0311c9d64b6a5b1701b005b65f263550fd054c7f))  - (goliatone)
+- Use sub in migration ([a792015](https://github.com/goliatone/go-users/commit/a792015ca378c552b009d3f03b4f1bd6915d5fdb))  - (goliatone)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.12.0 ([0a6cd0a](https://github.com/goliatone/go-users/commit/0a6cd0a7e10998908b61a0272ef4917531c39b5f))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- Auth extra migrations for social identity ([72a62ca](https://github.com/goliatone/go-users/commit/72a62ca78fc0e39b6dc3fb80c9c947bd9c59899b))  - (goliatone)
+- Migration auth schema ([b062de3](https://github.com/goliatone/go-users/commit/b062de3266af4d080f854598a1411579a343e96c))  - (goliatone)
+- New migration FS ([d7ee856](https://github.com/goliatone/go-users/commit/d7ee85644e69d950f90f9c7a90e5e1f9c91eb66c))  - (goliatone)
+- Split migrations into core and auth bootstrap ([d54e16e](https://github.com/goliatone/go-users/commit/d54e16e04386f3afc6ea218fe7213823e1ae3b4f))  - (goliatone)
+- Migration bootstrap ([1ba1481](https://github.com/goliatone/go-users/commit/1ba1481d2093e3c33c6b000e173a071eb7743455))  - (goliatone)
+- Migrations for external ids ([20207d2](https://github.com/goliatone/go-users/commit/20207d2f5dc06a76b35ed4b3aa1b085209a6d109))  - (goliatone)
+
+## <!-- 2 -->🚜 Refactor
+
+- Split auth migrations ([52e731e](https://github.com/goliatone/go-users/commit/52e731e50bf4d795c172d771f541e5646c3ec438))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.11.0 ([5bf67c7](https://github.com/goliatone/go-users/commit/5bf67c76eaf8c8ec440027d7beeb8333fabac6db))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update readme ([2f14f87](https://github.com/goliatone/go-users/commit/2f14f87469d6301b2d4ba322642d5ee23606ed1f))  - (goliatone)
+- Update examples ([f908046](https://github.com/goliatone/go-users/commit/f90804662c015658a2dca07c44567464fe14ea4b))  - (goliatone)
+- Udpate test ([26f46eb](https://github.com/goliatone/go-users/commit/26f46eb0b83c1fe6cd082d7e45e594dfde73c536))  - (goliatone)
+- Update guides ([15d6b9f](https://github.com/goliatone/go-users/commit/15d6b9f12859c43b3aebe69b0ae8f93172a2dfa1))  - (goliatone)
+- Update deps ([0d676a5](https://github.com/goliatone/go-users/commit/0d676a532301b29c0fa92744189f8dcf65a9c7a1))  - (goliatone)
+- Update tests ([0748574](https://github.com/goliatone/go-users/commit/074857411b024e951d15d54cd8a173a6329c3913))  - (goliatone)
+
 # [0.11.0](https://github.com/goliatone/go-users/compare/v0.10.0...v0.11.0) - (2026-01-20)
 
 ## <!-- 13 -->📦 Bumps
