@@ -34,6 +34,7 @@
 package main
 
 import (
+	featuregate "github.com/goliatone/go-featuregate/gate"
 	"github.com/goliatone/go-users/pkg/types"
 	"github.com/goliatone/go-users/service"
 )
@@ -51,6 +52,7 @@ type Dependencies struct {
 	AuthorizationPolicy  types.AuthorizationPolicy
 	Hooks                types.Hooks
 	Logger               types.Logger
+	FeatureGate          featuregate.FeatureGate
 }
 
 func buildService(deps Dependencies) *service.Service {
@@ -67,6 +69,7 @@ func buildService(deps Dependencies) *service.Service {
 		AuthorizationPolicy:  deps.AuthorizationPolicy,
 		Hooks:                deps.Hooks,
 		Logger:               deps.Logger,
+		FeatureGate:          deps.FeatureGate,
 	})
 }
 ```
@@ -83,6 +86,18 @@ Check `service.Service.Ready` or `HealthCheck` before wiring transports.
 - `ProfileUpsert`, `PreferenceUpsert`, `PreferenceDelete`: profile and scoped preference management.
 
 Every command runs through the scope guard before invoking repositories. Hooks fire after each command so transports can sync email, analytics, or caches.
+
+## Feature gates
+
+`go-users` can defer invite, self-registration, and password reset flows to a feature gate. Inject any implementation of `featuregate.FeatureGate` via `service.Config.FeatureGate`. When `FeatureGate` is `nil`, all gated flows are treated as enabled.
+
+Gated flows and keys:
+
+- `users.invite` → `UserInvite` (`command.ErrInviteDisabled`)
+- `users.password_reset` → `UserPasswordResetRequest` (`command.ErrPasswordResetDisabled`)
+- `featuregate.FeatureUsersSignup` (`users.signup`) → `UserRegistrationRequest` (`command.ErrSignupDisabled`)
+
+Scope handling: `go-users` resolves gates with the scope derived from `types.ScopeFilter` and (for password reset requests) the target user ID. If no scope identifiers are set, the gate falls back to context-based scope resolution. Gate errors are returned to the caller.
 
 ## Queries
 
