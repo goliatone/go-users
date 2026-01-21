@@ -21,6 +21,7 @@ store, _ := activity.NewRepository(activity.RepositoryConfig{DB: bunDB})
 registry := registry.NewRoleRegistry(registry.RoleRegistryConfig{DB: bunDB})
 profileRepo := profile.NewRepository(bunDB)
 preferenceRepo, _ := preferences.NewRepository(preferences.RepositoryConfig{DB: bunDB})
+gate := resolver.New(/* go-featuregate options */)
 
 svc := users.New(users.Config{
     AuthRepository:       goauth.NewUsersAdapter(authRepo),
@@ -42,6 +43,7 @@ svc := users.New(users.Config{
     InviteTokenTTL:      72 * time.Hour,
     ScopeResolver:       multitenant.ScopeResolverFromClaims(),
     AuthorizationPolicy: multitenant.PolicyFromRoles(),
+    FeatureGate:         gate,
 })
 
 if err := svc.HealthCheck(ctx); err != nil {
@@ -55,6 +57,18 @@ if err := svc.HealthCheck(ctx); err != nil {
 - Inventory, activity, profile, and preference repositories (the inventory and
   activity repos can be inferred from the injected auth repo and activity sink)
 - `PreferenceResolver` (auto-built when a preference repository is provided)
+
+### Feature gates
+
+`go-users` integrates with `go-featuregate` via `featuregate.FeatureGate`. Provide the gate through `users.Config.FeatureGate` to enable flow-specific toggles. When unset, all gated flows are treated as enabled.
+
+Checked keys:
+
+- `users.invite` (invite flow)
+- `users.password_reset` (password reset requests)
+- `featuregate.FeatureUsersSignup` / `users.signup` (self-registration requests)
+
+Scopes are passed via `gate.WithScopeSet` using the `types.ScopeFilter` (plus the target user ID for password reset requests). If no scope identifiers are set, the gate falls back to context-derived scope.
 
 ### Scope Filter & Labels
 
@@ -188,6 +202,7 @@ the latest schema snapshot on login).
 | `Clock`, `IDGenerator`, `Logger` | ⛔ | Defaults provided | Override for deterministic tests or structured logging |
 | `TransitionPolicy` | ⛔ | `types.DefaultTransitionPolicy()` | Replace if your auth provider supports extra states |
 | `InviteTokenTTL` | ⛔ | `72h` recommended | Governs invite expiration metadata |
+| `FeatureGate` | ⛔ | `featuregate.FeatureGate` | Optional; gates invite/signup/password reset flows |
 | `ScopeResolver`, `AuthorizationPolicy` | ⛔ | Multitenant middleware | Wire both to enforce tenant/org scoping (see `docs/MULTITENANCY.md`) |
 
 ## Command Reference
