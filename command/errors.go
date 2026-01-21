@@ -21,8 +21,12 @@ var (
 	ErrUserEmailRequired = errors.New("go-users: user email required")
 	// ErrInviteEmailRequired occurs when an invite omits the email address.
 	ErrInviteEmailRequired = errors.New("go-users: invite requires email")
+	// ErrInviteDisabled indicates the invite flow is disabled via feature gate.
+	ErrInviteDisabled = errors.New("go-users: invite disabled")
 	// ErrPasswordHashRequired occurs when a password reset omits the hashed password.
 	ErrPasswordHashRequired = errors.New("go-users: password reset requires password hash")
+	// ErrPasswordResetDisabled indicates password reset is disabled via feature gate.
+	ErrPasswordResetDisabled = errors.New("go-users: password reset disabled")
 	// ErrUserIDsRequired occurs when bulk handlers are invoked without targets.
 	ErrUserIDsRequired = errors.New("go-users: user ids required")
 	// ErrUsersRequired occurs when bulk user import lacks users.
@@ -57,4 +61,6 @@ var (
 	ErrResetIdentifierRequired = errors.New("go-users: password reset requires identifier")
 	// ErrResetCommandRequired indicates the reset command dependency is missing.
 	ErrResetCommandRequired = errors.New("go-users: password reset command required")
+	// ErrSignupDisabled indicates self-registration is disabled via feature gate.
+	ErrSignupDisabled = errors.New("go-users: signup disabled")
 )
