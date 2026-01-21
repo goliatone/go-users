@@ -49,6 +49,8 @@ func newAdminApp() *adminApp {
 	activityStore := memory.NewActivityStore()
 	profileRepo := memory.NewProfileRepository()
 	preferenceRepo := memory.NewPreferenceRepository()
+	tokenRepo := memory.NewUserTokenRepository()
+	secureLinks := memory.NewSecureLinkManager()
 
 	cms := newCMSBridge()
 	directory := newTenantDirectory()
@@ -83,6 +85,8 @@ func newAdminApp() *adminApp {
 		RoleRegistry:         roleRegistry,
 		ProfileRepository:    profileRepo,
 		PreferenceRepository: preferenceRepo,
+		UserTokenRepository:  tokenRepo,
+		SecureLinkManager:    secureLinks,
 		Hooks: types.Hooks{
 			AfterActivity:         cms.ForwardActivity,
 			AfterPreferenceChange: cms.ForwardPreference,
