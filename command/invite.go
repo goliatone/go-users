@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	featuregate "github.com/goliatone/go-featuregate/gate"
 	gocommand "github.com/goliatone/go-command"
 	"github.com/goliatone/go-users/pkg/types"
 	"github.com/goliatone/go-users/scope"
@@ -62,6 +63,7 @@ type UserInviteCommand struct {
 	logger   types.Logger
 	tokenTTL time.Duration
 	guard    scope.Guard
+	featureGate featuregate.FeatureGate
 	route    string
 }
 
@@ -77,6 +79,7 @@ type InviteCommandConfig struct {
 	Logger          types.Logger
 	TokenTTL        time.Duration
 	ScopeGuard      scope.Guard
+	FeatureGate     featuregate.FeatureGate
 	Route           string
 }
 
@@ -108,6 +111,7 @@ func NewUserInviteCommand(cfg InviteCommandConfig) *UserInviteCommand {
 		logger:   safeLogger(cfg.Logger),
 		tokenTTL: ttl,
 		guard:    safeScopeGuard(cfg.ScopeGuard),
+		featureGate: cfg.FeatureGate,
 		route:    route,
 	}
 }
@@ -131,6 +135,11 @@ func (c *UserInviteCommand) Execute(ctx context.Context, input UserInviteInput) 
 	scope, err := c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionUsersWrite, uuid.Nil)
 	if err != nil {
 		return err
+	}
+	if enabled, err := featureEnabled(ctx, c.featureGate, featureUsersInvite, scope, uuid.Nil); err != nil {
+		return err
+	} else if !enabled {
+		return ErrInviteDisabled
 	}
 
 	metadata := cloneMap(input.Metadata)
