@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	featuregate "github.com/goliatone/go-featuregate/gate"
 	gocommand "github.com/goliatone/go-command"
 	"github.com/goliatone/go-users/pkg/types"
 	"github.com/google/uuid"
@@ -53,6 +54,7 @@ type UserPasswordResetRequestCommand struct {
 	hooks    types.Hooks
 	logger   types.Logger
 	tokenTTL time.Duration
+	featureGate featuregate.FeatureGate
 	route    string
 }
 
@@ -67,6 +69,7 @@ type PasswordResetRequestConfig struct {
 	Hooks           types.Hooks
 	Logger          types.Logger
 	TokenTTL        time.Duration
+	FeatureGate     featuregate.FeatureGate
 	Route           string
 }
 
@@ -97,6 +100,7 @@ func NewUserPasswordResetRequestCommand(cfg PasswordResetRequestConfig) *UserPas
 		hooks:    safeHooks(cfg.Hooks),
 		logger:   safeLogger(cfg.Logger),
 		tokenTTL: ttl,
+		featureGate: cfg.FeatureGate,
 		route:    route,
 	}
 }
@@ -130,6 +134,11 @@ func (c *UserPasswordResetRequestCommand) Execute(ctx context.Context, input Use
 	}
 	if user == nil {
 		return ErrUserNotFound
+	}
+	if enabled, err := featureEnabled(ctx, c.featureGate, featureUsersPasswordReset, input.Scope, user.ID); err != nil {
+		return err
+	} else if !enabled {
+		return ErrPasswordResetDisabled
 	}
 
 	issuedAt := now(c.clock)
