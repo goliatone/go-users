@@ -19,6 +19,8 @@ func main() {
 	roleRegistry := memory.NewRoleRegistry()
 	profileRepo := memory.NewProfileRepository()
 	preferenceRepo := memory.NewPreferenceRepository()
+	tokenRepo := memory.NewUserTokenRepository()
+	secureLinks := memory.NewSecureLinkManager()
 
 	svc := users.New(users.Config{
 		AuthRepository:       repo,
@@ -28,6 +30,8 @@ func main() {
 		ActivityRepository:   activityStore,
 		ProfileRepository:    profileRepo,
 		PreferenceRepository: preferenceRepo,
+		UserTokenRepository:  tokenRepo,
+		SecureLinkManager:    secureLinks,
 		Hooks: types.Hooks{
 			AfterLifecycle: func(_ context.Context, event types.LifecycleEvent) {
 				log.Printf("[hook] lifecycle %s -> %s\n", event.FromState, event.ToState)
