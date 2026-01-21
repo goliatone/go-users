@@ -1,5 +1,30 @@
 # Changelog
 
+# [0.13.0](https://github.com/goliatone/go-users/compare/v0.12.0...v0.13.0) - (2026-01-21)
+
+## <!-- 1 -->🐛 Bug Fixes
+
+- Example include new securelink ([29dd2e7](https://github.com/goliatone/go-users/commit/29dd2e7e6ce57620ef4c77e88b891f22a1fa9160))  - (goliatone)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.13.0 ([4597fc5](https://github.com/goliatone/go-users/commit/4597fc5f7b112f9a2126bf4dcc009f528d2aed18))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- Service feature gate integration ([262c6f0](https://github.com/goliatone/go-users/commit/262c6f039a3380ce192eaa584ec0cf4281bf2ec8))  - (goliatone)
+- New errors ([2d6787e](https://github.com/goliatone/go-users/commit/2d6787ec9338a6a3c9825bd9f994a2fa2568a2b3))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.12.0 ([fa536c1](https://github.com/goliatone/go-users/commit/fa536c135991c88849acc6a9fefd053f9aeafb4a))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update deps ([4248f57](https://github.com/goliatone/go-users/commit/4248f574298bbe0544f82ef79de2f7fa800ce964))  - (goliatone)
+- Update readme ([9ef5507](https://github.com/goliatone/go-users/commit/9ef5507d60849295a9cda0cb881e5d698df08dc6))  - (goliatone)
+- Update tests ([05b6fdc](https://github.com/goliatone/go-users/commit/05b6fdc6c451e9cc0c3e3569ecc64aae08081e0d))  - (goliatone)
+
 # [0.12.0](https://github.com/goliatone/go-users/compare/v0.11.0...v0.12.0) - (2026-01-20)
 
 ## <!-- 1 -->🐛 Bug Fixes
