@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	featuregate "github.com/goliatone/go-featuregate/gate"
 	"github.com/goliatone/go-users/pkg/types"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -197,6 +198,32 @@ func TestUserInviteCommand_GeneratesTokenAndActivity(t *testing.T) {
 	require.False(t, hasToken)
 }
 
+func TestUserInviteCommand_FeatureGateDisabled(t *testing.T) {
+	repo := newFakeAuthRepo()
+	tokenRepo := newMemoryTokenRepo()
+	manager := &stubSecureLinkManager{}
+	gate := &stubFeatureGate{enabled: false}
+
+	cmd := NewUserInviteCommand(InviteCommandConfig{
+		Repository:      repo,
+		TokenRepository: tokenRepo,
+		SecureLinks:     manager,
+		FeatureGate:     gate,
+	})
+
+	err := cmd.Execute(context.Background(), UserInviteInput{
+		Email: "new@example.com",
+		Actor: types.ActorRef{
+			ID: uuid.New(),
+		},
+	})
+
+	require.ErrorIs(t, err, ErrInviteDisabled)
+	require.Nil(t, repo.lastCreated)
+	require.Nil(t, tokenRepo.lastCreated)
+	require.Equal(t, []string{featureUsersInvite}, gate.keys)
+}
+
 func TestUserPasswordResetRequestCommand_IssuesTokenAndLogsActivity(t *testing.T) {
 	userID := uuid.New()
 	repo := newFakeAuthRepo()
@@ -266,6 +293,56 @@ func TestUserPasswordResetRequestCommand_IssuesTokenAndLogsActivity(t *testing.T
 	require.Equal(t, expectedToken.String(), recorded.Data["jti"])
 	_, hasToken := recorded.Data["token"]
 	require.False(t, hasToken)
+}
+
+func TestUserPasswordResetRequestCommand_FeatureGateDisabled(t *testing.T) {
+	userID := uuid.New()
+	repo := newFakeAuthRepo()
+	repo.users[userID] = &types.AuthUser{
+		ID:    userID,
+		Email: "reset@example.com",
+	}
+	resetRepo := newMemoryResetRepo()
+	manager := &stubSecureLinkManager{}
+	gate := &stubFeatureGate{enabled: false}
+
+	cmd := NewUserPasswordResetRequestCommand(PasswordResetRequestConfig{
+		Repository:      repo,
+		ResetRepository: resetRepo,
+		SecureLinks:     manager,
+		FeatureGate:     gate,
+	})
+
+	err := cmd.Execute(context.Background(), UserPasswordResetRequestInput{
+		Identifier: "reset@example.com",
+	})
+
+	require.ErrorIs(t, err, ErrPasswordResetDisabled)
+	require.Len(t, resetRepo.resets, 0)
+	require.Equal(t, []string{featureUsersPasswordReset}, gate.keys)
+}
+
+func TestUserRegistrationRequestCommand_FeatureGateDisabled(t *testing.T) {
+	repo := newFakeAuthRepo()
+	tokenRepo := newMemoryTokenRepo()
+	manager := &stubSecureLinkManager{}
+	gate := &stubFeatureGate{enabled: false}
+
+	cmd := NewUserRegistrationRequestCommand(RegistrationRequestConfig{
+		Repository:      repo,
+		TokenRepository: tokenRepo,
+		SecureLinks:     manager,
+		FeatureGate:     gate,
+	})
+
+	err := cmd.Execute(context.Background(), UserRegistrationRequestInput{
+		Email: "register@example.com",
+	})
+
+	require.ErrorIs(t, err, ErrSignupDisabled)
+	require.Nil(t, repo.lastCreated)
+	require.Nil(t, tokenRepo.lastCreated)
+	require.Equal(t, []string{featuregate.FeatureUsersSignup}, gate.keys)
 }
 
 func TestUserTokenConsumeCommand_PreventsReplayAndLogsActivity(t *testing.T) {
@@ -759,6 +836,20 @@ func (s *stubSecureLinkManager) GetAndValidate(fn func(string) string) (types.Se
 
 func (s *stubSecureLinkManager) GetExpiration() time.Duration {
 	return s.expiration
+}
+
+type stubFeatureGate struct {
+	enabled bool
+	err     error
+	keys    []string
+}
+
+func (s *stubFeatureGate) Enabled(_ context.Context, key string, _ ...featuregate.ResolveOption) (bool, error) {
+	s.keys = append(s.keys, key)
+	if s.err != nil {
+		return false, s.err
+	}
+	return s.enabled, nil
 }
 
 type memoryTokenRepo struct {
