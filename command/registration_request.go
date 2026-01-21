@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	featuregate "github.com/goliatone/go-featuregate/gate"
 	gocommand "github.com/goliatone/go-command"
 	"github.com/goliatone/go-users/pkg/types"
 	"github.com/goliatone/go-users/scope"
@@ -60,6 +61,7 @@ type UserRegistrationRequestCommand struct {
 	logger   types.Logger
 	tokenTTL time.Duration
 	guard    scope.Guard
+	featureGate featuregate.FeatureGate
 	route    string
 }
 
@@ -75,6 +77,7 @@ type RegistrationRequestConfig struct {
 	Logger          types.Logger
 	TokenTTL        time.Duration
 	ScopeGuard      scope.Guard
+	FeatureGate     featuregate.FeatureGate
 	Route           string
 }
 
@@ -106,6 +109,7 @@ func NewUserRegistrationRequestCommand(cfg RegistrationRequestConfig) *UserRegis
 		logger:   safeLogger(cfg.Logger),
 		tokenTTL: ttl,
 		guard:    safeScopeGuard(cfg.ScopeGuard),
+		featureGate: cfg.FeatureGate,
 		route:    route,
 	}
 }
@@ -133,6 +137,11 @@ func (c *UserRegistrationRequestCommand) Execute(ctx context.Context, input User
 		if err != nil {
 			return err
 		}
+	}
+	if enabled, err := featureEnabled(ctx, c.featureGate, featuregate.FeatureUsersSignup, scope, uuid.Nil); err != nil {
+		return err
+	} else if !enabled {
+		return ErrSignupDisabled
 	}
 
 	metadata := cloneMap(input.Metadata)
