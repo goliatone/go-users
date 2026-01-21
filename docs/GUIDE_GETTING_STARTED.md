@@ -141,6 +141,27 @@ The `UserInviteResult` contains:
 - `User`: The created user record
 - `Token`: An invite token for completing registration
 
+## Feature Gates
+
+`go-users` can optionally gate invite, self-registration, and password reset flows through `go-featuregate`. Provide a `featuregate.FeatureGate` via `users.Config.FeatureGate`. If you omit it, these flows are treated as enabled.
+
+```go
+gate := resolver.New(/* go-featuregate options */)
+
+svc := users.New(users.Config{
+    AuthRepository: authRepo,
+    RoleRegistry:   roleRegistry,
+    ActivitySink:   activityStore,
+    FeatureGate:    gate,
+})
+```
+
+Gated flows:
+
+- `users.invite` (`command.ErrInviteDisabled`)
+- `users.password_reset` (`command.ErrPasswordResetDisabled`)
+- `featuregate.FeatureUsersSignup` / `users.signup` (`command.ErrSignupDisabled`)
+
 ## Transitioning User State
 
 Users progress through lifecycle states based on the default transition policy: `pending` → `active`/`disabled`, `active` ↔ `suspended`, `active`/`suspended` → `disabled`, `disabled` → `archived`.
