@@ -23,8 +23,6 @@ require (
 	github.com/uptrace/bun/dialect/sqlitedialect v1.2.16
 )
 
-replace github.com/goliatone/go-featuregate => ../go-featuregate
-
 require (
 	cel.dev/expr v0.25.1 // indirect
 	dario.cat/mergo v1.0.2 // indirect

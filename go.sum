@@ -87,6 +87,8 @@ github.com/goliatone/go-crud v0.17.0 h1:IH23V7baFss4vL8uP6AXgK1oRtQSIMYN7K0K4TY1
 github.com/goliatone/go-crud v0.17.0/go.mod h1:5ccW6GGO3FVE8lKalkVcoPYCd+VqrMXhSw2o0BQgIqA=
 github.com/goliatone/go-errors v0.10.0 h1:qVmOXKq6aa3cHbygI5VHGCosuA0CLAXso0BlinboYJE=
 github.com/goliatone/go-errors v0.10.0/go.mod h1:FiZEC2z5a8SBdRyljC9wFt+IzqZDfrst2dPoqWARbr4=
+github.com/goliatone/go-featuregate v0.1.0 h1:KDZ13NsNVvPONGywRWDxpCdhD0upoOQKlNKz4ahxPsc=
+github.com/goliatone/go-featuregate v0.1.0/go.mod h1:XambOsch2DLTme7BQCoxSv4aWL8K4C5zxlGxxnA1XLI=
 github.com/goliatone/go-masker v0.1.0 h1:YiNxBRC7AXpGKtUlXIoU4oj3DUfE+M2fvcDRyYC4Tt4=
 github.com/goliatone/go-masker v0.1.0/go.mod h1:n+AV93IO1rNI35kjbjfV1gMkjuIOSDVEzfhABTlCf4U=
 github.com/goliatone/go-options v0.7.0 h1:LP18jaxhKyoNe1D6G8pfvmELAFM+mxGOKpO1BwLrt3A=
