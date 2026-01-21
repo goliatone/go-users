@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	featuregate "github.com/goliatone/go-featuregate/gate"
 	"github.com/goliatone/go-users/command"
 	"github.com/goliatone/go-users/pkg/types"
 	"github.com/goliatone/go-users/preferences"
@@ -88,6 +89,7 @@ type Config struct {
 	PreferenceResolver      PreferenceResolver
 	ScopeResolver           types.ScopeResolver
 	AuthorizationPolicy     types.AuthorizationPolicy
+	FeatureGate             featuregate.FeatureGate
 }
 
 // PreferenceResolver resolves scoped preferences for queries.
@@ -265,6 +267,7 @@ func (s *Service) buildCommands() Commands {
 		Logger:          s.cfg.Logger,
 		TokenTTL:        s.cfg.InviteTokenTTL,
 		ScopeGuard:      s.scopeGuard,
+		FeatureGate:     s.cfg.FeatureGate,
 		Route:           s.cfg.InviteLinkRoute,
 	})
 	registrationRequest := command.NewUserRegistrationRequestCommand(command.RegistrationRequestConfig{
@@ -278,6 +281,7 @@ func (s *Service) buildCommands() Commands {
 		Logger:          s.cfg.Logger,
 		TokenTTL:        s.cfg.InviteTokenTTL,
 		ScopeGuard:      s.scopeGuard,
+		FeatureGate:     s.cfg.FeatureGate,
 		Route:           s.cfg.RegistrationLinkRoute,
 	})
 	tokenValidate := command.NewUserTokenValidateCommand(command.TokenValidateConfig{
@@ -303,6 +307,7 @@ func (s *Service) buildCommands() Commands {
 		Activity:        s.cfg.ActivitySink,
 		Hooks:           s.cfg.Hooks,
 		Logger:          s.cfg.Logger,
+		FeatureGate:     s.cfg.FeatureGate,
 		Route:           s.cfg.PasswordResetLinkRoute,
 	})
 	resetConfirm := command.NewUserPasswordResetConfirmCommand(command.PasswordResetConfirmConfig{
