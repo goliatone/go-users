@@ -17,23 +17,49 @@ func featureEnabled(ctx context.Context, gate featuregate.FeatureGate, key strin
 	if gate == nil {
 		return true, nil
 	}
-	scopeSet := featureScopeSet(scope, userID)
-	if scopeSet.TenantID == "" && scopeSet.OrgID == "" && scopeSet.UserID == "" {
+	chain := featureScopeChain(scope, userID)
+	if len(chain) == 0 {
 		return gate.Enabled(ctx, key)
 	}
-	return gate.Enabled(ctx, key, featuregate.WithScopeSet(scopeSet))
+	return gate.Enabled(ctx, key, featuregate.WithScopeChain(chain))
 }
 
-func featureScopeSet(scope types.ScopeFilter, userID uuid.UUID) featuregate.ScopeSet {
-	set := featuregate.ScopeSet{}
+func featureScopeChain(scope types.ScopeFilter, userID uuid.UUID) featuregate.ScopeChain {
+	chain := featuregate.ScopeChain{}
+	tenantID := ""
+	orgID := ""
 	if scope.TenantID != uuid.Nil {
-		set.TenantID = scope.TenantID.String()
+		tenantID = scope.TenantID.String()
 	}
 	if scope.OrgID != uuid.Nil {
-		set.OrgID = scope.OrgID.String()
+		orgID = scope.OrgID.String()
 	}
+
 	if userID != uuid.Nil {
-		set.UserID = userID.String()
+		chain = append(chain, featuregate.ScopeRef{
+			Kind:     featuregate.ScopeUser,
+			ID:       userID.String(),
+			TenantID: tenantID,
+			OrgID:    orgID,
+		})
 	}
-	return set
+	if orgID != "" {
+		chain = append(chain, featuregate.ScopeRef{
+			Kind:     featuregate.ScopeOrg,
+			ID:       orgID,
+			TenantID: tenantID,
+			OrgID:    orgID,
+		})
+	}
+	if tenantID != "" {
+		chain = append(chain, featuregate.ScopeRef{
+			Kind:     featuregate.ScopeTenant,
+			ID:       tenantID,
+			TenantID: tenantID,
+		})
+	}
+	if len(chain) == 0 {
+		return nil
+	}
+	return append(chain, featuregate.ScopeRef{Kind: featuregate.ScopeSystem})
 }
