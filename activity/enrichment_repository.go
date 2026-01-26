@@ -83,8 +83,7 @@ func (r *Repository) listActivityForEnrichmentQuery(ctx context.Context, db *bun
 	limit := normalizeEnrichmentLimit(filter.Limit)
 	rows := make([]LogEntry, 0, limit)
 	query := db.NewSelect().
-		Model(&rows).
-		Table("user_activity")
+		Model(&rows)
 	query = applyEnrichmentFilter(query, filter)
 	query = ApplyCursorPagination(query, filter.Cursor, limit)
 	if err := query.Scan(ctx); err != nil {
@@ -108,8 +107,7 @@ func (r *Repository) listActivityForEnrichmentFallback(ctx context.Context, db *
 	for {
 		rows := make([]LogEntry, 0, limit)
 		query := db.NewSelect().
-			Model(&rows).
-			Table("user_activity")
+			Model(&rows)
 		query = applyEnrichmentScope(query, filter.Scope)
 		query = ApplyCursorPagination(query, cursor, limit)
 		if err := query.Scan(ctx); err != nil {
@@ -187,7 +185,7 @@ func applyEnrichmentMissingOrStaleFilter(q *bun.SelectQuery, filter ActivityEnri
 	return q.Where("("+strings.Join(conditions, " OR ")+")", args...)
 }
 
-func missingKeyCondition(driver string, keys []string) (string, []any) {
+func missingKeyCondition(driver dialect.Name, keys []string) (string, []any) {
 	if len(keys) == 0 {
 		return "", nil
 	}
@@ -217,7 +215,7 @@ func missingKeyCondition(driver string, keys []string) (string, []any) {
 	return "(" + strings.Join(conditions, " OR ") + ")", args
 }
 
-func enrichedBeforeCondition(driver string, before time.Time) (string, []any) {
+func enrichedBeforeCondition(driver dialect.Name, before time.Time) (string, []any) {
 	if before.IsZero() {
 		return "", nil
 	}
