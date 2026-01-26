@@ -413,7 +413,16 @@ you wire your handlers (the default service queries do not attach a policy).
 
 Defaults treat `system_admin`/`superadmin` as superadmins and `tenant_admin`/`admin`/`org_admin`
 as admins (override with `WithRoleAliases`). The policy masks sensitive data via go-masker
-and redacts IPs for non-superadmins; customize with `WithPolicyMasker` or `WithIPRedaction`.
+and redacts IPs for non-superadmins.
+
+Support-role metadata exposure modes (opt-in via `WithMetadataExposure`):
+
+- `MetadataExposeNone` (default): no metadata returned.
+- `MetadataExposeSanitized`: metadata is returned after go-masker preprocessing (denylist rules).
+- `MetadataExposeAll`: raw metadata (intended for development/debug only).
+
+Customize sanitized mode with `WithPolicyMasker` or `WithMetadataSanitizer`, and toggle IP redaction
+with `WithIPRedaction`.
 
 ### Cursor pagination (optional)
 
