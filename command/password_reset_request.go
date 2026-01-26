@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	featuregate "github.com/goliatone/go-featuregate/gate"
 	gocommand "github.com/goliatone/go-command"
+	featuregate "github.com/goliatone/go-featuregate/gate"
 	"github.com/goliatone/go-users/pkg/types"
 	"github.com/google/uuid"
 )
@@ -45,17 +45,17 @@ type UserPasswordResetRequestResult struct {
 
 // UserPasswordResetRequestCommand issues securelink reset tokens and persists lifecycle data.
 type UserPasswordResetRequestCommand struct {
-	repo     types.AuthRepository
-	resets   types.PasswordResetRepository
-	manager  types.SecureLinkManager
-	clock    types.Clock
-	idGen    types.IDGenerator
-	sink     types.ActivitySink
-	hooks    types.Hooks
-	logger   types.Logger
-	tokenTTL time.Duration
+	repo        types.AuthRepository
+	resets      types.PasswordResetRepository
+	manager     types.SecureLinkManager
+	clock       types.Clock
+	idGen       types.IDGenerator
+	sink        types.ActivitySink
+	hooks       types.Hooks
+	logger      types.Logger
+	tokenTTL    time.Duration
 	featureGate featuregate.FeatureGate
-	route    string
+	route       string
 }
 
 // PasswordResetRequestConfig holds dependencies for reset issuance.
@@ -91,17 +91,17 @@ func NewUserPasswordResetRequestCommand(cfg PasswordResetRequestConfig) *UserPas
 		route = SecureLinkRoutePasswordReset
 	}
 	return &UserPasswordResetRequestCommand{
-		repo:     cfg.Repository,
-		resets:   cfg.ResetRepository,
-		manager:  cfg.SecureLinks,
-		clock:    safeClock(cfg.Clock),
-		idGen:    idGen,
-		sink:     safeActivitySink(cfg.Activity),
-		hooks:    safeHooks(cfg.Hooks),
-		logger:   safeLogger(cfg.Logger),
-		tokenTTL: ttl,
+		repo:        cfg.Repository,
+		resets:      cfg.ResetRepository,
+		manager:     cfg.SecureLinks,
+		clock:       safeClock(cfg.Clock),
+		idGen:       idGen,
+		sink:        safeActivitySink(cfg.Activity),
+		hooks:       safeHooks(cfg.Hooks),
+		logger:      safeLogger(cfg.Logger),
+		tokenTTL:    ttl,
 		featureGate: cfg.FeatureGate,
-		route:    route,
+		route:       route,
 	}
 }
 
