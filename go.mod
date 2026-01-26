@@ -9,7 +9,7 @@ require (
 	github.com/goliatone/go-command v0.13.0
 	github.com/goliatone/go-crud v0.17.0
 	github.com/goliatone/go-errors v0.10.0
-	github.com/goliatone/go-featuregate v0.1.0
+	github.com/goliatone/go-featuregate v0.5.0
 	github.com/goliatone/go-masker v0.1.0
 	github.com/goliatone/go-options v0.7.0
 	github.com/goliatone/go-repository-bun v0.12.0
