@@ -78,6 +78,35 @@ Rules of thumb:
 - `object_deleted` should be set when the resolver reports deletion while preserving the last known `object_display`.
 - Session ID extraction order: JWT `jti` → `claims.Metadata["session_id"]` → `auth.ActorContext.Metadata["session_id"]`.
 
+### Write-Time Enrichment Modes
+
+Configure write-time enrichment via `service.Config`:
+
+- `none`: no enrichment at write time.
+- `wrapper`: enrich with `activity.EnrichedSink` before persistence.
+- `repo`: enrich inside the repository `Log` hook.
+- `hybrid`: wrapper enriches app-specific metadata, then the repo enriches core actor/object fields.
+
+Enablement knobs: `EnrichmentEnabled`, `EnrichmentScope`, `EnrichmentWriteMode`, `ActivityEnricher`.
+
+### Backfill Job (optional)
+
+Use the cron command under `command/activity_enrichment` to enrich existing records:
+
+- Config: `Schedule` (default `0 * * * *`), `BatchSize`, `EnrichedAtCutoff`, optional `Scope`.
+- Suggested rollout: run hourly during initial backfill, then daily.
+- Updates are missing-key only and safe to run repeatedly.
+
+### JSONB Indexing Guidance (Postgres)
+
+For missing/stale enrichment scans, add functional indexes:
+
+- `CREATE INDEX ON user_activity ((data->>'actor_display'));`
+- `CREATE INDEX ON user_activity ((data->>'object_display'));`
+- `CREATE INDEX ON user_activity (((data->>'enriched_at')::timestamptz));`
+
+Add a GIN index on `data` for broader JSONB predicates.
+
 ## Building Activity Records
 
 ### From HTTP Requests (with go-auth)
