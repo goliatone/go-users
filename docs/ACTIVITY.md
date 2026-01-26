@@ -23,6 +23,37 @@ Metadata structure: prefer flat keys with clear units; always include `object_id
 
 Use the `channel` field for module-level filtering (e.g., `settings`, `media`, `export`, `bulk`). Keep channels lowercase, stable, and limited to the module name; reserve verb/object fields for finer-grained analysis. When emitting from shared helpers, set the channel via `activity.WithChannel("settings")`; omit it for legacy compatibility when a module tag is not needed.
 
+## Enrichment Metadata
+
+Write time enrichment stores stable display details in `ActivityRecord.Data` to avoid read-time lookups. These keys are flat by design to keep JSONB merges safe and queryable.
+
+Reserved keys:
+- `actor_display`, `actor_email`, `actor_id`, `actor_type`
+- `object_display`, `object_type`, `object_id`, `object_deleted`
+- `session_id`
+- `enriched_at`, `enricher_version`
+
+Invariants:
+- Keys are flat and stable; do not repurpose them for other meanings.
+- Values should be JSON-serializable primitives (string/bool) to keep indexing and merges safe.
+- `enriched_at` is an RFC3339Nano string; update it only when new enrichment keys are added.
+- Default `enricher_version` is `v1` (see `activity.DefaultEnricherVersion`); applications can override when wiring custom enrichers.
+
+Data update semantics:
+- Missing-key only: add keys that are absent in `data`.
+- Never overwrite user-provided metadata keys by default.
+- Refresh `enriched_at` only when a new enrichment key is written.
+
+Object display rules:
+- Use a stable, human-readable format per object type (avoid ephemeral values).
+- Unknown types should fall back to `object_type:object_id`.
+- When an object is deleted, set `object_deleted = true` and keep the last known `object_display` when available (otherwise use the fallback format).
+
+Session ID extraction order (deterministic):
+1. JWT `jti` claim (stable per session)
+2. `claims.Metadata["session_id"]`
+3. `auth.ActorContext.Metadata["session_id"]`
+
 ## Role-Aware Access Policy & Sanitization
 
 Use the role-aware helper and access policy when exposing activity feeds to admin clients:
