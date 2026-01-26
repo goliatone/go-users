@@ -100,15 +100,19 @@ func TestSanitizeRecordMasksDefaultFields(t *testing.T) {
 	t.Helper()
 	record := types.ActivityRecord{
 		Data: map[string]any{
-			"password": "secret-value",
-			"token":    "abcd1234",
-			"secret":   "shh",
+			"password":    "secret-value",
+			"token":       "abcd1234",
+			"secret":      "shh",
+			"actor_email": "admin@example.com",
+			"session_id":  "session-12345",
 		},
 	}
 	out := SanitizeRecord(DefaultMasker(), record)
 	require.NotEqual(t, "secret-value", out.Data["password"])
 	require.NotEqual(t, "abcd1234", out.Data["token"])
 	require.NotEqual(t, "shh", out.Data["secret"])
+	require.NotEqual(t, "admin@example.com", out.Data["actor_email"])
+	require.NotEqual(t, "session-12345", out.Data["session_id"])
 }
 
 func TestDefaultAccessPolicySanitizeRedactsAndMasks(t *testing.T) {
