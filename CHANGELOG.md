@@ -1,10 +1,40 @@
 # Changelog
 
-# [Unreleased]
+# [0.14.0](https://github.com/goliatone/go-users/compare/v0.13.0...v0.14.0) - (2026-01-26)
+
+## <!-- 1 -->🐛 Bug Fixes
+
+- Remove duplicated code ([d68ae93](https://github.com/goliatone/go-users/commit/d68ae93017eaee73b3e0b47008ea9930cd3b4763))  - (goliatone)
+- Update to use latest version of feature gate ([acac712](https://github.com/goliatone/go-users/commit/acac712d6944e562ee558cfbd52680dffaac97d7))  - (goliatone)
+- Implement feature gate properly ([aeeb22e](https://github.com/goliatone/go-users/commit/aeeb22ed4f37e2f0db6ec8b682dae62c59473197))  - (goliatone)
+- Bun repo syntax ([e45fde3](https://github.com/goliatone/go-users/commit/e45fde3ebf2d2f46dd1b7a469f66a699adf7cfb3))  - (goliatone)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.14.0 ([2e1039f](https://github.com/goliatone/go-users/commit/2e1039f43067dab61df451b64c4392b698b34f8c))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- Activity enrichment command ([d867202](https://github.com/goliatone/go-users/commit/d867202bfbd33ce0789cd92d5869f15e05183246))  - (goliatone)
+- Activity enrichment store with options ([820f085](https://github.com/goliatone/go-users/commit/820f0856909b1433929aee622eeeb6176553483c))  - (goliatone)
+- Activity enrishment in bun repo ([a4ebbe6](https://github.com/goliatone/go-users/commit/a4ebbe685f90fd35afe1ba443b5b7d2a87778051))  - (goliatone)
+- New PII masks in sanitizer ([1bf3ce3](https://github.com/goliatone/go-users/commit/1bf3ce30a12462454867194e08367f2d000bef55))  - (goliatone)
+- Activity session id ([7bd33dd](https://github.com/goliatone/go-users/commit/7bd33ddc0b2e6c6235690fa7dd3b011bf74f43f3))  - (goliatone)
+- Enrichment config and repository ([1be703b](https://github.com/goliatone/go-users/commit/1be703bd3b995ccc19ae589733c564968aa47910))  - (goliatone)
+- Activity enrichment flow ([aaf0050](https://github.com/goliatone/go-users/commit/aaf0050672d1c008087a025d09f1b0a81ee54785))  - (goliatone)
+- Use new feature gate ([0d78ec7](https://github.com/goliatone/go-users/commit/0d78ec7a82e7841e5ac74f86f80c28d1c40b85f6))  - (goliatone)
 
 ## <!-- 3 -->📚 Documentation
 
-- Document activity enrichment rollout steps (migrations, write-time modes, backfill schedule, JSONB indexing).
+- Update changelog for v0.13.0 ([7b6d7f8](https://github.com/goliatone/go-users/commit/7b6d7f884bfbac594232946814fc3d2e701f46d7))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update docs ([e0727db](https://github.com/goliatone/go-users/commit/e0727db524246768e3a784e7c1d224eae5fde317))  - (goliatone)
+- Update readme ([513e5cc](https://github.com/goliatone/go-users/commit/513e5cce16598ebffb706c4763bb3e827d782775))  - (goliatone)
+- Udpate test ([6f6546f](https://github.com/goliatone/go-users/commit/6f6546fdc98bb16b11490f8ff423b59689e08261))  - (goliatone)
+- Update tests ([561fe79](https://github.com/goliatone/go-users/commit/561fe7946e1e67df06e18c6d6126cd32867df423))  - (goliatone)
+- Update format ([8b6b2a6](https://github.com/goliatone/go-users/commit/8b6b2a69bfe5f050d4f20a51891bccd5190aea5a))  - (goliatone)
 
 # [0.13.0](https://github.com/goliatone/go-users/compare/v0.12.0...v0.13.0) - (2026-01-21)
 
@@ -356,4 +386,5 @@
 - Update migrations ([6273dec](https://github.com/goliatone/go-users/commit/6273dec0eab9694f41b2fee8556ae7f0f0cd2739))  - (goliatone)
 - Add base tasks ([e0df1a4](https://github.com/goliatone/go-users/commit/e0df1a4300d4514583c208add5f5c4db0a3a8312))  - (goliatone)
 - Initial commit ([3fe70f1](https://github.com/goliatone/go-users/commit/3fe70f190ecbef534a75fb9135dada86ba5d473b))  - (goliatone)
+
 
