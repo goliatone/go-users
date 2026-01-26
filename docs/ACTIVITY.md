@@ -97,7 +97,13 @@ Defaults:
 - Admin role aliases: `tenant_admin`, `admin`, `org_admin`
 - Machine activity markers: actor types (`system`, `machine`, `job`, `task`) and data keys (`system`, `machine`)
 
-The default policy also drops `Data` for support roles and allows custom maskers or IP redaction toggles via `WithPolicyMasker` and `WithIPRedaction`.
+The default policy drops `Data` for support roles. You can opt into metadata exposure with `WithMetadataExposure`:
+
+- `MetadataExposeNone` (default): no metadata returned.
+- `MetadataExposeSanitized`: metadata is returned after go-masker preprocessing (denylist rules).
+- `MetadataExposeAll`: raw metadata (intended for development/debug only).
+
+Customize sanitization with `WithPolicyMasker` (masker used by sanitized mode) or `WithMetadataSanitizer`, and toggle IP redaction via `WithIPRedaction`.
 
 ## Repository & Index Guidance
 
