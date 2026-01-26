@@ -63,6 +63,21 @@ type ActivityRecord struct {
 }
 ```
 
+## Enrichment Metadata (optional)
+
+Activity enrichment stores stable display details in `ActivityRecord.Data` to avoid read-time lookups. Keys are flat and missing-key-only updates are expected.
+
+Reserved keys:
+- `actor_display`, `actor_email`, `actor_id`, `actor_type`
+- `object_display`, `object_type`, `object_id`, `object_deleted`
+- `session_id`, `enriched_at`, `enricher_version`
+
+Rules of thumb:
+- `enriched_at` uses RFC3339Nano; refresh only when new keys are written.
+- Object display should be stable per type; fall back to `object_type:object_id` for unknown types.
+- `object_deleted` should be set when the resolver reports deletion while preserving the last known `object_display`.
+- Session ID extraction order: JWT `jti` → `claims.Metadata["session_id"]` → `auth.ActorContext.Metadata["session_id"]`.
+
 ## Building Activity Records
 
 ### From HTTP Requests (with go-auth)
