@@ -22,10 +22,12 @@ type AccessPolicyOption func(*DefaultAccessPolicy)
 
 // DefaultAccessPolicy applies BuildFilterFromActor and sanitizes records on read.
 type DefaultAccessPolicy struct {
-	filterOptions []FilterOption
-	masker        *masker.Masker
-	redactIP      bool
-	statsSelfOnly bool
+	filterOptions     []FilterOption
+	masker            *masker.Masker
+	metadataExposure  MetadataExposureStrategy
+	metadataSanitizer MetadataSanitizer
+	redactIP          bool
+	statsSelfOnly     bool
 }
 
 var _ ActivityAccessPolicy = (*DefaultAccessPolicy)(nil)
@@ -34,8 +36,9 @@ var _ ActivityStatsPolicy = (*DefaultAccessPolicy)(nil)
 // NewDefaultAccessPolicy returns the default policy implementation.
 func NewDefaultAccessPolicy(opts ...AccessPolicyOption) *DefaultAccessPolicy {
 	policy := &DefaultAccessPolicy{
-		masker:   DefaultMasker(),
-		redactIP: true,
+		masker:           DefaultMasker(),
+		metadataExposure: MetadataExposeNone,
+		redactIP:         true,
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -65,6 +68,26 @@ func WithPolicyMasker(masker *masker.Masker) AccessPolicyOption {
 			return
 		}
 		policy.masker = masker
+	}
+}
+
+// WithMetadataExposure configures how activity metadata is exposed for support roles.
+func WithMetadataExposure(strategy MetadataExposureStrategy) AccessPolicyOption {
+	return func(policy *DefaultAccessPolicy) {
+		if policy == nil {
+			return
+		}
+		policy.metadataExposure = strategy
+	}
+}
+
+// WithMetadataSanitizer overrides the metadata sanitizer for sanitized exposure mode.
+func WithMetadataSanitizer(sanitizer MetadataSanitizer) AccessPolicyOption {
+	return func(policy *DefaultAccessPolicy) {
+		if policy == nil {
+			return
+		}
+		policy.metadataSanitizer = sanitizer
 	}
 }
 
@@ -137,13 +160,28 @@ func (p *DefaultAccessPolicy) Sanitize(actor *auth.ActorContext, role string, re
 
 	out := make([]types.ActivityRecord, 0, len(records))
 	for _, record := range records {
-		rec := SanitizeRecord(mask, record)
+		rec := record
+		if isSupport {
+			switch p.metadataExposure {
+			case MetadataExposeAll:
+				// keep metadata as-is
+			case MetadataExposeSanitized:
+				if p.metadataSanitizer != nil {
+					rec.Data = p.metadataSanitizer(actor, role, record)
+				} else {
+					rec = SanitizeRecord(mask, record)
+				}
+			default:
+				rec.Data = nil
+			}
+		} else {
+			rec = SanitizeRecord(mask, record)
+		}
+
 		if p.redactIP && !isSuperadmin {
 			rec.IP = ""
 		}
-		if isSupport && len(rec.Data) > 0 {
-			rec.Data = nil
-		}
+
 		out = append(out, rec)
 	}
 	return out
