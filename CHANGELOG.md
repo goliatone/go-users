@@ -1,5 +1,25 @@
 # Changelog
 
+# [0.15.0](https://github.com/goliatone/go-users/compare/v0.14.0...v0.15.0) - (2026-01-26)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.15.0 ([c55d60c](https://github.com/goliatone/go-users/commit/c55d60ce7f5048d07ac7c7aab40911dad20e2531))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- Activity access policy configurable with different modes ([e2a7397](https://github.com/goliatone/go-users/commit/e2a73972f37b954a8edd65e1256d7dac67af87af))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.14.0 ([42dc44e](https://github.com/goliatone/go-users/commit/42dc44e9484b85a22204c4caede1d61c817dc7d6))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Udpate testc ([497f577](https://github.com/goliatone/go-users/commit/497f57721bb4b973eae9a5f78237e99999b64caa))  - (goliatone)
+- Update docs ([bbfc75e](https://github.com/goliatone/go-users/commit/bbfc75e4affeb2343d315b3f776964336ae7b99e))  - (goliatone)
+- Update readme ([13945ae](https://github.com/goliatone/go-users/commit/13945ae5dbdd1b5e1e540304e5b9446ae6ee5ebe))  - (goliatone)
+
 # [0.14.0](https://github.com/goliatone/go-users/compare/v0.13.0...v0.14.0) - (2026-01-26)
 
 ## <!-- 1 -->🐛 Bug Fixes
