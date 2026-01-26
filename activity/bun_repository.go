@@ -18,6 +18,9 @@ type RepositoryConfig struct {
 	Repository repository.Repository[*LogEntry]
 	Clock      types.Clock
 	IDGen      types.IDGenerator
+	Enricher   ActivityEnricher
+	// EnrichmentErrorHandler controls fail-fast vs best-effort behavior.
+	EnrichmentErrorHandler EnrichmentErrorHandler
 }
 
 type activityStore interface {
@@ -30,6 +33,9 @@ type Repository struct {
 	db    *bun.DB
 	clock types.Clock
 	idGen types.IDGenerator
+
+	enricher               ActivityEnricher
+	enrichmentErrorHandler EnrichmentErrorHandler
 }
 
 // NewRepository constructs a repository that implements both ActivitySink
@@ -64,11 +70,20 @@ func NewRepository(cfg RepositoryConfig) (*Repository, error) {
 		idGen = types.UUIDGenerator{}
 	}
 
+	db := cfg.DB
+	if db == nil {
+		if provider, ok := repo.(interface{ DB() *bun.DB }); ok {
+			db = provider.DB()
+		}
+	}
+
 	return &Repository{
-		activityStore: repo,
-		db:            cfg.DB,
-		clock:         clock,
-		idGen:         idGen,
+		activityStore:          repo,
+		db:                     db,
+		clock:                  clock,
+		idGen:                  idGen,
+		enricher:               cfg.Enricher,
+		enrichmentErrorHandler: cfg.EnrichmentErrorHandler,
 	}, nil
 }
 
@@ -76,10 +91,19 @@ var (
 	_ repository.Repository[*LogEntry] = (*Repository)(nil)
 	_ types.ActivitySink               = (*Repository)(nil)
 	_ types.ActivityRepository         = (*Repository)(nil)
+	_ ActivityEnrichmentStore          = (*Repository)(nil)
+	_ ActivityEnrichmentQuery          = (*Repository)(nil)
 )
 
 // Log persists an activity record into the database.
 func (r *Repository) Log(ctx context.Context, record types.ActivityRecord) error {
+	if r.enricher != nil {
+		enriched, err := applyEnricher(ctx, r.enricher, r.enrichmentErrorHandler, record)
+		if err != nil {
+			return err
+		}
+		record = enriched
+	}
 	entry := toLogEntry(record)
 	if entry.ID == uuid.Nil {
 		entry.ID = r.idGen.UUID()
