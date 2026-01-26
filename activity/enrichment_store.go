@@ -13,6 +13,17 @@ type ActivityEnrichmentStore interface {
 	UpdateActivityData(ctx context.Context, id uuid.UUID, data map[string]any) error
 }
 
+// ActivityEnrichmentUpdateOptions controls missing-key update behavior.
+type ActivityEnrichmentUpdateOptions struct {
+	// ForceKeys allows overwriting specific keys (e.g., enriched_at) when needed.
+	ForceKeys []string
+}
+
+// ActivityEnrichmentStoreWithOptions supports optional forced updates.
+type ActivityEnrichmentStoreWithOptions interface {
+	UpdateActivityDataWithOptions(ctx context.Context, id uuid.UUID, data map[string]any, opts ActivityEnrichmentUpdateOptions) error
+}
+
 // ActivityEnrichmentQuery exposes helper queries for missing/stale enrichment.
 type ActivityEnrichmentQuery interface {
 	ListActivityForEnrichment(ctx context.Context, filter ActivityEnrichmentFilter) (ActivityEnrichmentPage, error)
