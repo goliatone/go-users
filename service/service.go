@@ -5,6 +5,7 @@ import (
 	"time"
 
 	featuregate "github.com/goliatone/go-featuregate/gate"
+	"github.com/goliatone/go-users/activity"
 	"github.com/goliatone/go-users/command"
 	"github.com/goliatone/go-users/pkg/types"
 	"github.com/goliatone/go-users/preferences"
@@ -66,30 +67,39 @@ type Queries struct {
 // Config captures all required dependencies so callers can provide their own
 // instances (bun.DB, cached repositories, hooks, etc.).
 type Config struct {
-	AuthRepository          types.AuthRepository
-	InventoryRepository     types.UserInventoryRepository
-	ActivityRepository      types.ActivityRepository
-	RoleRegistry            types.RoleRegistry
-	ActivitySink            types.ActivitySink
-	Hooks                   types.Hooks
-	Clock                   types.Clock
-	IDGenerator             types.IDGenerator
-	Logger                  types.Logger
-	TransitionPolicy        types.TransitionPolicy
-	InviteTokenTTL          time.Duration
-	SecureLinkManager       types.SecureLinkManager
-	UserTokenRepository     types.UserTokenRepository
-	PasswordResetRepository types.PasswordResetRepository
-	InviteLinkRoute         string
-	RegistrationLinkRoute   string
-	PasswordResetLinkRoute  string
-	TokenScopeEnforcer      types.ScopeEnforcer
-	ProfileRepository       types.ProfileRepository
-	PreferenceRepository    types.PreferenceRepository
-	PreferenceResolver      PreferenceResolver
-	ScopeResolver           types.ScopeResolver
-	AuthorizationPolicy     types.AuthorizationPolicy
-	FeatureGate             featuregate.FeatureGate
+	AuthRepository                  types.AuthRepository
+	InventoryRepository             types.UserInventoryRepository
+	ActivityRepository              types.ActivityRepository
+	RoleRegistry                    types.RoleRegistry
+	ActivitySink                    types.ActivitySink
+	ActivityEnricher                activity.ActivityEnricher
+	ActivityEnrichmentStore         activity.ActivityEnrichmentStore
+	ActivityEnrichmentErrorStrategy activity.EnrichmentErrorStrategy
+	ActivityEnrichmentErrorHandler  activity.EnrichmentErrorHandler
+	EnrichmentScope                 activity.EnrichmentScope
+	EnrichmentWriteMode             activity.EnrichmentWriteMode
+	EnrichmentEnabled               bool
+	EnrichmentJobSchedule           string
+	SessionIDKey                    string
+	Hooks                           types.Hooks
+	Clock                           types.Clock
+	IDGenerator                     types.IDGenerator
+	Logger                          types.Logger
+	TransitionPolicy                types.TransitionPolicy
+	InviteTokenTTL                  time.Duration
+	SecureLinkManager               types.SecureLinkManager
+	UserTokenRepository             types.UserTokenRepository
+	PasswordResetRepository         types.PasswordResetRepository
+	InviteLinkRoute                 string
+	RegistrationLinkRoute           string
+	PasswordResetLinkRoute          string
+	TokenScopeEnforcer              types.ScopeEnforcer
+	ProfileRepository               types.ProfileRepository
+	PreferenceRepository            types.PreferenceRepository
+	PreferenceResolver              PreferenceResolver
+	ScopeResolver                   types.ScopeResolver
+	AuthorizationPolicy             types.AuthorizationPolicy
+	FeatureGate                     featuregate.FeatureGate
 }
 
 // PreferenceResolver resolves scoped preferences for queries.
