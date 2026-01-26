@@ -147,3 +147,37 @@ func TestDefaultAccessPolicySanitizeStripsSupportData(t *testing.T) {
 	require.Len(t, out, 1)
 	require.Nil(t, out[0].Data)
 }
+
+func TestDefaultAccessPolicySanitizeSupportSanitizedExposure(t *testing.T) {
+	t.Helper()
+	policy := NewDefaultAccessPolicy(WithMetadataExposure(MetadataExposeSanitized))
+	actor := &auth.ActorContext{
+		ActorID: uuid.NewString(),
+		Role:    types.ActorRoleSupport,
+	}
+
+	records := []types.ActivityRecord{
+		{ID: uuid.New(), Data: map[string]any{"token": "abcd1234"}},
+	}
+	out := policy.Sanitize(actor, "", records)
+	require.Len(t, out, 1)
+	require.NotNil(t, out[0].Data)
+	require.NotEqual(t, "abcd1234", out[0].Data["token"])
+}
+
+func TestDefaultAccessPolicySanitizeSupportAllExposure(t *testing.T) {
+	t.Helper()
+	policy := NewDefaultAccessPolicy(WithMetadataExposure(MetadataExposeAll))
+	actor := &auth.ActorContext{
+		ActorID: uuid.NewString(),
+		Role:    types.ActorRoleSupport,
+	}
+
+	records := []types.ActivityRecord{
+		{ID: uuid.New(), Data: map[string]any{"token": "abcd1234"}},
+	}
+	out := policy.Sanitize(actor, "", records)
+	require.Len(t, out, 1)
+	require.NotNil(t, out[0].Data)
+	require.Equal(t, "abcd1234", out[0].Data["token"])
+}
