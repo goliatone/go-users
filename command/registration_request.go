@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	featuregate "github.com/goliatone/go-featuregate/gate"
 	gocommand "github.com/goliatone/go-command"
+	featuregate "github.com/goliatone/go-featuregate/gate"
 	"github.com/goliatone/go-users/pkg/types"
 	"github.com/goliatone/go-users/scope"
 	"github.com/google/uuid"
@@ -51,18 +51,18 @@ type UserRegistrationRequestResult struct {
 
 // UserRegistrationRequestCommand creates pending users and records registration metadata.
 type UserRegistrationRequestCommand struct {
-	repo     types.AuthRepository
-	tokens   types.UserTokenRepository
-	manager  types.SecureLinkManager
-	clock    types.Clock
-	idGen    types.IDGenerator
-	sink     types.ActivitySink
-	hooks    types.Hooks
-	logger   types.Logger
-	tokenTTL time.Duration
-	guard    scope.Guard
+	repo        types.AuthRepository
+	tokens      types.UserTokenRepository
+	manager     types.SecureLinkManager
+	clock       types.Clock
+	idGen       types.IDGenerator
+	sink        types.ActivitySink
+	hooks       types.Hooks
+	logger      types.Logger
+	tokenTTL    time.Duration
+	guard       scope.Guard
 	featureGate featuregate.FeatureGate
-	route    string
+	route       string
 }
 
 // RegistrationRequestConfig holds dependencies for the registration flow.
@@ -99,18 +99,18 @@ func NewUserRegistrationRequestCommand(cfg RegistrationRequestConfig) *UserRegis
 		route = SecureLinkRouteRegister
 	}
 	return &UserRegistrationRequestCommand{
-		repo:     cfg.Repository,
-		tokens:   cfg.TokenRepository,
-		manager:  cfg.SecureLinks,
-		clock:    safeClock(cfg.Clock),
-		idGen:    idGen,
-		sink:     safeActivitySink(cfg.Activity),
-		hooks:    safeHooks(cfg.Hooks),
-		logger:   safeLogger(cfg.Logger),
-		tokenTTL: ttl,
-		guard:    safeScopeGuard(cfg.ScopeGuard),
+		repo:        cfg.Repository,
+		tokens:      cfg.TokenRepository,
+		manager:     cfg.SecureLinks,
+		clock:       safeClock(cfg.Clock),
+		idGen:       idGen,
+		sink:        safeActivitySink(cfg.Activity),
+		hooks:       safeHooks(cfg.Hooks),
+		logger:      safeLogger(cfg.Logger),
+		tokenTTL:    ttl,
+		guard:       safeScopeGuard(cfg.ScopeGuard),
 		featureGate: cfg.FeatureGate,
-		route:    route,
+		route:       route,
 	}
 }
 
