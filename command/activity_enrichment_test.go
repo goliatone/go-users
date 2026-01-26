@@ -1,9 +1,7 @@
-package activityenrichment
+package command
 
 import (
 	"context"
-	"database/sql"
-	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -15,8 +13,6 @@ import (
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
-	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/sqlitedialect"
 )
 
 func TestCommand_DefaultsMissingKeysAndCutoff(t *testing.T) {
@@ -26,10 +22,10 @@ func TestCommand_DefaultsMissingKeysAndCutoff(t *testing.T) {
 	}
 	store := &recordingEnrichmentStore{}
 	cmd := New(Config{
-		EnrichmentQuery: query,
-		EnrichmentStore: store,
+		EnrichmentQuery:  query,
+		EnrichmentStore:  store,
 		EnrichedAtCutoff: 24 * time.Hour,
-		Clock:           fixedClock{now: now},
+		Clock:            fixedClock{now},
 	})
 
 	err := cmd.Execute(context.Background(), Input{})
@@ -86,7 +82,7 @@ func TestCommand_EnrichesAndStampsEnrichedAt(t *testing.T) {
 		EnrichmentStore: store,
 		ActorResolver:   actorResolver,
 		ObjectResolver:  objectResolver,
-		Clock:           fixedClock{now: now},
+		Clock:           fixedClock{now},
 	})
 
 	err := cmd.Execute(context.Background(), Input{})
@@ -179,7 +175,7 @@ func TestCommand_BackfillIntegrationUpdatesMixedRecords(t *testing.T) {
 				},
 			},
 		},
-		Clock:            fixedClock{now: now},
+		Clock:            fixedClock{now},
 		EnrichedAtCutoff: 24 * time.Hour,
 	})
 
@@ -245,7 +241,7 @@ func TestCommand_ConcurrentRunsDoNotOverwriteExistingKeys(t *testing.T) {
 				},
 			},
 		},
-		Clock: fixedClock{now: now},
+		Clock: fixedClock{now},
 	})
 	cmdB := New(Config{
 		EnrichmentQuery: queryB,
@@ -258,7 +254,7 @@ func TestCommand_ConcurrentRunsDoNotOverwriteExistingKeys(t *testing.T) {
 				},
 			},
 		},
-		Clock: fixedClock{now: now},
+		Clock: fixedClock{now},
 	})
 
 	errCh := make(chan error, 2)
@@ -279,14 +275,6 @@ func TestCommand_ConcurrentRunsDoNotOverwriteExistingKeys(t *testing.T) {
 	require.Contains(t, []string{"Alice", "Bob"}, display)
 	require.Equal(t, 1, store.changedUpdates)
 	require.Len(t, store.actorDisplayHistory, 1)
-}
-
-type fixedClock struct {
-	now time.Time
-}
-
-func (c fixedClock) Now() time.Time {
-	return c.now
 }
 
 type stubEnrichmentQuery struct {
@@ -376,9 +364,9 @@ func (s *recordingEnrichmentStore) UpdateActivityDataWithOptions(ctx context.Con
 }
 
 type memoryEnrichmentStore struct {
-	mu                 sync.Mutex
-	data               map[uuid.UUID]map[string]any
-	changedUpdates     int
+	mu                  sync.Mutex
+	data                map[uuid.UUID]map[string]any
+	changedUpdates      int
 	actorDisplayHistory []string
 }
 
@@ -476,52 +464,4 @@ func indexByID(records []types.ActivityRecord) map[uuid.UUID]types.ActivityRecor
 		index[record.ID] = record
 	}
 	return index
-}
-
-func newActivityTestDB(t *testing.T) *bun.DB {
-	sqlDB, err := sql.Open("sqlite3", ":memory:?cache=shared")
-	require.NoError(t, err)
-	sqlDB.SetMaxOpenConns(1)
-	db := bun.NewDB(sqlDB, sqlitedialect.New())
-	t.Cleanup(func() {
-		_ = db.Close()
-		_ = sqlDB.Close()
-	})
-	return db
-}
-
-func applyActivityMigration(t *testing.T, db *bun.DB) {
-	content, err := os.ReadFile("../../data/sql/migrations/sqlite/00004_user_activity.up.sql")
-	require.NoError(t, err)
-	for _, stmt := range splitSQLStatements(string(content)) {
-		if strings.TrimSpace(stmt) == "" {
-			continue
-		}
-		_, err := db.Exec(stmt)
-		require.NoError(t, err)
-	}
-}
-
-func splitSQLStatements(sql string) []string {
-	lines := strings.Split(sql, "\n")
-	var builder strings.Builder
-	var statements []string
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "--") {
-			continue
-		}
-		builder.WriteString(line)
-		if strings.HasSuffix(line, ";") {
-			stmt := strings.TrimSpace(strings.TrimSuffix(builder.String(), ";"))
-			statements = append(statements, stmt)
-			builder.Reset()
-		} else {
-			builder.WriteString(" ")
-		}
-	}
-	if builder.Len() > 0 {
-		statements = append(statements, strings.TrimSpace(builder.String()))
-	}
-	return statements
 }
