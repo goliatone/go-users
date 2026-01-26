@@ -88,11 +88,12 @@ func NewRepository(cfg RepositoryConfig) (*Repository, error) {
 }
 
 var (
-	_ repository.Repository[*LogEntry] = (*Repository)(nil)
-	_ types.ActivitySink               = (*Repository)(nil)
-	_ types.ActivityRepository         = (*Repository)(nil)
-	_ ActivityEnrichmentStore          = (*Repository)(nil)
-	_ ActivityEnrichmentQuery          = (*Repository)(nil)
+	_ repository.Repository[*LogEntry]   = (*Repository)(nil)
+	_ types.ActivitySink                 = (*Repository)(nil)
+	_ types.ActivityRepository           = (*Repository)(nil)
+	_ ActivityEnrichmentStore            = (*Repository)(nil)
+	_ ActivityEnrichmentStoreWithOptions = (*Repository)(nil)
+	_ ActivityEnrichmentQuery            = (*Repository)(nil)
 )
 
 // Log persists an activity record into the database.
