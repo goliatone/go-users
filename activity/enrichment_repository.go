@@ -14,6 +14,11 @@ import (
 
 // UpdateActivityData merges missing keys into the activity data payload.
 func (r *Repository) UpdateActivityData(ctx context.Context, id uuid.UUID, data map[string]any) error {
+	return r.UpdateActivityDataWithOptions(ctx, id, data, ActivityEnrichmentUpdateOptions{})
+}
+
+// UpdateActivityDataWithOptions merges missing keys and optionally forces updates for specific keys.
+func (r *Repository) UpdateActivityDataWithOptions(ctx context.Context, id uuid.UUID, data map[string]any, opts ActivityEnrichmentUpdateOptions) error {
 	if r == nil {
 		return errors.New("activity: repository required")
 	}
@@ -33,6 +38,7 @@ func (r *Repository) UpdateActivityData(ctx context.Context, id uuid.UUID, data 
 	}
 
 	missing := missingActivityData(entry.Data, data)
+	missing = forceActivityData(missing, data, opts.ForceKeys)
 	if len(missing) == 0 {
 		return nil
 	}
@@ -313,6 +319,30 @@ func mergeActivityData(existing, updates map[string]any) map[string]any {
 		merged[key] = value
 	}
 	return merged
+}
+
+func forceActivityData(missing, updates map[string]any, forceKeys []string) map[string]any {
+	if len(forceKeys) == 0 || len(updates) == 0 {
+		return missing
+	}
+	normalized := normalizeIdentifiers(forceKeys)
+	if len(normalized) == 0 {
+		return missing
+	}
+	if missing == nil {
+		missing = make(map[string]any, len(normalized))
+	}
+	for _, key := range normalized {
+		if key == "" {
+			continue
+		}
+		value, ok := updates[key]
+		if !ok || value == nil {
+			continue
+		}
+		missing[key] = value
+	}
+	return missing
 }
 
 func (r *Repository) getDB() *bun.DB {
