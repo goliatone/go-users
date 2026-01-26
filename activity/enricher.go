@@ -57,6 +57,28 @@ func DefaultEnrichmentErrorHandler(strategy EnrichmentErrorStrategy) EnrichmentE
 	}
 }
 
+func applyEnricher(ctx context.Context, enricher ActivityEnricher, handler EnrichmentErrorHandler, record types.ActivityRecord) (types.ActivityRecord, error) {
+	if enricher == nil {
+		return record, nil
+	}
+	if handler == nil {
+		return enricher.Enrich(ctx, record)
+	}
+	if handlerChain, ok := enricher.(EnricherWithHandler); ok {
+		return handlerChain.EnrichWithHandler(ctx, record, handler)
+	}
+
+	enriched, err := enricher.Enrich(ctx, record)
+	if err != nil {
+		handled, hErr := handler(ctx, err, enricher, enriched, record)
+		if hErr != nil {
+			return record, hErr
+		}
+		return handled, nil
+	}
+	return enriched, nil
+}
+
 // Enrich applies the chain sequentially and stops on the first error.
 func (c EnricherChain) Enrich(ctx context.Context, record types.ActivityRecord) (types.ActivityRecord, error) {
 	return c.EnrichWithHandler(ctx, record, nil)
