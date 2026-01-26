@@ -68,7 +68,7 @@ Checked keys:
 - `users.password_reset` (password reset requests)
 - `featuregate.FeatureUsersSignup` / `users.signup` (self-registration requests)
 
-Scopes are passed via `gate.WithScopeSet` using the `types.ScopeFilter` (plus the target user ID for password reset requests). If no scope identifiers are set, the gate falls back to context-derived scope.
+Scopes are passed via `gate.WithScopeChain` using the `types.ScopeFilter` (plus the target user ID for password reset requests). The chain includes tenant/org/user scopes and a system scope; if no scope identifiers are set, the gate falls back to context-derived scope.
 
 ### Scope Filter & Labels
 
