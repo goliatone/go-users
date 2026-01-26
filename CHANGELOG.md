@@ -1,5 +1,11 @@
 # Changelog
 
+# [Unreleased]
+
+## <!-- 3 -->📚 Documentation
+
+- Document activity enrichment rollout steps (migrations, write-time modes, backfill schedule, JSONB indexing).
+
 # [0.13.0](https://github.com/goliatone/go-users/compare/v0.12.0...v0.13.0) - (2026-01-21)
 
 ## <!-- 1 -->🐛 Bug Fixes
@@ -350,5 +356,4 @@
 - Update migrations ([6273dec](https://github.com/goliatone/go-users/commit/6273dec0eab9694f41b2fee8556ae7f0f0cd2739))  - (goliatone)
 - Add base tasks ([e0df1a4](https://github.com/goliatone/go-users/commit/e0df1a4300d4514583c208add5f5c4db0a3a8312))  - (goliatone)
 - Initial commit ([3fe70f1](https://github.com/goliatone/go-users/commit/3fe70f190ecbef534a75fb9135dada86ba5d473b))  - (goliatone)
-
 
