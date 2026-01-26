@@ -1,5 +1,5 @@
-// Package activityenrichment provides a cron-friendly command for activity backfills.
-package activityenrichment
+// Package command provides a cron-friendly command for activity backfills.
+package command
 
 import (
 	"context"
@@ -568,17 +568,6 @@ func uniqueStrings(values []string) []string {
 		}
 		seen[trimmed] = struct{}{}
 		out = append(out, trimmed)
-	}
-	return out
-}
-
-func cloneMap(src map[string]any) map[string]any {
-	if len(src) == 0 {
-		return map[string]any{}
-	}
-	out := make(map[string]any, len(src))
-	for k, v := range src {
-		out[k] = v
 	}
 	return out
 }
