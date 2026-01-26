@@ -172,6 +172,16 @@ More details live in `docs/MULTITENANCY.md` and `docs/WORKSPACES.md`.
 - `data`: JSON payload with action-specific details.
 - `created_at`: event timestamp.
 
+### Activity metadata exposure (support roles)
+
+The default activity access policy drops metadata for support roles. You can opt into explicit modes with `activity.WithMetadataExposure`:
+
+- `MetadataExposeNone` (default): no metadata returned.
+- `MetadataExposeSanitized`: metadata is returned after go-masker preprocessing (denylist rules).
+- `MetadataExposeAll`: raw metadata (intended for development/debug only).
+
+Use `WithPolicyMasker` to change the masker used by sanitized mode or `WithMetadataSanitizer` for a custom transform.
+
 ### Activity enrichment (optional)
 
 Write-time enrichment stores stable display details in `user_activity.data` so the UI can render without read-time lookups. Reserved keys include `actor_display`, `actor_email`, `object_display`, `object_deleted`, `session_id`, `enriched_at`, and `enricher_version`.
