@@ -172,6 +172,20 @@ More details live in `docs/MULTITENANCY.md` and `docs/WORKSPACES.md`.
 - `data`: JSON payload with action-specific details.
 - `created_at`: event timestamp.
 
+### Activity enrichment (optional)
+
+Write-time enrichment stores stable display details in `user_activity.data` so the UI can render without read-time lookups. Reserved keys include `actor_display`, `actor_email`, `object_display`, `object_deleted`, `session_id`, `enriched_at`, and `enricher_version`.
+
+Write-time modes:
+- `none`: no enrichment at write time.
+- `wrapper`: enrich via `activity.EnrichedSink` before persistence.
+- `repo`: enrich inside the repository `Log` hook.
+- `hybrid`: wrapper enriches app-specific metadata (like `session_id`), then the repo enriches actor/object fields.
+
+Backfill job: use the cron command under `command/activity_enrichment` with `Schedule` (default `0 * * * *`), `BatchSize`, and `EnrichedAtCutoff` to enrich legacy rows. Missing-key merges are safe to run repeatedly; add functional indexes on `data->>'actor_display'`, `data->>'object_display'`, and `data->>'enriched_at'` for Postgres.
+
+See `docs/ACTIVITY.md` and `docs/GUIDE_ACTIVITY.md` for wiring details and rollout guidance.
+
 ### Profile and preference tables
 
 `user_profiles` stores profile attributes separate from core auth fields.
