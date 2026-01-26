@@ -44,6 +44,17 @@ Data update semantics:
 - Never overwrite user-provided metadata keys by default.
 - Refresh `enriched_at` only when a new enrichment key is written.
 
+Write-time enrichment modes (configurable):
+- `none`: no enrichment at write time.
+- `wrapper`: enrich via `activity.EnrichedSink` before persistence.
+- `repo`: enrich inside the repository `Log` hook.
+- `hybrid`: wrapper enriches app-specific metadata (like `session_id`), then the repo enriches actor/object fields.
+
+Enablement hooks live on `service.Config`:
+- `ActivityEnricher`, `ActivityEnrichmentStore`
+- `EnrichmentEnabled`, `EnrichmentScope`, `EnrichmentWriteMode`
+- Optional error handling via `ActivityEnrichmentErrorStrategy` or `ActivityEnrichmentErrorHandler`
+
 Object display rules:
 - Use a stable, human-readable format per object type (avoid ephemeral values).
 - Unknown types should fall back to `object_type:object_id`.
@@ -53,6 +64,12 @@ Session ID extraction order (deterministic):
 1. JWT `jti` claim (stable per session)
 2. `claims.Metadata["session_id"]`
 3. `auth.ActorContext.Metadata["session_id"]`
+
+Backfill job (cron command):
+- Command lives at `command/activity_enrichment` and can be scheduled via `EnrichmentJobSchedule`.
+- Config inputs: `Schedule` (default `0 * * * *`), `BatchSize`, `EnrichedAtCutoff` (duration), and optional `Scope`.
+- Start with an hourly schedule for initial backfill, then reduce to daily once the backlog is cleared.
+- The job only merges missing keys and refreshes `enriched_at` so it is safe to run repeatedly.
 
 ## Role-Aware Access Policy & Sanitization
 
@@ -92,6 +109,12 @@ Current SQLite/Postgres schema ships indexes for:
 - `verb` – verb-specific filtering.
 
 Queries: prefer `ActivityFilter` and `ActivityStatsFilter` to leverage these indexes. When filtering by channel in high-volume modules, add an optional composite index `(tenant_id, channel, created_at)` (or `(org_id, channel, created_at)` for org-scoped deployments). For metadata-heavy use cases, Postgres consumers can add a GIN index on `data` to accelerate keyword searches.
+
+Enrichment filter indexing (Postgres):
+- Missing-key scans: `CREATE INDEX ON user_activity ((data->>'actor_display'));`
+- Object display scans: `CREATE INDEX ON user_activity ((data->>'object_display'));`
+- Staleness scans: `CREATE INDEX ON user_activity (((data->>'enriched_at')::timestamptz));`
+- For broader JSONB predicates, add `CREATE INDEX ON user_activity USING GIN (data);`
 
 Retention & archiving guidance for high-volume deployments:
 
