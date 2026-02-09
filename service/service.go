@@ -50,6 +50,8 @@ type Commands struct {
 	ProfileUpsert            *command.ProfileUpsertCommand
 	PreferenceUpsert         *command.PreferenceUpsertCommand
 	PreferenceDelete         *command.PreferenceDeleteCommand
+	PreferenceUpsertMany     *command.PreferenceUpsertManyCommand
+	PreferenceDeleteMany     *command.PreferenceDeleteManyCommand
 }
 
 // Queries exposes read-model helpers.
@@ -372,6 +374,18 @@ func (s *Service) buildCommands() Commands {
 			ScopeGuard: s.scopeGuard,
 		}),
 		PreferenceDelete: command.NewPreferenceDeleteCommand(command.PreferenceCommandConfig{
+			Repository: s.cfg.PreferenceRepository,
+			Hooks:      s.cfg.Hooks,
+			Clock:      s.cfg.Clock,
+			ScopeGuard: s.scopeGuard,
+		}),
+		PreferenceUpsertMany: command.NewPreferenceUpsertManyCommand(command.PreferenceCommandConfig{
+			Repository: s.cfg.PreferenceRepository,
+			Hooks:      s.cfg.Hooks,
+			Clock:      s.cfg.Clock,
+			ScopeGuard: s.scopeGuard,
+		}),
+		PreferenceDeleteMany: command.NewPreferenceDeleteManyCommand(command.PreferenceCommandConfig{
 			Repository: s.cfg.PreferenceRepository,
 			Hooks:      s.cfg.Hooks,
 			Clock:      s.cfg.Clock,
