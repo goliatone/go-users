@@ -14,6 +14,7 @@ This guide covers managing user profiles and scoped preferences in `go-users`. L
   - [Scope Levels](#scope-levels)
   - [Preference Resolution and Inheritance](#preference-resolution-and-inheritance)
   - [Managing Preferences](#managing-preferences)
+  - [Bulk Preference APIs](#bulk-preference-apis)
   - [Querying Preferences](#querying-preferences)
   - [Preference Traces](#preference-traces)
 - [The Preference Resolver](#the-preference-resolver)
@@ -21,6 +22,7 @@ This guide covers managing user profiles and scoped preferences in `go-users`. L
 - [Building Settings UIs](#building-settings-uis)
 - [Common Patterns](#common-patterns)
 - [Error Handling](#error-handling)
+- [Migration Notes](#migration-notes)
 - [Next Steps](#next-steps)
 
 ---
@@ -335,6 +337,44 @@ func resetUserTheme(ctx context.Context, svc *service.Service, userID uuid.UUID)
 }
 ```
 
+### Bulk Preference APIs
+
+Use bulk commands to avoid per-key loops in adapters:
+
+```go
+var upserted []types.PreferenceBulkUpsertResult
+err := svc.Commands().PreferenceUpsertMany.Execute(ctx, command.PreferenceUpsertManyInput{
+    UserID: userID,
+    Scope:  types.ScopeFilter{TenantID: tenantID, OrgID: orgID},
+    Level:  types.PreferenceLevelUser,
+    Values: map[string]any{
+        "theme":          "dark", // stored as {"value":"dark"}
+        "notifications":  map[string]any{"email": true}, // stored as-is
+    },
+    Actor: actor,
+    Mode:  types.PreferenceBulkModeBestEffort,
+    Results: &upserted,
+})
+```
+
+```go
+var deleted []types.PreferenceBulkDeleteResult
+err := svc.Commands().PreferenceDeleteMany.Execute(ctx, command.PreferenceDeleteManyInput{
+    UserID: userID,
+    Scope:  types.ScopeFilter{TenantID: tenantID, OrgID: orgID},
+    Level:  types.PreferenceLevelUser,
+    Keys:   []string{"theme", "notifications"},
+    Actor:  actor,
+    Mode:   types.PreferenceBulkModeBestEffort,
+    Results: &deleted,
+})
+```
+
+Bulk atomicity modes:
+
+- `types.PreferenceBulkModeBestEffort` (default): each key is attempted and per-key errors are returned.
+- `types.PreferenceBulkModeTransactional`: explicit all-or-nothing request; repositories that cannot guarantee this return `types.ErrPreferenceBulkTransactionalUnsupported`.
+
 ### Querying Preferences
 
 #### Get Effective Preferences
@@ -376,6 +416,20 @@ snapshot, err := svc.Queries().Preferences.Query(ctx, query.PreferenceQueryInput
     Actor: actor,
 })
 ```
+
+Raw output mode (no envelope wrapper for `{ "value": ... }` payloads):
+
+```go
+snapshot, err := svc.Queries().Preferences.Query(ctx, query.PreferenceQueryInput{
+    UserID: userID,
+    Scope:  scopeFilter,
+    Actor:  actor,
+    OutputMode:      types.PreferenceOutputRawValue,
+    IncludeVersions: true,
+})
+```
+
+`PreferenceOutputRawValue` unwraps only payloads shaped exactly like `{ "value": ... }`. Structured maps with additional keys are preserved.
 
 #### Filter by Specific Levels
 
@@ -600,6 +654,14 @@ if updated.Version != displayVersion {
 // Safe to update
 savePreference(ctx, userID, "theme", newValue)
 ```
+
+With resolver metadata enabled (`IncludeVersions: true`) you can read `snapshot.EffectiveVersions` and per-layer `trace.Layers[i].Version` without extra repository calls.
+
+---
+
+## Migration Notes
+
+See `docs/PREFERENCES_API_MIGRATION.md` for adapter migration steps, including removing per-key loops and flatten/unflatten helpers in downstream consumers.
 
 ---
 
