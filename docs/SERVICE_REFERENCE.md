@@ -223,6 +223,8 @@ before touching repositories.
 | `ProfileUpsert` | `types.PolicyActionProfilesWrite` | `profile.updated` (via hooks) | Applies JSON merge semantics for `contact` + `metadata`, writes auditing columns, and triggers `AfterProfileChange`. |
 | `PreferenceUpsert` | `types.PolicyActionPreferencesWrite` | `preference.upsert` | Persists (or overwrites) scoped key/value payloads, increments versions, and triggers resolver cache invalidation via hooks. |
 | `PreferenceDelete` | `types.PolicyActionPreferencesWrite` | `preference.delete` | Soft delete semantics implemented through repository deletion; emits hook so caches drop derived layers. |
+| `PreferenceUpsertMany` | `types.PolicyActionPreferencesWrite` | `preference.upsert` | Bulk upserts preference keys with explicit mode (`best_effort` default, `transactional` optional when repository supports it). |
+| `PreferenceDeleteMany` | `types.PolicyActionPreferencesWrite` | `preference.delete` | Bulk deletes preference keys with explicit mode (`best_effort` default, `transactional` optional when repository supports it). |
 
 ## Query Reference
 
@@ -235,7 +237,7 @@ before touching repositories.
 | `ActivityFeed` | `types.PolicyActionActivityRead` | Scope, verbs, channels, actor/user/object filters, pagination | `types.ActivityPage` (records + totals + next offset). |
 | `ActivityStatsQuery` | `types.PolicyActionActivityRead` | Scope, verb prefix, time window | `types.ActivityStats` (counts by verb/channel). |
 | `ProfileQuery` | `types.PolicyActionProfilesRead` | User ID + scope | `*types.UserProfile` or `nil` if not created. |
-| `PreferenceQuery` | `types.PolicyActionPreferencesRead` | User ID + scope + optional keys | `types.PreferenceSnapshot` (effective map + trace of layers). |
+| `PreferenceQuery` | `types.PolicyActionPreferencesRead` | User ID + scope + optional keys + output mode + include versions | `types.PreferenceSnapshot` (effective map, effective versions, trace layers including version metadata). |
 
 ## Hook Contracts
 
