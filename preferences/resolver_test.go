@@ -69,6 +69,107 @@ func TestResolver_ResolveMergesScopes(t *testing.T) {
 	require.Equal(t, userRecord.ID.String(), trace.Layers[len(trace.Layers)-1].SnapshotID)
 }
 
+func TestResolver_ResolveRawValueModeUnwrapsEnvelope(t *testing.T) {
+	userID := uuid.New()
+	systemRecord := types.PreferenceRecord{
+		ID:      uuid.New(),
+		Key:     "ui.theme",
+		Value:   map[string]any{"value": "light"},
+		Level:   types.PreferenceLevelSystem,
+		Version: 1,
+	}
+	userRecord := types.PreferenceRecord{
+		ID:      uuid.New(),
+		UserID:  userID,
+		Key:     "ui.theme",
+		Value:   map[string]any{"value": "dark"},
+		Level:   types.PreferenceLevelUser,
+		Version: 2,
+	}
+	structured := types.PreferenceRecord{
+		ID:      uuid.New(),
+		UserID:  userID,
+		Key:     "notifications",
+		Value:   map[string]any{"enabled": true},
+		Level:   types.PreferenceLevelUser,
+		Version: 1,
+	}
+	repo := &fakePreferenceRepo{
+		values: map[types.PreferenceLevel][]types.PreferenceRecord{
+			types.PreferenceLevelSystem: {systemRecord},
+			types.PreferenceLevelUser:   {userRecord, structured},
+		},
+	}
+	resolver, err := NewResolver(ResolverConfig{Repository: repo})
+	require.NoError(t, err)
+
+	snapshot, err := resolver.Resolve(context.Background(), ResolveInput{
+		UserID:     userID,
+		OutputMode: types.PreferenceOutputRawValue,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "dark", snapshot.Effective["ui.theme"])
+	notifications, ok := snapshot.Effective["notifications"].(map[string]any)
+	require.True(t, ok)
+	require.True(t, notifications["enabled"].(bool))
+}
+
+func TestResolver_ResolveIncludesEffectiveVersions(t *testing.T) {
+	userID := uuid.New()
+	systemRecord := types.PreferenceRecord{
+		ID:      uuid.New(),
+		Key:     "locale",
+		Value:   map[string]any{"value": "en-US"},
+		Level:   types.PreferenceLevelSystem,
+		Version: 3,
+	}
+	userRecord := types.PreferenceRecord{
+		ID:      uuid.New(),
+		UserID:  userID,
+		Key:     "locale",
+		Value:   map[string]any{"value": "es-MX"},
+		Level:   types.PreferenceLevelUser,
+		Version: 8,
+	}
+	repo := &fakePreferenceRepo{
+		values: map[types.PreferenceLevel][]types.PreferenceRecord{
+			types.PreferenceLevelSystem: {systemRecord},
+			types.PreferenceLevelUser:   {userRecord},
+		},
+	}
+	resolver, err := NewResolver(ResolverConfig{Repository: repo})
+	require.NoError(t, err)
+
+	snapshot, err := resolver.Resolve(context.Background(), ResolveInput{
+		UserID:          userID,
+		OutputMode:      types.PreferenceOutputRawValue,
+		IncludeVersions: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, 8, snapshot.EffectiveVersions["locale"])
+
+	require.Len(t, snapshot.Traces, 1)
+	layerVersions := make([]int, 0, len(snapshot.Traces[0].Layers))
+	for _, layer := range snapshot.Traces[0].Layers {
+		if layer.Found {
+			layerVersions = append(layerVersions, layer.Version)
+		}
+	}
+	require.Contains(t, layerVersions, 3)
+	require.Contains(t, layerVersions, 8)
+}
+
+func TestResolver_ResolveRejectsUnknownOutputMode(t *testing.T) {
+	repo := &fakePreferenceRepo{}
+	resolver, err := NewResolver(ResolverConfig{Repository: repo})
+	require.NoError(t, err)
+
+	_, err = resolver.Resolve(context.Background(), ResolveInput{
+		OutputMode: types.PreferenceOutputMode("unsupported"),
+	})
+	require.ErrorIs(t, err, types.ErrUnsupportedPreferenceOutputMode)
+}
+
 type fakePreferenceRepo struct {
 	values map[types.PreferenceLevel][]types.PreferenceRecord
 }

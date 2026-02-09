@@ -29,7 +29,11 @@ func (input PreferenceDeleteInput) Validate() error {
 	if strings.TrimSpace(input.Key) == "" {
 		return ErrPreferenceKeyRequired
 	}
-	if needsUser(input.Level) && input.UserID == uuid.Nil {
+	level, err := normalizePreferenceLevel(input.Level)
+	if err != nil {
+		return err
+	}
+	if level == types.PreferenceLevelUser && input.UserID == uuid.Nil {
 		return types.ErrUserIDRequired
 	}
 	if input.Actor.ID == uuid.Nil {
@@ -66,9 +70,9 @@ func (c *PreferenceDeleteCommand) Execute(ctx context.Context, input PreferenceD
 	if err := input.Validate(); err != nil {
 		return err
 	}
-	level := input.Level
-	if level == "" {
-		level = types.PreferenceLevelUser
+	level, err := normalizePreferenceLevel(input.Level)
+	if err != nil {
+		return err
 	}
 	scope, err := c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionPreferencesWrite, input.UserID)
 	if err != nil {

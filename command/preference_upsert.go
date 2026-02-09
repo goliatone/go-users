@@ -42,7 +42,11 @@ func (input PreferenceUpsertInput) Validate() error {
 	if input.Value == nil {
 		return ErrPreferenceValueRequired
 	}
-	if needsUser(input.Level) && input.UserID == uuid.Nil {
+	level, err := normalizePreferenceLevel(input.Level)
+	if err != nil {
+		return err
+	}
+	if level == types.PreferenceLevelUser && input.UserID == uuid.Nil {
 		return types.ErrUserIDRequired
 	}
 	if input.Actor.ID == uuid.Nil {
@@ -85,9 +89,9 @@ func (c *PreferenceUpsertCommand) Execute(ctx context.Context, input PreferenceU
 		return err
 	}
 
-	level := input.Level
-	if level == "" {
-		level = types.PreferenceLevelUser
+	level, err := normalizePreferenceLevel(input.Level)
+	if err != nil {
+		return err
 	}
 
 	record := types.PreferenceRecord{
@@ -115,8 +119,4 @@ func (c *PreferenceUpsertCommand) Execute(ctx context.Context, input PreferenceU
 		OccurredAt: now(c.clock),
 	})
 	return nil
-}
-
-func needsUser(level types.PreferenceLevel) bool {
-	return level == "" || level == types.PreferenceLevelUser
 }

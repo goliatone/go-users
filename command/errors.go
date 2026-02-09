@@ -43,6 +43,12 @@ var (
 	ErrPreferenceKeyRequired = errors.New("go-users: preference key required")
 	// ErrPreferenceValueRequired indicates the preference value payload was missing.
 	ErrPreferenceValueRequired = errors.New("go-users: preference value required")
+	// ErrPreferenceValuesRequired indicates bulk preference payloads were missing.
+	ErrPreferenceValuesRequired = errors.New("go-users: preference values required")
+	// ErrPreferenceKeysRequired indicates bulk preference keys were missing.
+	ErrPreferenceKeysRequired = errors.New("go-users: preference keys required")
+	// ErrPreferenceDuplicateKey indicates bulk payload keys collide after normalization.
+	ErrPreferenceDuplicateKey = errors.New("go-users: duplicate preference key")
 	// ErrTokenRequired indicates a securelink token was missing.
 	ErrTokenRequired = errors.New("go-users: token required")
 	// ErrTokenTypeRequired indicates a token type was missing.

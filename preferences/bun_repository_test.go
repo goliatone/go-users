@@ -103,6 +103,114 @@ func TestPreferenceRepository_UpsertListDelete(t *testing.T) {
 	require.Len(t, remaining, 0)
 }
 
+func TestPreferenceRepository_BulkBestEffort(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+	applyDDL(t, db)
+
+	repo, err := NewRepository(RepositoryConfig{DB: db})
+	require.NoError(t, err)
+
+	userID := uuid.New()
+	tenantID := uuid.New()
+	actor := uuid.New()
+	records := []types.PreferenceRecord{
+		{
+			UserID: userID,
+			Scope: types.ScopeFilter{
+				TenantID: tenantID,
+			},
+			Level:     types.PreferenceLevelUser,
+			Key:       "theme",
+			Value:     map[string]any{"value": "dark"},
+			CreatedBy: actor,
+			UpdatedBy: actor,
+		},
+		{
+			UserID: userID,
+			Scope: types.ScopeFilter{
+				TenantID: tenantID,
+			},
+			Level:     types.PreferenceLevelUser,
+			Key:       "locale",
+			Value:     map[string]any{"value": "en-US"},
+			CreatedBy: actor,
+			UpdatedBy: actor,
+		},
+	}
+
+	saved, err := repo.UpsertManyPreferences(ctx, records, types.PreferenceBulkModeBestEffort)
+	require.NoError(t, err)
+	require.Len(t, saved, 2)
+
+	listed, err := repo.ListPreferences(ctx, types.PreferenceFilter{
+		UserID: userID,
+		Scope: types.ScopeFilter{
+			TenantID: tenantID,
+		},
+		Level: types.PreferenceLevelUser,
+	})
+	require.NoError(t, err)
+	require.Len(t, listed, 2)
+
+	err = repo.DeleteManyPreferences(ctx, userID, types.ScopeFilter{TenantID: tenantID}, types.PreferenceLevelUser, []string{"theme", "locale"}, types.PreferenceBulkModeBestEffort)
+	require.NoError(t, err)
+
+	afterDelete, err := repo.ListPreferences(ctx, types.PreferenceFilter{
+		UserID: userID,
+		Scope: types.ScopeFilter{
+			TenantID: tenantID,
+		},
+		Level: types.PreferenceLevelUser,
+	})
+	require.NoError(t, err)
+	require.Len(t, afterDelete, 0)
+}
+
+func TestPreferenceRepository_BulkTransactionalUnsupported(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+	applyDDL(t, db)
+
+	repo, err := NewRepository(RepositoryConfig{DB: db})
+	require.NoError(t, err)
+
+	_, err = repo.UpsertManyPreferences(ctx, []types.PreferenceRecord{{
+		UserID: uuid.New(),
+		Level:  types.PreferenceLevelUser,
+		Key:    "theme",
+		Value:  map[string]any{"value": "dark"},
+	}}, types.PreferenceBulkModeTransactional)
+	require.ErrorIs(t, err, types.ErrPreferenceBulkTransactionalUnsupported)
+
+	err = repo.DeleteManyPreferences(ctx, uuid.New(), types.ScopeFilter{}, types.PreferenceLevelUser, []string{"theme"}, types.PreferenceBulkModeTransactional)
+	require.ErrorIs(t, err, types.ErrPreferenceBulkTransactionalUnsupported)
+}
+
+func TestPreferenceRepository_ScopeAndLevelValidationUsesTypedSentinels(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+	applyDDL(t, db)
+
+	repo, err := NewRepository(RepositoryConfig{DB: db})
+	require.NoError(t, err)
+
+	_, err = repo.ListPreferences(ctx, types.PreferenceFilter{
+		Level: types.PreferenceLevelTenant,
+	})
+	require.ErrorIs(t, err, types.ErrPreferenceTenantScopeRequired)
+
+	_, err = repo.ListPreferences(ctx, types.PreferenceFilter{
+		Level: types.PreferenceLevelOrg,
+	})
+	require.ErrorIs(t, err, types.ErrPreferenceOrgScopeRequired)
+
+	_, err = repo.ListPreferences(ctx, types.PreferenceFilter{
+		Level: types.PreferenceLevel("invalid"),
+	})
+	require.ErrorIs(t, err, types.ErrUnsupportedPreferenceLevel)
+}
+
 func newTestDB(t *testing.T) *bun.DB {
 	sqldb, err := sql.Open("sqlite3", ":memory:?cache=shared")
 	require.NoError(t, err)
