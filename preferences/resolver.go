@@ -24,11 +24,13 @@ type Resolver struct {
 
 // ResolveInput controls which scopes participate in the resolution process.
 type ResolveInput struct {
-	UserID uuid.UUID
-	Scope  types.ScopeFilter
-	Levels []types.PreferenceLevel
-	Keys   []string
-	Base   map[string]any
+	UserID          uuid.UUID
+	Scope           types.ScopeFilter
+	Levels          []types.PreferenceLevel
+	Keys            []string
+	Base            map[string]any
+	OutputMode      types.PreferenceOutputMode
+	IncludeVersions bool
 }
 
 // NewResolver constructs a preference resolver.
@@ -44,10 +46,15 @@ func NewResolver(cfg ResolverConfig) (*Resolver, error) {
 
 // Resolve builds the effective preference snapshot for the supplied scope chain.
 func (r *Resolver) Resolve(ctx context.Context, input ResolveInput) (types.PreferenceSnapshot, error) {
+	outputMode, err := normalizeOutputMode(input.OutputMode)
+	if err != nil {
+		return types.PreferenceSnapshot{}, err
+	}
 	order := filterLevels(resolutionOrder(input.Levels), input)
 	layers := make([]opts.Layer[map[string]any], 0, len(order))
 	layerScopeMeta := make(map[types.PreferenceLevel]scopeValues, len(order))
 	keyRecords := make(map[types.PreferenceLevel]map[string]uuid.UUID, len(order))
+	keyVersions := make(map[types.PreferenceLevel]map[string]int, len(order))
 	layerValues := make(map[types.PreferenceLevel]map[string]any, len(order))
 
 	for _, level := range order {
@@ -61,8 +68,9 @@ func (r *Resolver) Resolve(ctx context.Context, input ResolveInput) (types.Prefe
 		if err != nil {
 			return types.PreferenceSnapshot{}, err
 		}
-		snapshot, idMap := snapshotFromRecords(recs)
+		snapshot, idMap, versionMap := snapshotFromRecords(recs)
 		keyRecords[level] = idMap
+		keyVersions[level] = versionMap
 
 		var payload map[string]any
 		switch level {
@@ -99,14 +107,19 @@ func (r *Resolver) Resolve(ctx context.Context, input ResolveInput) (types.Prefe
 	if err != nil {
 		return types.PreferenceSnapshot{}, err
 	}
-	effective := cloneMap(merged.Value)
-	traces, err := buildTraces(order, input.Keys, keyRecords, layerScopeMeta, layerValues)
+	effective := transformEffective(cloneMap(merged.Value), outputMode)
+	traces, err := buildTraces(order, input.Keys, keyRecords, keyVersions, layerScopeMeta, layerValues, outputMode)
 	if err != nil {
 		return types.PreferenceSnapshot{}, err
 	}
+	var effectiveVersions map[string]int
+	if input.IncludeVersions {
+		effectiveVersions = buildEffectiveVersions(traces)
+	}
 	return types.PreferenceSnapshot{
-		Effective: effective,
-		Traces:    traces,
+		Effective:         effective,
+		EffectiveVersions: effectiveVersions,
+		Traces:            traces,
 	}, nil
 }
 
@@ -147,17 +160,19 @@ func filterLevels(levels []types.PreferenceLevel, input ResolveInput) []types.Pr
 	return filtered
 }
 
-func snapshotFromRecords(records []types.PreferenceRecord) (map[string]any, map[string]uuid.UUID) {
+func snapshotFromRecords(records []types.PreferenceRecord) (map[string]any, map[string]uuid.UUID, map[string]int) {
 	if len(records) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	values := make(map[string]any, len(records))
 	index := make(map[string]uuid.UUID, len(records))
+	versions := make(map[string]int, len(records))
 	for _, rec := range records {
 		values[rec.Key] = cloneMap(rec.Value)
 		index[rec.Key] = rec.ID
+		versions[rec.Key] = rec.Version
 	}
-	return values, index
+	return values, index, versions
 }
 
 func mergeMaps(base map[string]any, overlay map[string]any) map[string]any {
@@ -226,7 +241,7 @@ func scopeMetadata(values scopeValues) map[string]any {
 	return meta
 }
 
-func buildTraces(order []types.PreferenceLevel, keys []string, keyRecords map[types.PreferenceLevel]map[string]uuid.UUID, scopes map[types.PreferenceLevel]scopeValues, values map[types.PreferenceLevel]map[string]any) ([]types.PreferenceTrace, error) {
+func buildTraces(order []types.PreferenceLevel, keys []string, keyRecords map[types.PreferenceLevel]map[string]uuid.UUID, keyVersions map[types.PreferenceLevel]map[string]int, scopes map[types.PreferenceLevel]scopeValues, values map[types.PreferenceLevel]map[string]any, outputMode types.PreferenceOutputMode) ([]types.PreferenceTrace, error) {
 	keySet := make(map[string]struct{})
 	for _, key := range keys {
 		if strings.TrimSpace(key) == "" {
@@ -251,10 +266,11 @@ func buildTraces(order []types.PreferenceLevel, keys []string, keyRecords map[ty
 				UserID:     scopeVals.user,
 				Scope:      types.ScopeFilter{TenantID: scopeVals.tenant, OrgID: scopeVals.org},
 				SnapshotID: lookupSnapshotID(level, keyRecords, key),
+				Version:    lookupVersion(level, keyVersions, key),
 			}
 			if levelValues := values[level]; levelValues != nil {
 				if v, ok := levelValues[key]; ok {
-					layer.Value = v
+					layer.Value = transformValue(v, outputMode)
 					layer.Found = true
 				}
 			}
@@ -275,6 +291,73 @@ func lookupSnapshotID(level types.PreferenceLevel, keyRecords map[types.Preferen
 		}
 	}
 	return ""
+}
+
+func lookupVersion(level types.PreferenceLevel, keyVersions map[types.PreferenceLevel]map[string]int, key string) int {
+	if versions := keyVersions[level]; versions != nil {
+		return versions[key]
+	}
+	return 0
+}
+
+func normalizeOutputMode(mode types.PreferenceOutputMode) (types.PreferenceOutputMode, error) {
+	if mode == "" {
+		return types.PreferenceOutputEnvelope, nil
+	}
+	switch mode {
+	case types.PreferenceOutputEnvelope, types.PreferenceOutputRawValue:
+		return mode, nil
+	default:
+		return "", types.ErrUnsupportedPreferenceOutputMode
+	}
+}
+
+func transformEffective(input map[string]any, mode types.PreferenceOutputMode) map[string]any {
+	if len(input) == 0 {
+		return nil
+	}
+	if mode == types.PreferenceOutputEnvelope {
+		return input
+	}
+	output := make(map[string]any, len(input))
+	for key, value := range input {
+		output[key] = transformValue(value, mode)
+	}
+	return output
+}
+
+func transformValue(value any, mode types.PreferenceOutputMode) any {
+	if mode != types.PreferenceOutputRawValue {
+		return value
+	}
+	typed, ok := value.(map[string]any)
+	if !ok || len(typed) != 1 {
+		return value
+	}
+	raw, ok := typed["value"]
+	if !ok {
+		return value
+	}
+	return raw
+}
+
+func buildEffectiveVersions(traces []types.PreferenceTrace) map[string]int {
+	if len(traces) == 0 {
+		return nil
+	}
+	versions := make(map[string]int, len(traces))
+	for _, trace := range traces {
+		for _, layer := range trace.Layers {
+			if !layer.Found {
+				continue
+			}
+			versions[trace.Key] = layer.Version
+		}
+	}
+	if len(versions) == 0 {
+		return nil
+	}
+	return versions
 }
 
 func toLevel(name string) types.PreferenceLevel {
