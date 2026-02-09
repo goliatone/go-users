@@ -529,6 +529,7 @@ func NewPreferenceRepository() *PreferenceRepository {
 }
 
 var _ types.PreferenceRepository = (*PreferenceRepository)(nil)
+var _ types.PreferenceBulkRepository = (*PreferenceRepository)(nil)
 
 func (r *PreferenceRepository) ListPreferences(_ context.Context, filter types.PreferenceFilter) ([]types.PreferenceRecord, error) {
 	r.mu.RLock()
@@ -576,6 +577,47 @@ func (r *PreferenceRepository) DeletePreference(_ context.Context, userID uuid.U
 	defer r.mu.Unlock()
 	delete(r.records, fmt.Sprintf("%s:%s:%s:%s:%s", userID, scope.TenantID, scope.OrgID, level, strings.ToLower(key)))
 	return nil
+}
+
+func (r *PreferenceRepository) UpsertManyPreferences(ctx context.Context, records []types.PreferenceRecord, mode types.PreferenceBulkMode) ([]types.PreferenceRecord, error) {
+	if mode == "" {
+		mode = types.PreferenceBulkModeBestEffort
+	}
+	switch mode {
+	case types.PreferenceBulkModeBestEffort:
+		out := make([]types.PreferenceRecord, 0, len(records))
+		for _, record := range records {
+			saved, err := r.UpsertPreference(ctx, record)
+			if err != nil {
+				return out, err
+			}
+			out = append(out, *saved)
+		}
+		return out, nil
+	case types.PreferenceBulkModeTransactional:
+		return nil, types.ErrPreferenceBulkTransactionalUnsupported
+	default:
+		return nil, types.ErrUnsupportedPreferenceBulkMode
+	}
+}
+
+func (r *PreferenceRepository) DeleteManyPreferences(ctx context.Context, userID uuid.UUID, scope types.ScopeFilter, level types.PreferenceLevel, keys []string, mode types.PreferenceBulkMode) error {
+	if mode == "" {
+		mode = types.PreferenceBulkModeBestEffort
+	}
+	switch mode {
+	case types.PreferenceBulkModeBestEffort:
+		for _, key := range keys {
+			if err := r.DeletePreference(ctx, userID, scope, level, key); err != nil {
+				return err
+			}
+		}
+		return nil
+	case types.PreferenceBulkModeTransactional:
+		return types.ErrPreferenceBulkTransactionalUnsupported
+	default:
+		return types.ErrUnsupportedPreferenceBulkMode
+	}
 }
 
 func preferenceKey(record types.PreferenceRecord) string {
