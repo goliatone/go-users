@@ -1,5 +1,26 @@
 # Changelog
 
+# [0.16.0](https://github.com/goliatone/go-users/compare/v0.15.0...v0.16.0) - (2026-02-09)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.16.0 ([9af17f6](https://github.com/goliatone/go-users/commit/9af17f65bfc53e9551cd4d83892220cda7668420))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- Preference service add upsert many and delete many ([be19587](https://github.com/goliatone/go-users/commit/be195878e6f267296804e0e005c2914c3a4fac69))  - (goliatone)
+- Version and output mode to preferences ([f3c1a55](https://github.com/goliatone/go-users/commit/f3c1a55af4e7f4249741a08e64f270a686b44cad))  - (goliatone)
+- Missing command to manage preferences ([7c01742](https://github.com/goliatone/go-users/commit/7c01742ee6154d413f46da19de2e13cd759398ed))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.15.0 ([99c2795](https://github.com/goliatone/go-users/commit/99c2795ba2e59dad0e5dea49a7bdaba4e48452c2))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update docs ([ace5326](https://github.com/goliatone/go-users/commit/ace532688a4816c00c7542ca649b2f80cc7835da))  - (goliatone)
+- Update example ([f562f88](https://github.com/goliatone/go-users/commit/f562f883023c12a4165faa1a2d8367ba2031c917))  - (goliatone)
+
 # [0.15.0](https://github.com/goliatone/go-users/compare/v0.14.0...v0.15.0) - (2026-01-26)
 
 ## <!-- 13 -->📦 Bumps
