@@ -12,12 +12,14 @@ import (
 
 // PreferenceQueryInput scopes preference resolution.
 type PreferenceQueryInput struct {
-	UserID uuid.UUID
-	Scope  types.ScopeFilter
-	Levels []types.PreferenceLevel
-	Keys   []string
-	Base   map[string]any
-	Actor  types.ActorRef
+	UserID          uuid.UUID
+	Scope           types.ScopeFilter
+	Levels          []types.PreferenceLevel
+	Keys            []string
+	Base            map[string]any
+	OutputMode      types.PreferenceOutputMode
+	IncludeVersions bool
+	Actor           types.ActorRef
 }
 
 // Type implements gocommand.Message.
@@ -66,10 +68,12 @@ func (q *PreferenceQuery) Query(ctx context.Context, input PreferenceQueryInput)
 		return types.PreferenceSnapshot{}, err
 	}
 	return q.resolver.Resolve(ctx, preferences.ResolveInput{
-		UserID: input.UserID,
-		Scope:  scope,
-		Levels: input.Levels,
-		Keys:   input.Keys,
-		Base:   input.Base,
+		UserID:          input.UserID,
+		Scope:           scope,
+		Levels:          input.Levels,
+		Keys:            input.Keys,
+		Base:            input.Base,
+		OutputMode:      input.OutputMode,
+		IncludeVersions: input.IncludeVersions,
 	})
 }
