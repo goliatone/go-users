@@ -3,6 +3,7 @@ package preferences
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	repository "github.com/goliatone/go-repository-bun"
@@ -81,6 +82,7 @@ func NewRepository(cfg RepositoryConfig, opts ...RepositoryOption) (*Repository,
 var (
 	_ repository.Repository[*Record] = (*Repository)(nil)
 	_ types.PreferenceRepository     = (*Repository)(nil)
+	_ types.PreferenceBulkRepository = (*Repository)(nil)
 )
 
 func wrapCachedRepository(repo repository.Repository[*Record], options RepositoryOptions) (repository.Repository[*Record], error) {
@@ -217,6 +219,63 @@ func (r *Repository) DeletePreference(ctx context.Context, userID uuid.UUID, sco
 	return r.Delete(writeCtx, existing)
 }
 
+// UpsertManyPreferences inserts or updates multiple scoped preference entries.
+// Best-effort mode applies each record independently and returns aggregated errors.
+// Transactional mode is currently unsupported by this repository.
+func (r *Repository) UpsertManyPreferences(ctx context.Context, records []types.PreferenceRecord, mode types.PreferenceBulkMode) ([]types.PreferenceRecord, error) {
+	mode = coalesceBulkMode(mode)
+	if err := validateBulkMode(mode); err != nil {
+		return nil, err
+	}
+	if len(records) == 0 {
+		return nil, nil
+	}
+	if mode == types.PreferenceBulkModeTransactional {
+		return nil, types.ErrPreferenceBulkTransactionalUnsupported
+	}
+	saved := make([]types.PreferenceRecord, 0, len(records))
+	var errs []error
+	for _, record := range records {
+		row, err := r.UpsertPreference(ctx, record)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("preference %q: %w", record.Key, err))
+			continue
+		}
+		saved = append(saved, *row)
+	}
+	if len(errs) > 0 {
+		return saved, errors.Join(errs...)
+	}
+	return saved, nil
+}
+
+// DeleteManyPreferences removes many scoped preference entries.
+// Best-effort mode applies each key independently and returns aggregated errors.
+// Transactional mode is currently unsupported by this repository.
+func (r *Repository) DeleteManyPreferences(ctx context.Context, userID uuid.UUID, scope types.ScopeFilter, level types.PreferenceLevel, keys []string, mode types.PreferenceBulkMode) error {
+	mode = coalesceBulkMode(mode)
+	if err := validateBulkMode(mode); err != nil {
+		return err
+	}
+	keys = normalizePreferenceKeys(keys)
+	if len(keys) == 0 {
+		return nil
+	}
+	if mode == types.PreferenceBulkModeTransactional {
+		return types.ErrPreferenceBulkTransactionalUnsupported
+	}
+	var errs []error
+	for _, key := range keys {
+		if err := r.DeletePreference(ctx, userID, scope, level, key); err != nil {
+			errs = append(errs, fmt.Errorf("preference %q: %w", key, err))
+		}
+	}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	return nil
+}
+
 func (r *Repository) findExisting(ctx context.Context, level types.PreferenceLevel, ids scopeValues, key string) (*Record, error) {
 	lowerKey := strings.ToLower(strings.TrimSpace(key))
 	if lowerKey == "" {
@@ -263,7 +322,7 @@ func scopeIDs(level types.PreferenceLevel, userID uuid.UUID, scope types.ScopeFi
 		}, nil
 	case types.PreferenceLevelOrg:
 		if scope.OrgID == uuid.Nil {
-			return scopeValues{}, errors.New("preferences: org scope required")
+			return scopeValues{}, types.ErrPreferenceOrgScopeRequired
 		}
 		return scopeValues{
 			tenant: scopeUUID(scope.TenantID),
@@ -271,7 +330,7 @@ func scopeIDs(level types.PreferenceLevel, userID uuid.UUID, scope types.ScopeFi
 		}, nil
 	case types.PreferenceLevelTenant:
 		if scope.TenantID == uuid.Nil {
-			return scopeValues{}, errors.New("preferences: tenant scope required")
+			return scopeValues{}, types.ErrPreferenceTenantScopeRequired
 		}
 		return scopeValues{
 			tenant: scopeUUID(scope.TenantID),
@@ -279,7 +338,7 @@ func scopeIDs(level types.PreferenceLevel, userID uuid.UUID, scope types.ScopeFi
 	case types.PreferenceLevelSystem:
 		return scopeValues{}, nil
 	default:
-		return scopeValues{}, errors.New("preferences: unknown level")
+		return scopeValues{}, types.ErrUnsupportedPreferenceLevel
 	}
 }
 
@@ -288,6 +347,22 @@ func coalesceLevel(level types.PreferenceLevel) types.PreferenceLevel {
 		return types.PreferenceLevelUser
 	}
 	return level
+}
+
+func coalesceBulkMode(mode types.PreferenceBulkMode) types.PreferenceBulkMode {
+	if mode == "" {
+		return types.PreferenceBulkModeBestEffort
+	}
+	return mode
+}
+
+func validateBulkMode(mode types.PreferenceBulkMode) error {
+	switch mode {
+	case types.PreferenceBulkModeBestEffort, types.PreferenceBulkModeTransactional:
+		return nil
+	default:
+		return types.ErrUnsupportedPreferenceBulkMode
+	}
 }
 
 func normalizePreferenceKeys(keys []string) []string {
