@@ -358,6 +358,26 @@ const (
 	PreferenceLevelUser   PreferenceLevel = "user"
 )
 
+// PreferenceOutputMode controls how resolved effective values are shaped.
+type PreferenceOutputMode string
+
+const (
+	// PreferenceOutputEnvelope preserves stored payload maps as-is.
+	PreferenceOutputEnvelope PreferenceOutputMode = "envelope"
+	// PreferenceOutputRawValue unwraps payloads shaped as {"value": ...}.
+	PreferenceOutputRawValue PreferenceOutputMode = "raw_value"
+)
+
+// PreferenceBulkMode controls atomicity guarantees for bulk writes.
+type PreferenceBulkMode string
+
+const (
+	// PreferenceBulkModeBestEffort processes keys independently.
+	PreferenceBulkModeBestEffort PreferenceBulkMode = "best_effort"
+	// PreferenceBulkModeTransactional requires all-or-nothing semantics.
+	PreferenceBulkModeTransactional PreferenceBulkMode = "transactional"
+)
+
 // PreferenceRecord represents a stored scoped preference entry.
 type PreferenceRecord struct {
 	ID        uuid.UUID
@@ -388,10 +408,31 @@ type PreferenceRepository interface {
 	DeletePreference(ctx context.Context, userID uuid.UUID, scope ScopeFilter, level PreferenceLevel, key string) error
 }
 
+// PreferenceBulkRepository is an optional extension for repositories that can
+// process preference writes in bulk.
+type PreferenceBulkRepository interface {
+	UpsertManyPreferences(ctx context.Context, records []PreferenceRecord, mode PreferenceBulkMode) ([]PreferenceRecord, error)
+	DeleteManyPreferences(ctx context.Context, userID uuid.UUID, scope ScopeFilter, level PreferenceLevel, keys []string, mode PreferenceBulkMode) error
+}
+
+// PreferenceBulkUpsertResult captures a per-key bulk upsert result.
+type PreferenceBulkUpsertResult struct {
+	Key    string
+	Record *PreferenceRecord
+	Err    error
+}
+
+// PreferenceBulkDeleteResult captures a per-key bulk delete result.
+type PreferenceBulkDeleteResult struct {
+	Key string
+	Err error
+}
+
 // PreferenceSnapshot depicts the effective settings plus provenance per key.
 type PreferenceSnapshot struct {
-	Effective map[string]any
-	Traces    []PreferenceTrace
+	Effective         map[string]any
+	EffectiveVersions map[string]int
+	Traces            []PreferenceTrace
 }
 
 // PreferenceTrace captures how each scope contributed to a key.
@@ -407,6 +448,7 @@ type PreferenceTraceLayer struct {
 	Scope      ScopeFilter
 	SnapshotID string
 	Value      any
+	Version    int
 	Found      bool
 }
 
@@ -539,4 +581,16 @@ var (
 	ErrMissingPreferenceRepository = errors.New("go-users: missing preference repository")
 	// ErrMissingPreferenceResolver occurs when preference queries lack a resolver.
 	ErrMissingPreferenceResolver = errors.New("go-users: missing preference resolver")
+	// ErrUnsupportedPreferenceLevel occurs when callers supply an unknown preference level.
+	ErrUnsupportedPreferenceLevel = errors.New("go-users: unsupported preference level")
+	// ErrUnsupportedPreferenceOutputMode occurs when callers request an unknown output mode.
+	ErrUnsupportedPreferenceOutputMode = errors.New("go-users: unsupported preference output mode")
+	// ErrPreferenceTenantScopeRequired occurs when tenant-level preference calls omit tenant scope.
+	ErrPreferenceTenantScopeRequired = errors.New("go-users: tenant scope required")
+	// ErrPreferenceOrgScopeRequired occurs when org-level preference calls omit org scope.
+	ErrPreferenceOrgScopeRequired = errors.New("go-users: org scope required")
+	// ErrUnsupportedPreferenceBulkMode occurs when callers request an unknown bulk mode.
+	ErrUnsupportedPreferenceBulkMode = errors.New("go-users: unsupported preference bulk mode")
+	// ErrPreferenceBulkTransactionalUnsupported indicates the repository cannot guarantee transactional bulk writes.
+	ErrPreferenceBulkTransactionalUnsupported = errors.New("go-users: transactional preference bulk writes are not supported")
 )
