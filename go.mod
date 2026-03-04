@@ -5,17 +5,18 @@ go 1.24.10
 toolchain go1.24.11
 
 require (
-	github.com/goliatone/go-auth v0.25.0
-	github.com/goliatone/go-command v0.13.0
-	github.com/goliatone/go-crud v0.17.0
+	github.com/goliatone/go-auth v0.35.0
+	github.com/goliatone/go-command v0.16.1
+	github.com/goliatone/go-crud v0.23.0
 	github.com/goliatone/go-errors v0.10.0
-	github.com/goliatone/go-featuregate v0.5.0
+	github.com/goliatone/go-featuregate v0.6.0
 	github.com/goliatone/go-masker v0.1.0
-	github.com/goliatone/go-options v0.7.0
-	github.com/goliatone/go-repository-bun v0.12.0
-	github.com/goliatone/go-repository-cache v0.6.0
-	github.com/goliatone/go-router v0.42.0
-	github.com/goliatone/go-urlkit v0.3.0
+	github.com/goliatone/go-options v0.7.1
+	github.com/goliatone/go-persistence-bun v0.11.0
+	github.com/goliatone/go-repository-bun v0.15.1
+	github.com/goliatone/go-repository-cache v0.7.1
+	github.com/goliatone/go-router v0.50.0
+	github.com/goliatone/go-urlkit v0.5.0
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/stretchr/testify v1.11.1
@@ -39,7 +40,7 @@ require (
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/dop251/goja v0.0.0-20251201205617-2bb4c724c0f9 // indirect
 	github.com/ettle/strcase v0.2.0 // indirect
-	github.com/expr-lang/expr v1.17.6 // indirect
+	github.com/expr-lang/expr v1.17.7 // indirect
 	github.com/fasthttp/websocket v1.5.12 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/flosch/pongo2/v6 v6.0.0 // indirect
@@ -56,9 +57,10 @@ require (
 	github.com/gofiber/utils v1.2.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
 	github.com/goliatone/go-composite-fs v0.3.0 // indirect
-	github.com/goliatone/go-persistence-bun v0.10.0 // indirect
+	github.com/goliatone/go-logger v0.8.0 // indirect
 	github.com/goliatone/go-print v0.4.1 // indirect
-	github.com/goliatone/hashid v0.1.1 // indirect
+	github.com/goliatone/go-slug v0.1.0 // indirect
+	github.com/goliatone/hashid v0.2.0 // indirect
 	github.com/goodsign/monday v1.0.2 // indirect
 	github.com/google/cel-go v0.26.1 // indirect
 	github.com/google/pprof v0.0.0-20251208000136-3d256cb9ff16 // indirect
@@ -94,6 +96,7 @@ require (
 	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/exp v0.0.0-20251209150349-8475f28825e9 // indirect
 	golang.org/x/net v0.48.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
