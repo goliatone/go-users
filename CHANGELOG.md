@@ -1,15 +1,23 @@
 # Changelog
 
-## Unreleased
+# [0.17.0](https://github.com/goliatone/go-users/compare/v0.16.0...v0.17.0) - (2026-03-04)
 
-### Added
+## <!-- 13 -->📦 Bumps
 
-- Migration profile planner for standalone vs combined installs (`migrations.ProfileSources`, `ProfileStandalone`, `ProfileCombinedWithAuth`) with enforced core-only combined mode.
-- Integration coverage for standalone/combined migration apply+rollback and auth-compat schema parity checks.
+- Bump version: v0.17.0 ([ffd7cc3](https://github.com/goliatone/go-users/commit/ffd7cc3cc9886751dc00d517761246c6ce2315bd))  - (goliatone)
 
-### Documentation
+## <!-- 16 -->➕ Add
 
-- Updated migration guidance to use profile-safe registration helpers and explicit source-label/validation wiring.
+- Profile migration ([973fe32](https://github.com/goliatone/go-users/commit/973fe324d19faca68b93e3fbffbfd9bc820743ef))  - (goliatone)
+- Activity mapper and users activity ([0578a96](https://github.com/goliatone/go-users/commit/0578a962247acae7f5b1fddfbaaacfb7f7b15f2f))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.16.0 ([f6f0663](https://github.com/goliatone/go-users/commit/f6f06639a1104b9e2f58216da9bf0e50a27021b8))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update docs ([08a6e8a](https://github.com/goliatone/go-users/commit/08a6e8ac2feb2935b603a70e95a31f10372cf1d2))  - (goliatone)
 
 # [0.16.0](https://github.com/goliatone/go-users/compare/v0.15.0...v0.16.0) - (2026-02-09)
 
@@ -438,4 +446,5 @@
 - Update migrations ([6273dec](https://github.com/goliatone/go-users/commit/6273dec0eab9694f41b2fee8556ae7f0f0cd2739))  - (goliatone)
 - Add base tasks ([e0df1a4](https://github.com/goliatone/go-users/commit/e0df1a4300d4514583c208add5f5c4db0a3a8312))  - (goliatone)
 - Initial commit ([3fe70f1](https://github.com/goliatone/go-users/commit/3fe70f190ecbef534a75fb9135dada86ba5d473b))  - (goliatone)
+
 
