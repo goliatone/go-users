@@ -121,11 +121,26 @@ More details live in `docs/MULTITENANCY.md` and `docs/WORKSPACES.md`.
 ## Storage and migrations
 
 - SQL definitions live under `data/sql/migrations`. Files are numbered and include `.up.sql` and `.down.sql`.
-- Register migrations through `migrations.Register(fsys)` and feed the returned filesystems to your runner.
-- Standalone installs should register auth bootstrap + auth extras (social accounts/identifiers) before core; go-auth installs should register core only.
+- Use `migrations.ProfileSources(...)` to resolve deterministic standalone/combined registration sets.
+- `migrations.ProfileCombinedWithAuth` enforces core-only registration (for installs that already register `go-auth`).
+- `migrations.ProfileStandalone` resolves auth bootstrap + auth extras + core (in dependency order).
 - `migrations.TestMigrationsApplyToSQLite` verifies that the SQL stack applies cleanly to SQLite.
 - Bun repositories under `activity`, `preferences`, and `registry` are thin wrappers around `bun.DB` and match the interfaces in `pkg/types`.
 - You can replace any repository with your own implementation as long as it satisfies the interface.
+
+```go
+sources, err := migrations.ProfileSources(migrations.ProfileCombinedWithAuth)
+if err != nil {
+    return err
+}
+for _, source := range sources {
+    client.RegisterDialectMigrations(
+        source.Filesystem,
+        persistence.WithDialectSourceLabel(source.SourceLabel),
+        persistence.WithValidationTargets(source.ValidationTargets...),
+    )
+}
+```
 
 ### User tables
 

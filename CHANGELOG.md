@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Migration profile planner for standalone vs combined installs (`migrations.ProfileSources`, `ProfileStandalone`, `ProfileCombinedWithAuth`) with enforced core-only combined mode.
+- Integration coverage for standalone/combined migration apply+rollback and auth-compat schema parity checks.
+
+### Documentation
+
+- Updated migration guidance to use profile-safe registration helpers and explicit source-label/validation wiring.
+
 # [0.16.0](https://github.com/goliatone/go-users/compare/v0.15.0...v0.16.0) - (2026-02-09)
 
 ## <!-- 13 -->📦 Bumps
@@ -427,5 +438,4 @@
 - Update migrations ([6273dec](https://github.com/goliatone/go-users/commit/6273dec0eab9694f41b2fee8556ae7f0f0cd2739))  - (goliatone)
 - Add base tasks ([e0df1a4](https://github.com/goliatone/go-users/commit/e0df1a4300d4514583c208add5f5c4db0a3a8312))  - (goliatone)
 - Initial commit ([3fe70f1](https://github.com/goliatone/go-users/commit/3fe70f190ecbef534a75fb9135dada86ba5d473b))  - (goliatone)
-
 

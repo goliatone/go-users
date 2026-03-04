@@ -31,6 +31,7 @@ This guide covers database migrations for `go-users`, including the migration ar
 - **Reversible** - Each migration includes both up and down scripts
 - **Integration-ready** - Works with `go-persistence-bun` migration runner
 - **go-auth aware** - When `go-auth` is present, register only go-users core; standalone installs register auth bootstrap + auth extras.
+- **Profile-safe** - `migrations.ProfileSources` enforces core-only combined mode and ordered standalone mode.
 
 ---
 
@@ -83,17 +84,19 @@ var CoreMigrationsFS embed.FS       // go-users core tables only
 var AuthBootstrapMigrationsFS embed.FS // users/password_reset + auth columns
 var AuthExtrasMigrationsFS embed.FS    // social_accounts/user_identifiers
 
-// 2. Optional: Use migrations.Register for centralized registration
+// 2. Resolve sources from an explicit install profile
 import "github.com/goliatone/go-users/migrations"
-// init() automatically calls migrations.Register(users.GetCoreMigrationsFS())
-// import _ "github.com/goliatone/go-users/migrations/bootstrap" for auth bootstrap
-// import _ "github.com/goliatone/go-users/migrations/extras" for auth extras
+sources, _ := migrations.ProfileSources(migrations.ProfileCombinedWithAuth)
+// or: migrations.ProfileSources(migrations.ProfileStandalone)
 
-// 3. Retrieve all registered filesystems
-filesystems := migrations.Filesystems()
-
-// 4. Or access directly for go-persistence-bun
-coreFS, _ := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
+// 3. Register each source with label + validation targets
+for _, source := range sources {
+    client.RegisterDialectMigrations(
+        source.Filesystem,
+        persistence.WithDialectSourceLabel(source.SourceLabel),
+        persistence.WithValidationTargets(source.ValidationTargets...),
+    )
+}
 ```
 
 ---
@@ -154,6 +157,11 @@ overrides in `data/sql/migrations/auth/sqlite`. Auth extras live under
 Register auth bootstrap (and auth extras, if used) before core so dependent tables exist.
 When `go-auth` migrations are already registered, skip auth bootstrap/auth extras
 to avoid duplicate tables.
+
+The recommended path is to use `migrations.ProfileSources`:
+
+- `migrations.ProfileCombinedWithAuth`: core-only (safe when go-auth is present)
+- `migrations.ProfileStandalone`: auth bootstrap + auth extras + core
 
 If you use `GetMigrationsFS()`, register three sub-filesystems:
 `data/sql/migrations/auth`, `data/sql/migrations/auth_extras`, and
