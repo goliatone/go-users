@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	i18n "github.com/goliatone/go-i18n"
 	"github.com/google/uuid"
 )
 
@@ -331,6 +332,14 @@ type UserProfile struct {
 	UpdatedBy   uuid.UUID
 }
 
+// CanonicalizeLocale normalizes the profile locale into the shared canonical form.
+func (p *UserProfile) CanonicalizeLocale() {
+	if p == nil {
+		return
+	}
+	p.Locale = NormalizeLocale(p.Locale)
+}
+
 // ProfilePatch represents partial updates applied to a user profile.
 type ProfilePatch struct {
 	DisplayName *string
@@ -340,6 +349,20 @@ type ProfilePatch struct {
 	Bio         *string
 	Contact     map[string]any
 	Metadata    map[string]any
+}
+
+// CanonicalizeLocale normalizes the locale patch value in-place when present.
+func (p *ProfilePatch) CanonicalizeLocale() {
+	if p == nil || p.Locale == nil {
+		return
+	}
+	normalized := NormalizeLocale(*p.Locale)
+	p.Locale = &normalized
+}
+
+// NormalizeLocale returns the canonical locale identifier for shared user data.
+func NormalizeLocale(locale string) string {
+	return i18n.NormalizeLocale(locale)
 }
 
 // ProfileRepository persists and retrieves profile records.
