@@ -3,6 +3,7 @@ package profile
 import (
 	"time"
 
+	i18n "github.com/goliatone/go-i18n"
 	"github.com/google/uuid"
 	"github.com/uptrace/bun"
 )
@@ -25,4 +26,12 @@ type Record struct {
 	CreatedBy   uuid.UUID      `bun:"created_by,type:uuid"`
 	UpdatedAt   time.Time      `bun:"updated_at"`
 	UpdatedBy   uuid.UUID      `bun:"updated_by,type:uuid"`
+}
+
+// CanonicalizeLocale normalizes the stored locale field into canonical form.
+func (r *Record) CanonicalizeLocale() {
+	if r == nil {
+		return
+	}
+	r.Locale = i18n.NormalizeLocale(r.Locale)
 }
