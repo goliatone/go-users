@@ -597,6 +597,24 @@ func TestProfileUpsertCommand_EmitsHook(t *testing.T) {
 	require.Equal(t, "New Name", event.Profile.DisplayName)
 }
 
+func TestProfileUpsertCommand_CanonicalizesLocalePatch(t *testing.T) {
+	repo := &fakeProfileRepo{}
+	cmd := NewProfileUpsertCommand(ProfileCommandConfig{Repository: repo})
+
+	locale := "en_us"
+	err := cmd.Execute(context.Background(), ProfileUpsertInput{
+		UserID: uuid.New(),
+		Patch: types.ProfilePatch{
+			Locale: &locale,
+		},
+		Actor: types.ActorRef{ID: uuid.New()},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, repo.stored)
+	require.Equal(t, "en-US", repo.stored.Locale)
+}
+
 func TestPreferenceCommands_LogEvents(t *testing.T) {
 	repo := &fakePreferenceRepo{}
 	var events []types.PreferenceEvent

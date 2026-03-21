@@ -29,7 +29,7 @@ func TestRepository_UpsertAndGet(t *testing.T) {
 	profile := types.UserProfile{
 		UserID:      userID,
 		DisplayName: "Initial Name",
-		Locale:      "en",
+		Locale:      "en_us",
 		Scope: types.ScopeFilter{
 			TenantID: tenantID,
 		},
@@ -46,6 +46,7 @@ func TestRepository_UpsertAndGet(t *testing.T) {
 	created, err := repo.UpsertProfile(ctx, profile)
 	require.NoError(t, err)
 	require.Equal(t, "Initial Name", created.DisplayName)
+	require.Equal(t, "en-US", created.Locale)
 	require.Equal(t, tenantID, created.Scope.TenantID)
 	require.NotZero(t, created.CreatedAt)
 	require.NotZero(t, created.UpdatedAt)
@@ -65,6 +66,7 @@ func TestRepository_UpsertAndGet(t *testing.T) {
 	fetched, err := repo.GetProfile(ctx, userID, types.ScopeFilter{TenantID: tenantID})
 	require.NoError(t, err)
 	require.Equal(t, "Updated Name", fetched.DisplayName)
+	require.Equal(t, "en-US", fetched.Locale)
 	require.Equal(t, "user@example.com", fetched.Contact["email"])
 	require.Equal(t, "import", fetched.Metadata["source"])
 }

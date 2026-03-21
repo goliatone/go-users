@@ -119,7 +119,7 @@ func TestResolver_ResolveIncludesEffectiveVersions(t *testing.T) {
 	systemRecord := types.PreferenceRecord{
 		ID:      uuid.New(),
 		Key:     "locale",
-		Value:   map[string]any{"value": "en-US"},
+		Value:   map[string]any{"value": "en_us"},
 		Level:   types.PreferenceLevelSystem,
 		Version: 3,
 	}
@@ -146,6 +146,7 @@ func TestResolver_ResolveIncludesEffectiveVersions(t *testing.T) {
 		IncludeVersions: true,
 	})
 	require.NoError(t, err)
+	require.Equal(t, "es-MX", snapshot.Effective["locale"])
 	require.Equal(t, 8, snapshot.EffectiveVersions["locale"])
 
 	require.Len(t, snapshot.Traces, 1)
@@ -157,6 +158,38 @@ func TestResolver_ResolveIncludesEffectiveVersions(t *testing.T) {
 	}
 	require.Contains(t, layerVersions, 3)
 	require.Contains(t, layerVersions, 8)
+}
+
+func TestResolver_ResolveNormalizesLocalePreferencePayloadFields(t *testing.T) {
+	userID := uuid.New()
+	userRecord := types.PreferenceRecord{
+		ID:     uuid.New(),
+		UserID: userID,
+		Key:    "locale",
+		Value: map[string]any{
+			"language": "en_us",
+			"timezone": "America/Los_Angeles",
+		},
+		Level: types.PreferenceLevelUser,
+	}
+	repo := &fakePreferenceRepo{
+		values: map[types.PreferenceLevel][]types.PreferenceRecord{
+			types.PreferenceLevelUser: {userRecord},
+		},
+	}
+	resolver, err := NewResolver(ResolverConfig{Repository: repo})
+	require.NoError(t, err)
+
+	snapshot, err := resolver.Resolve(context.Background(), ResolveInput{
+		UserID:     userID,
+		OutputMode: types.PreferenceOutputEnvelope,
+	})
+	require.NoError(t, err)
+
+	localeValue, ok := snapshot.Effective["locale"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "en-US", localeValue["language"])
+	require.Equal(t, "America/Los_Angeles", localeValue["timezone"])
 }
 
 func TestResolver_ResolveRejectsUnknownOutputMode(t *testing.T) {
