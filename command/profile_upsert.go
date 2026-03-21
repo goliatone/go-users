@@ -91,7 +91,10 @@ func (c *ProfileUpsertCommand) Execute(ctx context.Context, input ProfileUpsertI
 		profile.CreatedBy = input.Actor.ID
 	}
 	profile.UpdatedBy = input.Actor.ID
-	applyProfilePatch(profile, input.Patch)
+	patch := input.Patch
+	patch.CanonicalizeLocale()
+	applyProfilePatch(profile, patch)
+	profile.CanonicalizeLocale()
 
 	updated, err := c.repo.UpsertProfile(ctx, *profile)
 	if err != nil {
