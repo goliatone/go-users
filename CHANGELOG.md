@@ -1,5 +1,25 @@
 # Changelog
 
+# [0.18.0](https://github.com/goliatone/go-users/compare/v0.17.0...v0.18.0) - (2026-03-21)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.18.0 ([4289842](https://github.com/goliatone/go-users/commit/428984258a4511224a0981aaf5008f22ef1a8b7d))  - (goliatone)
+
+## <!-- 2 -->🚜 Refactor
+
+- Update to handle canonical locales and other i18n updates ([f8f7e9e](https://github.com/goliatone/go-users/commit/f8f7e9e93b403eae57d9bea52de28d5c00696453))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.17.0 ([f981bc9](https://github.com/goliatone/go-users/commit/f981bc98796f788418d41ae830187a732bfd5dbb))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update docs ([1eb5c04](https://github.com/goliatone/go-users/commit/1eb5c047c7f986f27f38f729bebe781623a1eab6))  - (goliatone)
+- Update deps ([e6fd516](https://github.com/goliatone/go-users/commit/e6fd516f68f2c09b104f8d2ae6838d40dfe0648d))  - (goliatone)
+- Update tests ([39916bd](https://github.com/goliatone/go-users/commit/39916bd5d1bbd8a7962bfd6e65780e433bcd145e))  - (goliatone)
+
 # [0.17.0](https://github.com/goliatone/go-users/compare/v0.16.0...v0.17.0) - (2026-03-04)
 
 ## <!-- 13 -->📦 Bumps
