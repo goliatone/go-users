@@ -161,7 +161,7 @@ func selectUserID(userID uuid.UUID) repository.SelectCriteria {
 }
 
 func fromDomain(profile types.UserProfile) *Record {
-	return &Record{
+	rec := &Record{
 		UserID:      profile.UserID,
 		DisplayName: profile.DisplayName,
 		AvatarURL:   profile.AvatarURL,
@@ -177,13 +177,15 @@ func fromDomain(profile types.UserProfile) *Record {
 		UpdatedAt:   profile.UpdatedAt,
 		UpdatedBy:   profile.UpdatedBy,
 	}
+	rec.CanonicalizeLocale()
+	return rec
 }
 
 func toDomain(rec *Record) *types.UserProfile {
 	if rec == nil {
 		return nil
 	}
-	return &types.UserProfile{
+	profile := &types.UserProfile{
 		UserID:      rec.UserID,
 		DisplayName: rec.DisplayName,
 		AvatarURL:   rec.AvatarURL,
@@ -201,6 +203,8 @@ func toDomain(rec *Record) *types.UserProfile {
 		CreatedBy: rec.CreatedBy,
 		UpdatedBy: rec.UpdatedBy,
 	}
+	profile.CanonicalizeLocale()
+	return profile
 }
 
 func cloneMap(origin map[string]any) map[string]any {
