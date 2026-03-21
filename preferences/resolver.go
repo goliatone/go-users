@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	i18n "github.com/goliatone/go-i18n"
 	opts "github.com/goliatone/go-options"
 	"github.com/goliatone/go-users/pkg/types"
 	"github.com/google/uuid"
@@ -85,6 +86,7 @@ func (r *Resolver) Resolve(ctx context.Context, input ResolveInput) (types.Prefe
 		if payload == nil {
 			payload = make(map[string]any)
 		}
+		payload = normalizeLocalePreferencePayload(payload)
 		meta, err := scopeIDs(level, input.UserID, input.Scope)
 		if err != nil {
 			return types.PreferenceSnapshot{}, err
@@ -339,6 +341,58 @@ func transformValue(value any, mode types.PreferenceOutputMode) any {
 		return value
 	}
 	return raw
+}
+
+func normalizeLocalePreferencePayload(payload map[string]any) map[string]any {
+	if len(payload) == 0 {
+		return payload
+	}
+	out := cloneMap(payload)
+	for key, value := range out {
+		if !strings.EqualFold(strings.TrimSpace(key), "locale") {
+			continue
+		}
+		out[key] = normalizeLocalePreferenceValue(value)
+	}
+	return out
+}
+
+func normalizeLocalePreferenceValue(value any) any {
+	switch typed := value.(type) {
+	case string:
+		return i18n.NormalizeLocale(typed)
+	case map[string]any:
+		out := cloneMap(typed)
+		for key, nested := range out {
+			out[key] = normalizeLocaleFieldValue(key, nested)
+		}
+		return out
+	default:
+		return value
+	}
+}
+
+func normalizeLocaleFieldValue(field string, value any) any {
+	switch typed := value.(type) {
+	case string:
+		if isLocaleField(field) {
+			return i18n.NormalizeLocale(typed)
+		}
+		return value
+	case map[string]any:
+		return normalizeLocalePreferenceValue(typed)
+	default:
+		return value
+	}
+}
+
+func isLocaleField(field string) bool {
+	switch strings.ToLower(strings.TrimSpace(field)) {
+	case "value", "locale", "language", "default_locale", "preferred_locale", "source_locale", "target_locale", "fallback_locale":
+		return true
+	default:
+		return false
+	}
 }
 
 func buildEffectiveVersions(traces []types.PreferenceTrace) map[string]int {
