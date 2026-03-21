@@ -15,7 +15,7 @@
 
 ## Prerequisites
 
-- Go 1.23+.
+- Go 1.24+.
 - A repository implementation for each interface located in `pkg/types`.
 - Access to a SQL database when using the bundled migrations (PostgreSQL or SQLite).
 
