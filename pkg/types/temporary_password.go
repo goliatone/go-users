@@ -11,6 +11,26 @@ const (
 	TemporaryPasswordExpiresAtMetadataKey = "password_temporary_expires_at"
 )
 
+// HasTemporaryPasswordMetadata reports whether the user metadata carries any
+// temporary-password markers that must be cleared with a permanent password
+// change.
+func HasTemporaryPasswordMetadata(metadata map[string]any) bool {
+	if len(metadata) == 0 {
+		return false
+	}
+	for _, key := range [...]string{
+		TemporaryPasswordMetadataKey,
+		PasswordChangeRequiredMetadataKey,
+		TemporaryPasswordIssuedAtMetadataKey,
+		TemporaryPasswordExpiresAtMetadataKey,
+	} {
+		if _, ok := metadata[key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 // MarkTemporaryPasswordMetadata returns a cloned metadata map with temporary
 // password state applied.
 func MarkTemporaryPasswordMetadata(metadata map[string]any, issuedAt, expiresAt time.Time) map[string]any {
