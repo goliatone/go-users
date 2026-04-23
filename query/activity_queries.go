@@ -117,33 +117,12 @@ func (q *ActivityStatsQuery) Query(ctx context.Context, filter types.ActivitySta
 	if q.repo == nil {
 		return types.ActivityStats{}, types.ErrMissingActivityRepository
 	}
-	if q.policy != nil {
-		actorCtx, err := authctx.ResolveActorContext(ctx)
-		if err != nil {
-			return types.ActivityStats{}, err
-		}
-		if statsPolicy, ok := q.policy.(activity.ActivityStatsPolicy); ok {
-			filter, err = statsPolicy.ApplyStats(actorCtx, "", filter)
-			if err != nil {
-				return types.ActivityStats{}, err
-			}
-		} else {
-			policyFilter, err := q.policy.Apply(actorCtx, "", types.ActivityFilter{
-				Actor: filter.Actor,
-				Scope: filter.Scope,
-			})
-			if err != nil {
-				return types.ActivityStats{}, err
-			}
-			filter.Actor = policyFilter.Actor
-			filter.Scope = policyFilter.Scope
-			filter.MachineActivityEnabled = policyFilter.MachineActivityEnabled
-			filter.MachineActorTypes = policyFilter.MachineActorTypes
-			filter.MachineDataKeys = policyFilter.MachineDataKeys
-		}
-	}
-	if err := filter.Validate(); err != nil {
+	filter, err := q.applyStatsPolicy(ctx, filter)
+	if err != nil {
 		return types.ActivityStats{}, err
+	}
+	if validateErr := filter.Validate(); validateErr != nil {
+		return types.ActivityStats{}, validateErr
 	}
 	scope, err := q.guard.Enforce(ctx, filter.Actor, filter.Scope, types.PolicyActionActivityRead, uuid.Nil)
 	if err != nil {
@@ -151,4 +130,30 @@ func (q *ActivityStatsQuery) Query(ctx context.Context, filter types.ActivitySta
 	}
 	filter.Scope = scope
 	return q.repo.ActivityStats(ctx, filter)
+}
+
+func (q *ActivityStatsQuery) applyStatsPolicy(ctx context.Context, filter types.ActivityStatsFilter) (types.ActivityStatsFilter, error) {
+	if q.policy == nil {
+		return filter, nil
+	}
+	actorCtx, err := authctx.ResolveActorContext(ctx)
+	if err != nil {
+		return types.ActivityStatsFilter{}, err
+	}
+	if statsPolicy, ok := q.policy.(activity.ActivityStatsPolicy); ok {
+		return statsPolicy.ApplyStats(actorCtx, "", filter)
+	}
+	policyFilter, err := q.policy.Apply(actorCtx, "", types.ActivityFilter{
+		Actor: filter.Actor,
+		Scope: filter.Scope,
+	})
+	if err != nil {
+		return types.ActivityStatsFilter{}, err
+	}
+	filter.Actor = policyFilter.Actor
+	filter.Scope = policyFilter.Scope
+	filter.MachineActivityEnabled = policyFilter.MachineActivityEnabled
+	filter.MachineActorTypes = policyFilter.MachineActorTypes
+	filter.MachineDataKeys = policyFilter.MachineDataKeys
+	return filter, nil
 }

@@ -96,20 +96,13 @@ func NewUserRegistrationRequestCommand(cfg RegistrationRequestConfig) *UserRegis
 		Route:        cfg.Route,
 		DefaultRoute: SecureLinkRouteRegister,
 	})
-	return &UserRegistrationRequestCommand{
+	cmd := &UserRegistrationRequestCommand{
 		repo:        cfg.Repository,
 		tokens:      cfg.TokenRepository,
-		manager:     runtime.manager,
-		clock:       runtime.clock,
-		idGen:       runtime.idGen,
-		sink:        runtime.sink,
-		hooks:       runtime.hooks,
-		logger:      runtime.logger,
-		tokenTTL:    runtime.tokenTTL,
-		guard:       runtime.guard,
 		featureGate: cfg.FeatureGate,
-		route:       runtime.route,
 	}
+	cmd.applyRuntime(runtime)
+	return cmd
 }
 
 var _ gocommand.Commander[UserRegistrationRequestInput] = (*UserRegistrationRequestCommand)(nil)
@@ -226,4 +219,16 @@ func (c *UserRegistrationRequestCommand) Execute(ctx context.Context, input User
 	}
 
 	return nil
+}
+
+func (c *UserRegistrationRequestCommand) applyRuntime(runtime secureLinkRuntime) {
+	c.manager = runtime.manager
+	c.clock = runtime.clock
+	c.idGen = runtime.idGen
+	c.sink = runtime.sink
+	c.hooks = runtime.hooks
+	c.logger = runtime.logger
+	c.tokenTTL = runtime.tokenTTL
+	c.guard = runtime.guard
+	c.route = runtime.route
 }

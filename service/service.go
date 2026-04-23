@@ -244,94 +244,10 @@ func (s *Service) ActivitySink() types.ActivitySink {
 }
 
 func (s *Service) buildCommands() Commands {
-	lifecycle := command.NewUserLifecycleTransitionCommand(command.LifecycleCommandConfig{
-		Repository: s.cfg.AuthRepository,
-		Policy:     s.cfg.TransitionPolicy,
-		Clock:      s.cfg.Clock,
-		Logger:     s.cfg.Logger,
-		Hooks:      s.cfg.Hooks,
-		Activity:   s.cfg.ActivitySink,
-		ScopeGuard: s.scopeGuard,
-	})
-	userCreate := command.NewUserCreateCommand(command.UserCreateCommandConfig{
-		Repository: s.cfg.AuthRepository,
-		Clock:      s.cfg.Clock,
-		Activity:   s.cfg.ActivitySink,
-		Hooks:      s.cfg.Hooks,
-		Logger:     s.cfg.Logger,
-		ScopeGuard: s.scopeGuard,
-	})
-	userPasswordReset := command.NewUserPasswordResetCommand(command.PasswordResetCommandConfig{
-		Repository: s.cfg.AuthRepository,
-		Clock:      s.cfg.Clock,
-		Activity:   s.cfg.ActivitySink,
-		Hooks:      s.cfg.Hooks,
-		Logger:     s.cfg.Logger,
-		ScopeGuard: s.scopeGuard,
-	})
-	userInvite := command.NewUserInviteCommand(command.InviteCommandConfig{
-		Repository:      s.cfg.AuthRepository,
-		TokenRepository: s.cfg.UserTokenRepository,
-		SecureLinks:     s.cfg.SecureLinkManager,
-		Clock:           s.cfg.Clock,
-		IDGen:           s.cfg.IDGenerator,
-		Activity:        s.cfg.ActivitySink,
-		Hooks:           s.cfg.Hooks,
-		Logger:          s.cfg.Logger,
-		TokenTTL:        s.cfg.InviteTokenTTL,
-		ScopeGuard:      s.scopeGuard,
-		FeatureGate:     s.cfg.FeatureGate,
-		Route:           s.cfg.InviteLinkRoute,
-	})
-	registrationRequest := command.NewUserRegistrationRequestCommand(command.RegistrationRequestConfig{
-		Repository:      s.cfg.AuthRepository,
-		TokenRepository: s.cfg.UserTokenRepository,
-		SecureLinks:     s.cfg.SecureLinkManager,
-		Clock:           s.cfg.Clock,
-		IDGen:           s.cfg.IDGenerator,
-		Activity:        s.cfg.ActivitySink,
-		Hooks:           s.cfg.Hooks,
-		Logger:          s.cfg.Logger,
-		TokenTTL:        s.cfg.InviteTokenTTL,
-		ScopeGuard:      s.scopeGuard,
-		FeatureGate:     s.cfg.FeatureGate,
-		Route:           s.cfg.RegistrationLinkRoute,
-	})
-	tokenValidate := command.NewUserTokenValidateCommand(command.TokenValidateConfig{
-		TokenRepository: s.cfg.UserTokenRepository,
-		SecureLinks:     s.cfg.SecureLinkManager,
-		Clock:           s.cfg.Clock,
-		ScopeEnforcer:   s.cfg.TokenScopeEnforcer,
-	})
-	tokenConsume := command.NewUserTokenConsumeCommand(command.TokenConsumeConfig{
-		TokenRepository: s.cfg.UserTokenRepository,
-		SecureLinks:     s.cfg.SecureLinkManager,
-		Clock:           s.cfg.Clock,
-		ScopeEnforcer:   s.cfg.TokenScopeEnforcer,
-		Activity:        s.cfg.ActivitySink,
-		Hooks:           s.cfg.Hooks,
-	})
-	resetRequest := command.NewUserPasswordResetRequestCommand(command.PasswordResetRequestConfig{
-		Repository:      s.cfg.AuthRepository,
-		ResetRepository: s.cfg.PasswordResetRepository,
-		SecureLinks:     s.cfg.SecureLinkManager,
-		Clock:           s.cfg.Clock,
-		IDGen:           s.cfg.IDGenerator,
-		Activity:        s.cfg.ActivitySink,
-		Hooks:           s.cfg.Hooks,
-		Logger:          s.cfg.Logger,
-		FeatureGate:     s.cfg.FeatureGate,
-		Route:           s.cfg.PasswordResetLinkRoute,
-	})
-	resetConfirm := command.NewUserPasswordResetConfirmCommand(command.PasswordResetConfirmConfig{
-		ResetRepository: s.cfg.PasswordResetRepository,
-		SecureLinks:     s.cfg.SecureLinkManager,
-		ResetCommand:    userPasswordReset,
-		Clock:           s.cfg.Clock,
-		ScopeEnforcer:   s.cfg.TokenScopeEnforcer,
-		Logger:          s.cfg.Logger,
-	})
-	return Commands{
+	lifecycle := s.newLifecycleCommand()
+	userCreate := s.newUserCreateCommand()
+	userPasswordReset := s.newPasswordResetCommand()
+	cmds := Commands{
 		UserLifecycleTransition: lifecycle,
 		BulkUserTransition:      command.NewBulkUserTransitionCommand(lifecycle),
 		BulkUserImport:          command.NewBulkUserImportCommand(userCreate),
@@ -351,54 +267,143 @@ func (s *Service) buildCommands() Commands {
 			Logger:     s.cfg.Logger,
 			ScopeGuard: s.scopeGuard,
 		}),
-		UserInvite:               userInvite,
-		UserRegistrationRequest:  registrationRequest,
-		UserTokenValidate:        tokenValidate,
-		UserTokenConsume:         tokenConsume,
-		UserPasswordReset:        userPasswordReset,
-		UserPasswordResetRequest: resetRequest,
-		UserPasswordResetConfirm: resetConfirm,
-		CreateRole:               command.NewCreateRoleCommand(s.cfg.RoleRegistry, s.scopeGuard),
-		UpdateRole:               command.NewUpdateRoleCommand(s.cfg.RoleRegistry, s.scopeGuard),
-		DeleteRole:               command.NewDeleteRoleCommand(s.cfg.RoleRegistry, s.scopeGuard),
-		AssignRole:               command.NewAssignRoleCommand(s.cfg.RoleRegistry, s.scopeGuard),
-		UnassignRole:             command.NewUnassignRoleCommand(s.cfg.RoleRegistry, s.scopeGuard),
-		LogActivity: command.NewActivityLogCommand(command.ActivityLogConfig{
-			Sink:  s.cfg.ActivitySink,
-			Hooks: s.cfg.Hooks,
-			Clock: s.cfg.Clock,
-		}),
-		ProfileUpsert: command.NewProfileUpsertCommand(command.ProfileCommandConfig{
-			Repository: s.cfg.ProfileRepository,
-			Hooks:      s.cfg.Hooks,
-			Clock:      s.cfg.Clock,
-			ScopeGuard: s.scopeGuard,
-		}),
-		PreferenceUpsert: command.NewPreferenceUpsertCommand(command.PreferenceCommandConfig{
-			Repository: s.cfg.PreferenceRepository,
-			Hooks:      s.cfg.Hooks,
-			Clock:      s.cfg.Clock,
-			ScopeGuard: s.scopeGuard,
-		}),
-		PreferenceDelete: command.NewPreferenceDeleteCommand(command.PreferenceCommandConfig{
-			Repository: s.cfg.PreferenceRepository,
-			Hooks:      s.cfg.Hooks,
-			Clock:      s.cfg.Clock,
-			ScopeGuard: s.scopeGuard,
-		}),
-		PreferenceUpsertMany: command.NewPreferenceUpsertManyCommand(command.PreferenceCommandConfig{
-			Repository: s.cfg.PreferenceRepository,
-			Hooks:      s.cfg.Hooks,
-			Clock:      s.cfg.Clock,
-			ScopeGuard: s.scopeGuard,
-		}),
-		PreferenceDeleteMany: command.NewPreferenceDeleteManyCommand(command.PreferenceCommandConfig{
-			Repository: s.cfg.PreferenceRepository,
-			Hooks:      s.cfg.Hooks,
-			Clock:      s.cfg.Clock,
-			ScopeGuard: s.scopeGuard,
-		}),
+		UserPasswordReset: userPasswordReset,
 	}
+	s.attachSecureLinkCommands(&cmds, userPasswordReset)
+	s.attachRoleCommands(&cmds)
+	s.attachActivityProfilePreferenceCommands(&cmds)
+	return cmds
+}
+
+func (s *Service) newLifecycleCommand() *command.UserLifecycleTransitionCommand {
+	return command.NewUserLifecycleTransitionCommand(command.LifecycleCommandConfig{
+		Repository: s.cfg.AuthRepository,
+		Policy:     s.cfg.TransitionPolicy,
+		Clock:      s.cfg.Clock,
+		Logger:     s.cfg.Logger,
+		Hooks:      s.cfg.Hooks,
+		Activity:   s.cfg.ActivitySink,
+		ScopeGuard: s.scopeGuard,
+	})
+}
+
+func (s *Service) newUserCreateCommand() *command.UserCreateCommand {
+	return command.NewUserCreateCommand(command.UserCreateCommandConfig{
+		Repository: s.cfg.AuthRepository,
+		Clock:      s.cfg.Clock,
+		Activity:   s.cfg.ActivitySink,
+		Hooks:      s.cfg.Hooks,
+		Logger:     s.cfg.Logger,
+		ScopeGuard: s.scopeGuard,
+	})
+}
+
+func (s *Service) newPasswordResetCommand() *command.UserPasswordResetCommand {
+	return command.NewUserPasswordResetCommand(command.PasswordResetCommandConfig{
+		Repository: s.cfg.AuthRepository,
+		Clock:      s.cfg.Clock,
+		Activity:   s.cfg.ActivitySink,
+		Hooks:      s.cfg.Hooks,
+		Logger:     s.cfg.Logger,
+		ScopeGuard: s.scopeGuard,
+	})
+}
+
+func (s *Service) attachSecureLinkCommands(cmds *Commands, reset *command.UserPasswordResetCommand) {
+	cmds.UserInvite = command.NewUserInviteCommand(command.InviteCommandConfig{
+		Repository:      s.cfg.AuthRepository,
+		TokenRepository: s.cfg.UserTokenRepository,
+		SecureLinks:     s.cfg.SecureLinkManager,
+		Clock:           s.cfg.Clock,
+		IDGen:           s.cfg.IDGenerator,
+		Activity:        s.cfg.ActivitySink,
+		Hooks:           s.cfg.Hooks,
+		Logger:          s.cfg.Logger,
+		TokenTTL:        s.cfg.InviteTokenTTL,
+		ScopeGuard:      s.scopeGuard,
+		FeatureGate:     s.cfg.FeatureGate,
+		Route:           s.cfg.InviteLinkRoute,
+	})
+	cmds.UserRegistrationRequest = command.NewUserRegistrationRequestCommand(command.RegistrationRequestConfig{
+		Repository:      s.cfg.AuthRepository,
+		TokenRepository: s.cfg.UserTokenRepository,
+		SecureLinks:     s.cfg.SecureLinkManager,
+		Clock:           s.cfg.Clock,
+		IDGen:           s.cfg.IDGenerator,
+		Activity:        s.cfg.ActivitySink,
+		Hooks:           s.cfg.Hooks,
+		Logger:          s.cfg.Logger,
+		TokenTTL:        s.cfg.InviteTokenTTL,
+		ScopeGuard:      s.scopeGuard,
+		FeatureGate:     s.cfg.FeatureGate,
+		Route:           s.cfg.RegistrationLinkRoute,
+	})
+	cmds.UserTokenValidate = command.NewUserTokenValidateCommand(command.TokenValidateConfig{
+		TokenRepository: s.cfg.UserTokenRepository,
+		SecureLinks:     s.cfg.SecureLinkManager,
+		Clock:           s.cfg.Clock,
+		ScopeEnforcer:   s.cfg.TokenScopeEnforcer,
+	})
+	cmds.UserTokenConsume = command.NewUserTokenConsumeCommand(command.TokenConsumeConfig{
+		TokenRepository: s.cfg.UserTokenRepository,
+		SecureLinks:     s.cfg.SecureLinkManager,
+		Clock:           s.cfg.Clock,
+		ScopeEnforcer:   s.cfg.TokenScopeEnforcer,
+		Activity:        s.cfg.ActivitySink,
+		Hooks:           s.cfg.Hooks,
+	})
+	cmds.UserPasswordResetRequest = command.NewUserPasswordResetRequestCommand(command.PasswordResetRequestConfig{
+		Repository:      s.cfg.AuthRepository,
+		ResetRepository: s.cfg.PasswordResetRepository,
+		SecureLinks:     s.cfg.SecureLinkManager,
+		Clock:           s.cfg.Clock,
+		IDGen:           s.cfg.IDGenerator,
+		Activity:        s.cfg.ActivitySink,
+		Hooks:           s.cfg.Hooks,
+		Logger:          s.cfg.Logger,
+		FeatureGate:     s.cfg.FeatureGate,
+		Route:           s.cfg.PasswordResetLinkRoute,
+	})
+	cmds.UserPasswordResetConfirm = command.NewUserPasswordResetConfirmCommand(command.PasswordResetConfirmConfig{
+		ResetRepository: s.cfg.PasswordResetRepository,
+		SecureLinks:     s.cfg.SecureLinkManager,
+		ResetCommand:    reset,
+		Clock:           s.cfg.Clock,
+		ScopeEnforcer:   s.cfg.TokenScopeEnforcer,
+		Logger:          s.cfg.Logger,
+	})
+}
+
+func (s *Service) attachRoleCommands(cmds *Commands) {
+	cmds.CreateRole = command.NewCreateRoleCommand(s.cfg.RoleRegistry, s.scopeGuard)
+	cmds.UpdateRole = command.NewUpdateRoleCommand(s.cfg.RoleRegistry, s.scopeGuard)
+	cmds.DeleteRole = command.NewDeleteRoleCommand(s.cfg.RoleRegistry, s.scopeGuard)
+	cmds.AssignRole = command.NewAssignRoleCommand(s.cfg.RoleRegistry, s.scopeGuard)
+	cmds.UnassignRole = command.NewUnassignRoleCommand(s.cfg.RoleRegistry, s.scopeGuard)
+}
+
+func (s *Service) attachActivityProfilePreferenceCommands(cmds *Commands) {
+	prefCfg := command.PreferenceCommandConfig{
+		Repository: s.cfg.PreferenceRepository,
+		Hooks:      s.cfg.Hooks,
+		Clock:      s.cfg.Clock,
+		ScopeGuard: s.scopeGuard,
+	}
+	cmds.LogActivity = command.NewActivityLogCommand(command.ActivityLogConfig{
+		Sink:  s.cfg.ActivitySink,
+		Hooks: s.cfg.Hooks,
+		Clock: s.cfg.Clock,
+	})
+	cmds.ProfileUpsert = command.NewProfileUpsertCommand(command.ProfileCommandConfig{
+		Repository: s.cfg.ProfileRepository,
+		Hooks:      s.cfg.Hooks,
+		Clock:      s.cfg.Clock,
+		ScopeGuard: s.scopeGuard,
+	})
+	cmds.PreferenceUpsert = command.NewPreferenceUpsertCommand(prefCfg)
+	cmds.PreferenceDelete = command.NewPreferenceDeleteCommand(prefCfg)
+	cmds.PreferenceUpsertMany = command.NewPreferenceUpsertManyCommand(prefCfg)
+	cmds.PreferenceDeleteMany = command.NewPreferenceDeleteManyCommand(prefCfg)
 }
 
 func (s *Service) buildQueries() Queries {

@@ -52,56 +52,11 @@ func (r *Resolver) Resolve(ctx context.Context, input ResolveInput) (types.Prefe
 		return types.PreferenceSnapshot{}, err
 	}
 	order := filterLevels(resolutionOrder(input.Levels), input)
-	layers := make([]opts.Layer[map[string]any], 0, len(order))
-	layerScopeMeta := make(map[types.PreferenceLevel]scopeValues, len(order))
-	keyRecords := make(map[types.PreferenceLevel]map[string]uuid.UUID, len(order))
-	keyVersions := make(map[types.PreferenceLevel]map[string]int, len(order))
-	layerValues := make(map[types.PreferenceLevel]map[string]any, len(order))
-
-	for _, level := range order {
-		filter := types.PreferenceFilter{
-			UserID: input.UserID,
-			Scope:  input.Scope,
-			Level:  level,
-			Keys:   input.Keys,
-		}
-		recs, listErr := r.repo.ListPreferences(ctx, filter)
-		if listErr != nil {
-			return types.PreferenceSnapshot{}, listErr
-		}
-		snapshot, idMap, versionMap := snapshotFromRecords(recs)
-		keyRecords[level] = idMap
-		keyVersions[level] = versionMap
-
-		var payload map[string]any
-		switch level {
-		case types.PreferenceLevelSystem:
-			payload = mergeMaps(r.defaults, input.Base)
-			for k, v := range snapshot {
-				payload[k] = v
-			}
-		default:
-			payload = snapshot
-		}
-		if payload == nil {
-			payload = make(map[string]any)
-		}
-		payload = normalizeLocalePreferencePayload(payload)
-		meta, scopeErr := scopeIDs(level, input.UserID, input.Scope)
-		if scopeErr != nil {
-			return types.PreferenceSnapshot{}, scopeErr
-		}
-		layerScopeMeta[level] = meta
-		layerValues[level] = cloneMap(payload)
-
-		scope := opts.NewScope(scopeName(level), scopePriority(level),
-			opts.WithScopeLabel(scopeLabel(level)),
-			opts.WithScopeMetadata(scopeMetadata(meta)))
-		layer := opts.NewLayer(scope, payload, opts.WithSnapshotID[map[string]any](scope.Name))
-		layers = append(layers, layer)
+	layerData, err := r.buildResolutionLayers(ctx, input, order)
+	if err != nil {
+		return types.PreferenceSnapshot{}, err
 	}
-
-	stack, err := opts.NewStack(layers...)
+	stack, err := opts.NewStack(layerData.layers...)
 	if err != nil {
 		return types.PreferenceSnapshot{}, err
 	}
@@ -110,7 +65,7 @@ func (r *Resolver) Resolve(ctx context.Context, input ResolveInput) (types.Prefe
 		return types.PreferenceSnapshot{}, err
 	}
 	effective := transformEffective(cloneMap(merged.Value), outputMode)
-	traces, err := buildTraces(order, input.Keys, keyRecords, keyVersions, layerScopeMeta, layerValues, outputMode)
+	traces, err := buildTraces(order, input.Keys, layerData.keyRecords, layerData.keyVersions, layerData.scopeMeta, layerData.values, outputMode)
 	if err != nil {
 		return types.PreferenceSnapshot{}, err
 	}
@@ -123,6 +78,75 @@ func (r *Resolver) Resolve(ctx context.Context, input ResolveInput) (types.Prefe
 		EffectiveVersions: effectiveVersions,
 		Traces:            traces,
 	}, nil
+}
+
+type resolutionLayerData struct {
+	layers      []opts.Layer[map[string]any]
+	scopeMeta   map[types.PreferenceLevel]scopeValues
+	keyRecords  map[types.PreferenceLevel]map[string]uuid.UUID
+	keyVersions map[types.PreferenceLevel]map[string]int
+	values      map[types.PreferenceLevel]map[string]any
+}
+
+func (r *Resolver) buildResolutionLayers(ctx context.Context, input ResolveInput, order []types.PreferenceLevel) (resolutionLayerData, error) {
+	data := resolutionLayerData{
+		layers:      make([]opts.Layer[map[string]any], 0, len(order)),
+		scopeMeta:   make(map[types.PreferenceLevel]scopeValues, len(order)),
+		keyRecords:  make(map[types.PreferenceLevel]map[string]uuid.UUID, len(order)),
+		keyVersions: make(map[types.PreferenceLevel]map[string]int, len(order)),
+		values:      make(map[types.PreferenceLevel]map[string]any, len(order)),
+	}
+	for _, level := range order {
+		if err := r.appendResolutionLayer(ctx, input, level, &data); err != nil {
+			return resolutionLayerData{}, err
+		}
+	}
+	return data, nil
+}
+
+func (r *Resolver) appendResolutionLayer(ctx context.Context, input ResolveInput, level types.PreferenceLevel, data *resolutionLayerData) error {
+	recs, err := r.repo.ListPreferences(ctx, types.PreferenceFilter{
+		UserID: input.UserID,
+		Scope:  input.Scope,
+		Level:  level,
+		Keys:   input.Keys,
+	})
+	if err != nil {
+		return err
+	}
+	snapshot, idMap, versionMap := snapshotFromRecords(recs)
+	payload := resolutionPayload(level, snapshot, r.defaults, input.Base)
+	meta, err := scopeIDs(level, input.UserID, input.Scope)
+	if err != nil {
+		return err
+	}
+	data.keyRecords[level] = idMap
+	data.keyVersions[level] = versionMap
+	data.scopeMeta[level] = meta
+	data.values[level] = cloneMap(payload)
+	data.layers = append(data.layers, newResolutionLayer(level, payload, meta))
+	return nil
+}
+
+func resolutionPayload(level types.PreferenceLevel, snapshot, defaults, base map[string]any) map[string]any {
+	payload := snapshot
+	if level == types.PreferenceLevelSystem {
+		payload = mergeMaps(defaults, base)
+		for key, value := range snapshot {
+			payload[key] = value
+		}
+	}
+	if payload == nil {
+		payload = make(map[string]any)
+	}
+	return normalizeLocalePreferencePayload(payload)
+}
+
+func newResolutionLayer(level types.PreferenceLevel, payload map[string]any, meta scopeValues) opts.Layer[map[string]any] {
+	scope := opts.NewScope(scopeName(level), scopePriority(level),
+		opts.WithScopeLabel(scopeLabel(level)),
+		opts.WithScopeMetadata(scopeMetadata(meta)))
+	return opts.NewLayer(scope, payload, opts.WithSnapshotID[map[string]any](scope.Name))
 }
 
 func resolutionOrder(levels []types.PreferenceLevel) []types.PreferenceLevel {

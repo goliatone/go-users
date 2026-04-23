@@ -116,20 +116,8 @@ func New(cfg Config) *Command {
 		logger = types.NopLogger{}
 	}
 
-	store := cfg.EnrichmentStore
-	query := cfg.EnrichmentQuery
-	if cfg.ActivityRepository != nil {
-		if store == nil {
-			if cast, ok := cfg.ActivityRepository.(activity.ActivityEnrichmentStore); ok {
-				store = cast
-			}
-		}
-		if query == nil {
-			if cast, ok := cfg.ActivityRepository.(activity.ActivityEnrichmentQuery); ok {
-				query = cast
-			}
-		}
-	}
+	store := resolveEnrichmentStore(cfg.ActivityRepository, cfg.EnrichmentStore)
+	query := resolveEnrichmentQuery(cfg.ActivityRepository, cfg.EnrichmentQuery)
 
 	return &Command{
 		schedule:         schedule,
@@ -145,6 +133,22 @@ func New(cfg Config) *Command {
 		clock:            clock,
 		logger:           logger,
 	}
+}
+
+func resolveEnrichmentStore(repo types.ActivityRepository, store activity.ActivityEnrichmentStore) activity.ActivityEnrichmentStore {
+	if store != nil || repo == nil {
+		return store
+	}
+	cast, _ := repo.(activity.ActivityEnrichmentStore)
+	return cast
+}
+
+func resolveEnrichmentQuery(repo types.ActivityRepository, query activity.ActivityEnrichmentQuery) activity.ActivityEnrichmentQuery {
+	if query != nil || repo == nil {
+		return query
+	}
+	cast, _ := repo.(activity.ActivityEnrichmentQuery)
+	return cast
 }
 
 var _ gocommand.Commander[Input] = (*Command)(nil)

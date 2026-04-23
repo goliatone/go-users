@@ -98,20 +98,13 @@ func NewUserInviteCommand(cfg InviteCommandConfig) *UserInviteCommand {
 		Route:        cfg.Route,
 		DefaultRoute: SecureLinkRouteInviteAccept,
 	})
-	return &UserInviteCommand{
+	cmd := &UserInviteCommand{
 		repo:        cfg.Repository,
 		tokens:      cfg.TokenRepository,
-		manager:     runtime.manager,
-		clock:       runtime.clock,
-		idGen:       runtime.idGen,
-		sink:        runtime.sink,
-		hooks:       runtime.hooks,
-		logger:      runtime.logger,
-		tokenTTL:    runtime.tokenTTL,
-		guard:       runtime.guard,
 		featureGate: cfg.FeatureGate,
-		route:       runtime.route,
 	}
+	cmd.applyRuntime(runtime)
+	return cmd
 }
 
 var _ gocommand.Commander[UserInviteInput] = (*UserInviteCommand)(nil)
@@ -149,8 +142,8 @@ func (c *UserInviteCommand) Execute(ctx context.Context, input UserInviteInput) 
 	if err != nil {
 		return err
 	}
-	if err := c.recordInviteToken(ctx, created.ID, jti, issuedAt, expiresAt); err != nil {
-		return err
+	if tokenErr := c.recordInviteToken(ctx, created.ID, jti, issuedAt, expiresAt); tokenErr != nil {
+		return tokenErr
 	}
 
 	created, err = c.updateInviteMetadata(ctx, created, input.Actor, scope, jti, issuedAt, expiresAt)
@@ -172,6 +165,18 @@ func (c *UserInviteCommand) createInviteUser(ctx context.Context, input UserInvi
 		Status:    types.LifecycleStatePending,
 		Metadata:  cloneMap(input.Metadata),
 	})
+}
+
+func (c *UserInviteCommand) applyRuntime(runtime secureLinkRuntime) {
+	c.manager = runtime.manager
+	c.clock = runtime.clock
+	c.idGen = runtime.idGen
+	c.sink = runtime.sink
+	c.hooks = runtime.hooks
+	c.logger = runtime.logger
+	c.tokenTTL = runtime.tokenTTL
+	c.guard = runtime.guard
+	c.route = runtime.route
 }
 
 func (c *UserInviteCommand) issueInviteLink(user *types.AuthUser, scope types.ScopeFilter) (string, string, time.Time, time.Time, error) {

@@ -49,38 +49,9 @@ func NewRoleRegistry(cfg RoleRegistryConfig) (*RoleRegistry, error) {
 		idGen = types.UUIDGenerator{}
 	}
 
-	rolesRepo := cfg.Roles
-	assignRepo := cfg.Assignments
-
-	if rolesRepo == nil || assignRepo == nil {
-		if cfg.DB == nil {
-			return nil, errors.New("bun role registry: db or repositories must be provided")
-		}
-		if rolesRepo == nil {
-			rolesRepo = repository.NewRepository(cfg.DB, repository.ModelHandlers[*CustomRole]{
-				NewRecord: func() *CustomRole { return &CustomRole{} },
-				GetID: func(role *CustomRole) uuid.UUID {
-					if role == nil {
-						return uuid.Nil
-					}
-					return role.ID
-				},
-				SetID: func(role *CustomRole, id uuid.UUID) {
-					if role != nil {
-						role.ID = id
-					}
-				},
-			})
-		}
-		if assignRepo == nil {
-			assignRepo = repository.NewRepository(cfg.DB, repository.ModelHandlers[*RoleAssignment]{
-				NewRecord: func() *RoleAssignment { return &RoleAssignment{} },
-				GetID: func(*RoleAssignment) uuid.UUID {
-					return uuid.Nil
-				},
-				SetID: func(*RoleAssignment, uuid.UUID) {},
-			})
-		}
+	rolesRepo, assignRepo, err := resolveRoleRepositories(cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	return &RoleRegistry{
@@ -92,6 +63,45 @@ func NewRoleRegistry(cfg RoleRegistryConfig) (*RoleRegistry, error) {
 		logger:      logger,
 		idGen:       idGen,
 	}, nil
+}
+
+func resolveRoleRepositories(cfg RoleRegistryConfig) (repository.Repository[*CustomRole], repository.Repository[*RoleAssignment], error) {
+	rolesRepo := cfg.Roles
+	assignRepo := cfg.Assignments
+	if rolesRepo != nil && assignRepo != nil {
+		return rolesRepo, assignRepo, nil
+	}
+	if cfg.DB == nil {
+		return nil, nil, errors.New("bun role registry: db or repositories must be provided")
+	}
+	if rolesRepo == nil {
+		rolesRepo = repository.NewRepository(cfg.DB, repository.ModelHandlers[*CustomRole]{
+			NewRecord: func() *CustomRole { return &CustomRole{} },
+			GetID:     customRoleID,
+			SetID:     setCustomRoleID,
+		})
+	}
+	if assignRepo == nil {
+		assignRepo = repository.NewRepository(cfg.DB, repository.ModelHandlers[*RoleAssignment]{
+			NewRecord: func() *RoleAssignment { return &RoleAssignment{} },
+			GetID:     func(*RoleAssignment) uuid.UUID { return uuid.Nil },
+			SetID:     func(*RoleAssignment, uuid.UUID) {},
+		})
+	}
+	return rolesRepo, assignRepo, nil
+}
+
+func customRoleID(role *CustomRole) uuid.UUID {
+	if role == nil {
+		return uuid.Nil
+	}
+	return role.ID
+}
+
+func setCustomRoleID(role *CustomRole, id uuid.UUID) {
+	if role != nil {
+		role.ID = id
+	}
 }
 
 // CreateRole inserts a custom role scoped to the provided tenant/org.

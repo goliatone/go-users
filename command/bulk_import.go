@@ -75,63 +75,16 @@ func (c *BulkUserImportCommand) Execute(ctx context.Context, input BulkUserImpor
 	var errs []error
 
 	for idx, user := range input.Users {
-		result := BulkUserImportResult{Index: idx}
-		normalized := normalizeAuthUser(user)
-		if normalized != nil {
-			result.Email = normalized.Email
-		}
-
-		statusOverride := types.LifecycleState("")
-		if normalized == nil {
-			err := bulkImportError(ErrUserRequired, bulkImportMetadata(idx, result.Email, uuid.Nil))
-			result.Err = err
-			results = append(results, result)
-			errs = append(errs, err)
-			if !input.ContinueOnError {
-				break
-			}
-			continue
-		}
-		if normalized.Status == "" && input.DefaultStatus != "" {
-			statusOverride = input.DefaultStatus
-		}
-
-		if input.DryRun {
-			err := c.executeDryRun(ctx, input, normalized, statusOverride, &result)
-			if err != nil {
-				errs = append(errs, err)
-				if !input.ContinueOnError {
-					results = append(results, result)
-					break
-				}
-			}
-			results = append(results, result)
-			continue
-		}
-
-		created := &types.AuthUser{}
-		err := c.create.Execute(ctx, UserCreateInput{
-			User:   normalized,
-			Status: statusOverride,
-			Actor:  input.Actor,
-			Scope:  input.Scope,
-			Result: created,
-		})
-		if err != nil {
-			err = bulkImportError(err, bulkImportMetadata(idx, result.Email, uuid.Nil))
-			result.Err = err
-			results = append(results, result)
-			errs = append(errs, err)
-			if !input.ContinueOnError {
-				break
-			}
-			continue
-		}
-
-		result.UserID = created.ID
-		result.Email = created.Email
-		result.Status = created.Status
+		result, err := c.executeBulkUser(ctx, input, idx, user)
 		results = append(results, result)
+		if err != nil {
+			errs = append(errs, err)
+			if !input.ContinueOnError {
+				break
+			}
+			continue
+		}
+
 	}
 
 	if input.Results != nil {
@@ -142,6 +95,46 @@ func (c *BulkUserImportCommand) Execute(ctx context.Context, input BulkUserImpor
 		return errors.Join(errs...)
 	}
 	return nil
+}
+
+func (c *BulkUserImportCommand) executeBulkUser(ctx context.Context, input BulkUserImportInput, idx int, user *types.AuthUser) (BulkUserImportResult, error) {
+	result := BulkUserImportResult{Index: idx}
+	normalized := normalizeAuthUser(user)
+	if normalized == nil {
+		err := bulkImportError(ErrUserRequired, bulkImportMetadata(idx, result.Email, uuid.Nil))
+		result.Err = err
+		return result, err
+	}
+	result.Email = normalized.Email
+	statusOverride := bulkStatusOverride(normalized, input.DefaultStatus)
+	if input.DryRun {
+		err := c.executeDryRun(ctx, input, normalized, statusOverride, &result)
+		return result, err
+	}
+	created := &types.AuthUser{}
+	err := c.create.Execute(ctx, UserCreateInput{
+		User:   normalized,
+		Status: statusOverride,
+		Actor:  input.Actor,
+		Scope:  input.Scope,
+		Result: created,
+	})
+	if err != nil {
+		err = bulkImportError(err, bulkImportMetadata(idx, result.Email, uuid.Nil))
+		result.Err = err
+		return result, err
+	}
+	result.UserID = created.ID
+	result.Email = created.Email
+	result.Status = created.Status
+	return result, nil
+}
+
+func bulkStatusOverride(user *types.AuthUser, fallback types.LifecycleState) types.LifecycleState {
+	if user.Status == "" && fallback != "" {
+		return fallback
+	}
+	return ""
 }
 
 func (c *BulkUserImportCommand) executeDryRun(ctx context.Context, input BulkUserImportInput, user *types.AuthUser, statusOverride types.LifecycleState, result *BulkUserImportResult) error {

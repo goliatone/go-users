@@ -137,28 +137,7 @@ func (c *UserPasswordResetConfirmCommand) Execute(ctx context.Context, input Use
 
 	consumedAt := now(c.clock)
 	if err := c.resets.ConsumeReset(ctx, jti, consumedAt); err != nil {
-		if repository.IsSQLExpectedCountViolation(err) {
-			latest, lookupErr := c.resets.GetResetByJTI(ctx, jti)
-			if lookupErr == nil {
-				if latest == nil {
-					return ErrTokenNotFound
-				}
-				if !latest.ExpiresAt.IsZero() && consumedAt.After(latest.ExpiresAt) {
-					return ErrTokenExpired
-				}
-				if latest.Status == types.PasswordResetStatusExpired {
-					return ErrTokenExpired
-				}
-				if latest.Status == types.PasswordResetStatusChanged || !latest.UsedAt.IsZero() {
-					return ErrTokenAlreadyUsed
-				}
-			}
-			return ErrTokenAlreadyUsed
-		}
-		if repository.IsRecordNotFound(err) {
-			return ErrTokenNotFound
-		}
-		return err
+		return c.passwordResetConsumeError(ctx, jti, consumedAt, err)
 	}
 
 	resetScope := scopeFromPayload(payload)
@@ -187,4 +166,34 @@ func (c *UserPasswordResetConfirmCommand) Execute(ctx context.Context, input Use
 		input.Result.User = result.User
 	}
 	return nil
+}
+
+func (c *UserPasswordResetConfirmCommand) passwordResetConsumeError(ctx context.Context, jti string, consumedAt time.Time, err error) error {
+	if repository.IsRecordNotFound(err) {
+		return ErrTokenNotFound
+	}
+	if !repository.IsSQLExpectedCountViolation(err) {
+		return err
+	}
+	latest, lookupErr := c.resets.GetResetByJTI(ctx, jti)
+	if lookupErr != nil {
+		return ErrTokenAlreadyUsed
+	}
+	return passwordResetConflictError(latest, consumedAt)
+}
+
+func passwordResetConflictError(record *types.PasswordResetRecord, consumedAt time.Time) error {
+	if record == nil {
+		return ErrTokenNotFound
+	}
+	if !record.ExpiresAt.IsZero() && consumedAt.After(record.ExpiresAt) {
+		return ErrTokenExpired
+	}
+	if record.Status == types.PasswordResetStatusExpired {
+		return ErrTokenExpired
+	}
+	if record.Status == types.PasswordResetStatusChanged || !record.UsedAt.IsZero() {
+		return ErrTokenAlreadyUsed
+	}
+	return ErrTokenAlreadyUsed
 }

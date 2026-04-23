@@ -237,35 +237,39 @@ func enrichedBeforeCondition(driver dialect.Name, before time.Time) (string, []a
 }
 
 func matchesEnrichmentFilter(record types.ActivityRecord, missingKeys []string, enrichedBefore *time.Time) bool {
-	hasMissing := false
-	if len(missingKeys) > 0 {
-		for _, key := range missingKeys {
-			if key == "" {
-				continue
-			}
-			if _, ok := record.Data[key]; !ok {
-				hasMissing = true
-				break
-			}
-		}
-	}
-
-	isStale := false
-	if enrichedBefore != nil && !enrichedBefore.IsZero() {
-		isStale = true
-		if value, ok := record.Data[DataKeyEnrichedAt]; ok {
-			if parsed, ok := value.(string); ok && parsed != "" {
-				if ts, err := time.Parse(time.RFC3339Nano, parsed); err == nil && !ts.Before(enrichedBefore.UTC()) {
-					isStale = false
-				}
-			}
-		}
-	}
-
-	if len(missingKeys) == 0 && (enrichedBefore == nil || enrichedBefore.IsZero()) {
+	hasCriteria := len(missingKeys) > 0 || (enrichedBefore != nil && !enrichedBefore.IsZero())
+	if !hasCriteria {
 		return true
 	}
-	return hasMissing || isStale
+	return hasMissingEnrichmentKey(record.Data, missingKeys) || isEnrichmentStale(record.Data, enrichedBefore)
+}
+
+func hasMissingEnrichmentKey(data map[string]any, missingKeys []string) bool {
+	for _, key := range missingKeys {
+		if key == "" {
+			continue
+		}
+		if _, ok := data[key]; !ok {
+			return true
+		}
+	}
+	return false
+}
+
+func isEnrichmentStale(data map[string]any, enrichedBefore *time.Time) bool {
+	if enrichedBefore == nil || enrichedBefore.IsZero() {
+		return false
+	}
+	value, ok := data[DataKeyEnrichedAt]
+	if !ok {
+		return true
+	}
+	parsed, ok := value.(string)
+	if !ok || parsed == "" {
+		return true
+	}
+	ts, err := time.Parse(time.RFC3339Nano, parsed)
+	return err != nil || ts.Before(enrichedBefore.UTC())
 }
 
 func toEnrichmentPage(rows []LogEntry) ActivityEnrichmentPage {

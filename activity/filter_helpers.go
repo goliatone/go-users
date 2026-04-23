@@ -205,35 +205,54 @@ func applyChannelOptions(filter types.ActivityFilter, cfg FilterConfig) (types.A
 	}
 
 	if len(allow) > 0 {
-		if len(filter.Channels) > 0 {
-			filter.Channels = intersectStrings(filter.Channels, allow)
-			if len(filter.Channels) == 0 {
-				return types.ActivityFilter{}, errors.New("activity: channel allowlist excludes requested channels")
-			}
-		} else if filter.Channel != "" {
-			if !containsString(allow, filter.Channel) {
-				return types.ActivityFilter{}, errors.New("activity: channel allowlist excludes requested channel")
-			}
-		} else {
-			filter.Channels = allow
+		var err error
+		filter, err = applyChannelAllowlist(filter, allow)
+		if err != nil {
+			return types.ActivityFilter{}, err
 		}
 	}
 
 	if len(deny) > 0 {
-		if filter.Channel != "" && containsString(deny, filter.Channel) {
-			return types.ActivityFilter{}, errors.New("activity: channel denylist excludes requested channel")
+		var err error
+		filter, err = applyChannelDenylist(filter, deny)
+		if err != nil {
+			return types.ActivityFilter{}, err
 		}
-		if len(filter.Channels) > 0 {
-			filter.Channels = subtractStrings(filter.Channels, deny)
-			if len(filter.Channels) == 0 {
-				return types.ActivityFilter{}, errors.New("activity: channel denylist excludes all channels")
-			}
-		}
-		filter.ChannelDenylist = deny
 	} else if len(reqDeny) > 0 {
 		filter.ChannelDenylist = reqDeny
 	}
 
+	return filter, nil
+}
+
+func applyChannelAllowlist(filter types.ActivityFilter, allow []string) (types.ActivityFilter, error) {
+	if len(filter.Channels) > 0 {
+		filter.Channels = intersectStrings(filter.Channels, allow)
+		if len(filter.Channels) == 0 {
+			return types.ActivityFilter{}, errors.New("activity: channel allowlist excludes requested channels")
+		}
+		return filter, nil
+	}
+	if filter.Channel != "" && !containsString(allow, filter.Channel) {
+		return types.ActivityFilter{}, errors.New("activity: channel allowlist excludes requested channel")
+	}
+	if filter.Channel == "" {
+		filter.Channels = allow
+	}
+	return filter, nil
+}
+
+func applyChannelDenylist(filter types.ActivityFilter, deny []string) (types.ActivityFilter, error) {
+	if filter.Channel != "" && containsString(deny, filter.Channel) {
+		return types.ActivityFilter{}, errors.New("activity: channel denylist excludes requested channel")
+	}
+	if len(filter.Channels) > 0 {
+		filter.Channels = subtractStrings(filter.Channels, deny)
+		if len(filter.Channels) == 0 {
+			return types.ActivityFilter{}, errors.New("activity: channel denylist excludes all channels")
+		}
+	}
+	filter.ChannelDenylist = deny
 	return filter, nil
 }
 
@@ -375,24 +394,40 @@ func intersectScopeFilters(base, requested types.ScopeFilter) (types.ScopeFilter
 		out.OrgID = requested.OrgID
 	}
 	if len(requested.Labels) > 0 {
-		if out.Labels == nil {
-			out.Labels = make(map[string]uuid.UUID, len(requested.Labels))
+		labels, err := intersectScopeLabels(base.Labels, out.Labels, requested.Labels)
+		if err != nil {
+			return types.ScopeFilter{}, err
 		}
-		for key, value := range requested.Labels {
-			if value == uuid.Nil {
-				continue
-			}
-			normalized := strings.ToLower(strings.TrimSpace(key))
-			if normalized == "" {
-				continue
-			}
-			if base.Labels != nil {
-				if baseValue, ok := base.Labels[normalized]; ok && baseValue != uuid.Nil && baseValue != value {
-					return types.ScopeFilter{}, errors.New("activity: requested label scope not permitted")
-				}
-			}
-			out.Labels[normalized] = value
-		}
+		out.Labels = labels
 	}
 	return out, nil
+}
+
+func intersectScopeLabels(base, current, requested map[string]uuid.UUID) (map[string]uuid.UUID, error) {
+	out := current
+	if out == nil {
+		out = make(map[string]uuid.UUID, len(requested))
+	}
+	for key, value := range requested {
+		if value == uuid.Nil {
+			continue
+		}
+		normalized := strings.ToLower(strings.TrimSpace(key))
+		if normalized == "" {
+			continue
+		}
+		if !labelScopeAllowed(base, normalized, value) {
+			return nil, errors.New("activity: requested label scope not permitted")
+		}
+		out[normalized] = value
+	}
+	return out, nil
+}
+
+func labelScopeAllowed(base map[string]uuid.UUID, key string, value uuid.UUID) bool {
+	if base == nil {
+		return true
+	}
+	baseValue, ok := base[key]
+	return !ok || baseValue == uuid.Nil || baseValue == value
 }

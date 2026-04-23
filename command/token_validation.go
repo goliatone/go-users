@@ -234,28 +234,7 @@ func (c *UserTokenConsumeCommand) Execute(ctx context.Context, input UserTokenCo
 
 	usedAt := now(c.clock)
 	if err := c.tokens.UpdateTokenStatus(ctx, input.TokenType, record.JTI, types.UserTokenStatusUsed, usedAt); err != nil {
-		if repository.IsSQLExpectedCountViolation(err) {
-			latest, lookupErr := c.tokens.GetTokenByJTI(ctx, input.TokenType, record.JTI)
-			if lookupErr == nil {
-				if latest == nil {
-					return ErrTokenNotFound
-				}
-				if !latest.ExpiresAt.IsZero() && usedAt.After(latest.ExpiresAt) {
-					return ErrTokenExpired
-				}
-				if latest.Status == types.UserTokenStatusExpired {
-					return ErrTokenExpired
-				}
-				if latest.Status == types.UserTokenStatusUsed || !latest.UsedAt.IsZero() {
-					return ErrTokenAlreadyUsed
-				}
-			}
-			return ErrTokenAlreadyUsed
-		}
-		if repository.IsRecordNotFound(err) {
-			return ErrTokenNotFound
-		}
-		return err
+		return c.tokenConsumeError(ctx, input.TokenType, record.JTI, usedAt, err)
 	}
 	record.Status = types.UserTokenStatusUsed
 	record.UsedAt = usedAt
@@ -287,6 +266,36 @@ func (c *UserTokenConsumeCommand) Execute(ctx context.Context, input UserTokenCo
 		input.Result.Payload = payload
 	}
 	return nil
+}
+
+func (c *UserTokenConsumeCommand) tokenConsumeError(ctx context.Context, tokenType types.UserTokenType, jti string, usedAt time.Time, err error) error {
+	if repository.IsRecordNotFound(err) {
+		return ErrTokenNotFound
+	}
+	if !repository.IsSQLExpectedCountViolation(err) {
+		return err
+	}
+	latest, lookupErr := c.tokens.GetTokenByJTI(ctx, tokenType, jti)
+	if lookupErr != nil {
+		return ErrTokenAlreadyUsed
+	}
+	return userTokenConflictError(latest, usedAt)
+}
+
+func userTokenConflictError(record *types.UserToken, usedAt time.Time) error {
+	if record == nil {
+		return ErrTokenNotFound
+	}
+	if !record.ExpiresAt.IsZero() && usedAt.After(record.ExpiresAt) {
+		return ErrTokenExpired
+	}
+	if record.Status == types.UserTokenStatusExpired {
+		return ErrTokenExpired
+	}
+	if record.Status == types.UserTokenStatusUsed || !record.UsedAt.IsZero() {
+		return ErrTokenAlreadyUsed
+	}
+	return ErrTokenAlreadyUsed
 }
 
 func tokenConsumeActivity(tokenType types.UserTokenType) (string, string) {

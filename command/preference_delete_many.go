@@ -77,70 +77,84 @@ func (c *PreferenceDeleteManyCommand) Execute(ctx context.Context, input Prefere
 	if err := input.Validate(); err != nil {
 		return err
 	}
-	level, err := normalizePreferenceLevel(input.Level)
+	bulk, err := c.preparePreferenceDeleteMany(ctx, input)
 	if err != nil {
 		return err
 	}
-	mode, err := normalizePreferenceBulkMode(input.Mode)
-	if err != nil {
-		return err
-	}
-	scope, err := c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionPreferencesWrite, input.UserID)
-	if err != nil {
-		return err
-	}
-
-	keys := normalizePreferenceKeys(input.Keys)
-	results := make([]types.PreferenceBulkDeleteResult, 0, len(keys))
-	switch mode {
+	var results []types.PreferenceBulkDeleteResult
+	switch bulk.mode {
 	case types.PreferenceBulkModeTransactional:
-		bulkRepo, ok := c.repo.(types.PreferenceBulkRepository)
-		if !ok {
-			return types.ErrPreferenceBulkTransactionalUnsupported
-		}
-		if err := bulkRepo.DeleteManyPreferences(ctx, input.UserID, scope, level, keys, types.PreferenceBulkModeTransactional); err != nil {
-			return err
-		}
-		for _, key := range keys {
-			results = append(results, types.PreferenceBulkDeleteResult{Key: key})
-			emitPreferenceHook(ctx, c.hooks, types.PreferenceEvent{
-				UserID:     input.UserID,
-				Scope:      scope,
-				Key:        key,
-				Action:     "preference.delete",
-				ActorID:    input.Actor.ID,
-				OccurredAt: now(c.clock),
-			})
-		}
+		results, err = c.deleteManyTransactional(ctx, input, bulk)
 	case types.PreferenceBulkModeBestEffort:
-		var errs []error
-		for _, key := range keys {
-			delErr := c.repo.DeletePreference(ctx, input.UserID, scope, level, key)
-			result := types.PreferenceBulkDeleteResult{Key: key}
-			if delErr != nil {
-				result.Err = delErr
-				errs = append(errs, fmt.Errorf("preference %q: %w", key, delErr))
-			} else {
-				emitPreferenceHook(ctx, c.hooks, types.PreferenceEvent{
-					UserID:     input.UserID,
-					Scope:      scope,
-					Key:        key,
-					Action:     "preference.delete",
-					ActorID:    input.Actor.ID,
-					OccurredAt: now(c.clock),
-				})
-			}
-			results = append(results, result)
-		}
-		if input.Results != nil {
-			*input.Results = append((*input.Results)[:0], results...)
-		}
-		if len(errs) > 0 {
-			return errors.Join(errs...)
-		}
+		results, err = c.deleteManyBestEffort(ctx, input, bulk)
 	}
 	if input.Results != nil {
 		*input.Results = append((*input.Results)[:0], results...)
 	}
-	return nil
+	return err
+}
+
+func (c *PreferenceDeleteManyCommand) preparePreferenceDeleteMany(ctx context.Context, input PreferenceDeleteManyInput) (preferenceBulkContext, error) {
+	level, err := normalizePreferenceLevel(input.Level)
+	if err != nil {
+		return preferenceBulkContext{}, err
+	}
+	mode, err := normalizePreferenceBulkMode(input.Mode)
+	if err != nil {
+		return preferenceBulkContext{}, err
+	}
+	scope, err := c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionPreferencesWrite, input.UserID)
+	if err != nil {
+		return preferenceBulkContext{}, err
+	}
+	return preferenceBulkContext{
+		level: level,
+		mode:  mode,
+		scope: scope,
+		keys:  normalizePreferenceKeys(input.Keys),
+	}, nil
+}
+
+func (c *PreferenceDeleteManyCommand) deleteManyTransactional(ctx context.Context, input PreferenceDeleteManyInput, bulk preferenceBulkContext) ([]types.PreferenceBulkDeleteResult, error) {
+	bulkRepo, ok := c.repo.(types.PreferenceBulkRepository)
+	if !ok {
+		return nil, types.ErrPreferenceBulkTransactionalUnsupported
+	}
+	if err := bulkRepo.DeleteManyPreferences(ctx, input.UserID, bulk.scope, bulk.level, bulk.keys, types.PreferenceBulkModeTransactional); err != nil {
+		return nil, err
+	}
+	results := make([]types.PreferenceBulkDeleteResult, 0, len(bulk.keys))
+	for _, key := range bulk.keys {
+		results = append(results, types.PreferenceBulkDeleteResult{Key: key})
+		c.emitDeleteManyHook(ctx, input, bulk.scope, key)
+	}
+	return results, nil
+}
+
+func (c *PreferenceDeleteManyCommand) deleteManyBestEffort(ctx context.Context, input PreferenceDeleteManyInput, bulk preferenceBulkContext) ([]types.PreferenceBulkDeleteResult, error) {
+	results := make([]types.PreferenceBulkDeleteResult, 0, len(bulk.keys))
+	var errs []error
+	for _, key := range bulk.keys {
+		delErr := c.repo.DeletePreference(ctx, input.UserID, bulk.scope, bulk.level, key)
+		result := types.PreferenceBulkDeleteResult{Key: key}
+		if delErr != nil {
+			result.Err = delErr
+			errs = append(errs, fmt.Errorf("preference %q: %w", key, delErr))
+		} else {
+			c.emitDeleteManyHook(ctx, input, bulk.scope, key)
+		}
+		results = append(results, result)
+	}
+	return results, errors.Join(errs...)
+}
+
+func (c *PreferenceDeleteManyCommand) emitDeleteManyHook(ctx context.Context, input PreferenceDeleteManyInput, scope types.ScopeFilter, key string) {
+	emitPreferenceHook(ctx, c.hooks, types.PreferenceEvent{
+		UserID:     input.UserID,
+		Scope:      scope,
+		Key:        key,
+		Action:     "preference.delete",
+		ActorID:    input.Actor.ID,
+		OccurredAt: now(c.clock),
+	})
 }

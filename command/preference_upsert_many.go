@@ -78,6 +78,13 @@ func NewPreferenceUpsertManyCommand(cfg PreferenceCommandConfig) *PreferenceUpse
 
 var _ gocommand.Commander[PreferenceUpsertManyInput] = (*PreferenceUpsertManyCommand)(nil)
 
+type preferenceBulkContext struct {
+	level types.PreferenceLevel
+	mode  types.PreferenceBulkMode
+	scope types.ScopeFilter
+	keys  []string
+}
+
 // Execute validates and persists many preference entries.
 func (c *PreferenceUpsertManyCommand) Execute(ctx context.Context, input PreferenceUpsertManyInput) error {
 	if c.repo == nil {
