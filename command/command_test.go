@@ -170,6 +170,14 @@ func TestUserPasswordResetCommand_ClearsTemporaryMetadataByDefault(t *testing.T)
 		Metadata: types.MarkTemporaryPasswordMetadata(map[string]any{
 			"keep": "value",
 		}, issuedAt, issuedAt.Add(time.Hour)),
+		Raw: &struct {
+			Metadata map[string]any
+		}{
+			Metadata: map[string]any{
+				types.TemporaryPasswordMetadataKey:      true,
+				types.PasswordChangeRequiredMetadataKey: true,
+			},
+		},
 	}
 
 	cmd := NewUserPasswordResetCommand(PasswordResetCommandConfig{
@@ -194,6 +202,7 @@ func TestUserPasswordResetCommand_ClearsTemporaryMetadataByDefault(t *testing.T)
 	require.NotContains(t, result.User.Metadata, types.TemporaryPasswordMetadataKey)
 	require.NotContains(t, result.User.Metadata, types.PasswordChangeRequiredMetadataKey)
 	require.Equal(t, "value", result.User.Metadata["keep"])
+	require.Nil(t, result.User.Raw)
 }
 
 func TestUserPasswordResetCommand_UsesAtomicTemporaryMetadataCleanup(t *testing.T) {
@@ -600,9 +609,12 @@ func TestUserPasswordResetConfirmCommand_ConsumesToken(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, types.PasswordResetStatusChanged, resetRepo.resets["reset-jti"].Status)
+	require.False(t, resetRepo.resets["reset-jti"].UsedAt.IsZero())
+	require.Equal(t, resetRepo.resets["reset-jti"].UsedAt, resetRepo.resets["reset-jti"].ResetAt)
 	require.Equal(t, userID, repo.lastResetUserID)
 	require.NotNil(t, result.User)
 	require.Equal(t, userID, result.User.ID)
+	require.Nil(t, result.User.Raw)
 }
 
 func TestUserPasswordResetConfirmCommand_DoesNotConsumeTokenWhenResetFails(t *testing.T) {
@@ -673,6 +685,55 @@ func TestUserPasswordResetConfirmCommand_DoesNotConsumeTokenWhenResetFails(t *te
 	require.NotContains(t, result.User.Metadata, types.TemporaryPasswordMetadataKey)
 	require.NotContains(t, result.User.Metadata, types.PasswordChangeRequiredMetadataKey)
 	require.Equal(t, "value", result.User.Metadata["keep"])
+}
+
+func TestUserPasswordResetConfirmCommand_BlocksActiveClaimBeforePasswordReset(t *testing.T) {
+	userID := uuid.New()
+	issuedAt := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
+	repo := newFakeAuthRepo()
+	repo.users[userID] = &types.AuthUser{
+		ID:    userID,
+		Email: "user@example.com",
+	}
+	repo.passwords[userID] = "old-hash"
+
+	resetRepo := newMemoryResetRepo()
+	_, err := resetRepo.CreateReset(context.Background(), types.PasswordResetRecord{
+		UserID:    userID,
+		Email:     "user@example.com",
+		Status:    types.PasswordResetStatusRequested,
+		JTI:       "reset-jti",
+		IssuedAt:  issuedAt,
+		ExpiresAt: issuedAt.Add(time.Hour),
+	})
+	require.NoError(t, err)
+	require.NoError(t, resetRepo.ClaimReset(context.Background(), "reset-jti", issuedAt, DefaultPasswordResetClaimTTL))
+
+	manager := &stubSecureLinkManager{
+		validatePayload: types.SecureLinkPayload{
+			"jti":        "reset-jti",
+			"user_id":    userID.String(),
+			"expires_at": issuedAt.Add(time.Hour).Format(time.RFC3339Nano),
+		},
+	}
+	resetCmd := NewUserPasswordResetCommand(PasswordResetCommandConfig{
+		Repository: repo,
+	})
+	confirmCmd := NewUserPasswordResetConfirmCommand(PasswordResetConfirmConfig{
+		ResetRepository: resetRepo,
+		SecureLinks:     manager,
+		ResetCommand:    resetCmd,
+		Clock:           fixedClock{t: issuedAt},
+	})
+
+	err = confirmCmd.Execute(context.Background(), UserPasswordResetConfirmInput{
+		Token:           "reset-token",
+		NewPasswordHash: "new-hash",
+	})
+
+	require.ErrorIs(t, err, ErrTokenInProgress)
+	require.Equal(t, uuid.Nil, repo.lastResetUserID)
+	require.Equal(t, "old-hash", repo.passwords[userID])
 }
 
 func TestUserCreateCommand_DefaultsStatusAndLogsActivity(t *testing.T) {
@@ -1307,6 +1368,12 @@ func (m *memoryResetRepo) CreateReset(_ context.Context, record types.PasswordRe
 	if copy.ID == uuid.Nil {
 		copy.ID = uuid.New()
 	}
+	if copy.CreatedAt.IsZero() {
+		copy.CreatedAt = time.Now().UTC()
+	}
+	if copy.UpdatedAt.IsZero() {
+		copy.UpdatedAt = copy.CreatedAt
+	}
 	m.resets[copy.JTI] = &copy
 	return &copy, nil
 }
@@ -1344,4 +1411,61 @@ func (m *memoryResetRepo) UpdateResetStatus(_ context.Context, jti string, statu
 		rec.ResetAt = usedAt
 	}
 	return nil
+}
+
+func (m *memoryResetRepo) ClaimReset(_ context.Context, jti string, claimedAt time.Time, staleAfter time.Duration) error {
+	rec, ok := m.resets[jti]
+	if !ok {
+		return repository.NewRecordNotFound()
+	}
+	if rec.Status == types.PasswordResetStatusChanged || !rec.UsedAt.IsZero() {
+		return repository.SQLExpectedCount(staticSQLResult(0), 1)
+	}
+	if !rec.ExpiresAt.IsZero() && !claimedAt.Before(rec.ExpiresAt) {
+		return repository.SQLExpectedCount(staticSQLResult(0), 1)
+	}
+	if rec.Status == types.PasswordResetStatusProcessing && rec.UpdatedAt.Add(staleAfter).After(claimedAt) {
+		return repository.SQLExpectedCount(staticSQLResult(0), 1)
+	}
+	rec.Status = types.PasswordResetStatusProcessing
+	rec.UpdatedAt = claimedAt
+	return nil
+}
+
+func (m *memoryResetRepo) ReleaseResetClaim(_ context.Context, jti string, claimedAt time.Time) error {
+	rec, ok := m.resets[jti]
+	if !ok {
+		return repository.NewRecordNotFound()
+	}
+	if rec.Status != types.PasswordResetStatusProcessing || !rec.UsedAt.IsZero() || !rec.UpdatedAt.Equal(claimedAt) {
+		return errors.New("claim not held")
+	}
+	rec.Status = types.PasswordResetStatusRequested
+	rec.UpdatedAt = claimedAt.Add(time.Nanosecond)
+	return nil
+}
+
+func (m *memoryResetRepo) FinalizeReset(_ context.Context, jti string, claimedAt, resetAt time.Time) error {
+	rec, ok := m.resets[jti]
+	if !ok {
+		return repository.NewRecordNotFound()
+	}
+	if rec.Status != types.PasswordResetStatusProcessing || !rec.UsedAt.IsZero() || !rec.UpdatedAt.Equal(claimedAt) {
+		return errors.New("claim not held")
+	}
+	rec.Status = types.PasswordResetStatusChanged
+	rec.UsedAt = resetAt
+	rec.ResetAt = resetAt
+	rec.UpdatedAt = resetAt
+	return nil
+}
+
+type staticSQLResult int64
+
+func (r staticSQLResult) LastInsertId() (int64, error) {
+	return 0, nil
+}
+
+func (r staticSQLResult) RowsAffected() (int64, error) {
+	return int64(r), nil
 }
