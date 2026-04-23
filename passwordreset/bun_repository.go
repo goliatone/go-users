@@ -62,6 +62,7 @@ func NewRepository(cfg RepositoryConfig) (*Repository, error) {
 }
 
 var _ types.PasswordResetRepository = (*Repository)(nil)
+var _ types.PasswordResetLifecycleRepository = (*Repository)(nil)
 
 // CreateReset persists a password reset record.
 func (r *Repository) CreateReset(ctx context.Context, record types.PasswordResetRecord) (*types.PasswordResetRecord, error) {
@@ -127,6 +128,109 @@ func (r *Repository) ConsumeReset(ctx context.Context, jti string, usedAt time.T
 		Where("status = ?", string(types.PasswordResetStatusRequested)).
 		Where("used_at IS NULL").
 		Where("expires_at IS NULL OR expires_at > ?", usedAt)
+	res, err := q.Exec(ctx)
+	if err != nil {
+		return repository.MapDatabaseError(err, repository.DetectDriver(r.db))
+	}
+	return repository.SQLExpectedCount(res, 1)
+}
+
+// ClaimReset marks a reset token as processing to provide exclusive ownership
+// during password change finalization.
+func (r *Repository) ClaimReset(ctx context.Context, jti string, claimedAt time.Time, staleAfter time.Duration) error {
+	if r == nil || r.db == nil {
+		return errors.New("passwordreset: db required for claim")
+	}
+	normalized := strings.TrimSpace(jti)
+	if normalized == "" {
+		return errors.New("passwordreset: jti required")
+	}
+	if claimedAt.IsZero() {
+		claimedAt = r.clock.Now()
+	}
+	if staleAfter <= 0 {
+		return errors.New("passwordreset: stale claim duration required")
+	}
+	staleBefore := claimedAt.Add(-staleAfter)
+	rec := &Record{
+		Status:    string(types.PasswordResetStatusProcessing),
+		UpdatedAt: timePtr(claimedAt),
+	}
+	q := r.db.NewUpdate().Model(rec).
+		Column("status", "updated_at").
+		Where("jti = ?", normalized).
+		Where("used_at IS NULL").
+		Where("expires_at IS NULL OR expires_at > ?", claimedAt).
+		WhereGroup(" AND ", func(q *bun.UpdateQuery) *bun.UpdateQuery {
+			return q.
+				Where("status = ?", string(types.PasswordResetStatusRequested)).
+				WhereOr("(status = ? AND updated_at IS NOT NULL AND updated_at <= ?)", string(types.PasswordResetStatusProcessing), staleBefore)
+		})
+	res, err := q.Exec(ctx)
+	if err != nil {
+		return repository.MapDatabaseError(err, repository.DetectDriver(r.db))
+	}
+	return repository.SQLExpectedCount(res, 1)
+}
+
+// ReleaseResetClaim returns a processing token to requested state so callers
+// can retry after a failed password change.
+func (r *Repository) ReleaseResetClaim(ctx context.Context, jti string, claimedAt time.Time) error {
+	if r == nil || r.db == nil {
+		return errors.New("passwordreset: db required for claim release")
+	}
+	normalized := strings.TrimSpace(jti)
+	if normalized == "" {
+		return errors.New("passwordreset: jti required")
+	}
+	if claimedAt.IsZero() {
+		return errors.New("passwordreset: claim timestamp required")
+	}
+	rec := &Record{
+		Status:    string(types.PasswordResetStatusRequested),
+		UpdatedAt: timePtr(r.clock.Now()),
+	}
+	q := r.db.NewUpdate().Model(rec).
+		Column("status", "updated_at").
+		Where("jti = ?", normalized).
+		Where("status = ?", string(types.PasswordResetStatusProcessing)).
+		Where("used_at IS NULL").
+		Where("updated_at = ?", claimedAt)
+	res, err := q.Exec(ctx)
+	if err != nil {
+		return repository.MapDatabaseError(err, repository.DetectDriver(r.db))
+	}
+	return repository.SQLExpectedCount(res, 1)
+}
+
+// FinalizeReset marks a claimed reset token as changed in one write after the
+// password update has succeeded.
+func (r *Repository) FinalizeReset(ctx context.Context, jti string, claimedAt, resetAt time.Time) error {
+	if r == nil || r.db == nil {
+		return errors.New("passwordreset: db required for finalize")
+	}
+	normalized := strings.TrimSpace(jti)
+	if normalized == "" {
+		return errors.New("passwordreset: jti required")
+	}
+	if claimedAt.IsZero() {
+		return errors.New("passwordreset: claim timestamp required")
+	}
+	if resetAt.IsZero() {
+		resetAt = r.clock.Now()
+	}
+	rec := &Record{
+		Status:    string(types.PasswordResetStatusChanged),
+		UsedAt:    timePtr(resetAt),
+		ResetedAt: timePtr(resetAt),
+		UpdatedAt: timePtr(r.clock.Now()),
+	}
+	q := r.db.NewUpdate().Model(rec).
+		Column("status", "used_at", "reseted_at", "updated_at").
+		Where("jti = ?", normalized).
+		Where("status = ?", string(types.PasswordResetStatusProcessing)).
+		Where("used_at IS NULL").
+		Where("updated_at = ?", claimedAt)
 	res, err := q.Exec(ctx)
 	if err != nil {
 		return repository.MapDatabaseError(err, repository.DetectDriver(r.db))
