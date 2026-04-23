@@ -1,5 +1,33 @@
 # Changelog
 
+# [0.23.0](https://github.com/goliatone/go-users/compare/v0.22.1...v0.23.0) - (2026-04-23)
+
+## <!-- 1 -->🐛 Bug Fixes
+
+- Code quality ([df3e687](https://github.com/goliatone/go-users/commit/df3e6877879cdf5b1687e1647993c390b05880fb))  - (goliatone)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.23.0 ([0582159](https://github.com/goliatone/go-users/commit/05821595b4470f3c35447adf0ce912025b0ee0cd))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- Passwor dreset types ([aca1e87](https://github.com/goliatone/go-users/commit/aca1e8721b155f727536e589d840787f102da2aa))  - (goliatone)
+- Password reset repo ([187db20](https://github.com/goliatone/go-users/commit/187db20167218029c9990429670a4e8e7c52a6b6))  - (goliatone)
+- Password reset command handle temporary password meta ([05caf35](https://github.com/goliatone/go-users/commit/05caf35c96e02faba34d92183a0a3f0af3ee791f))  - (goliatone)
+- Command error for reset flow ([647f4c5](https://github.com/goliatone/go-users/commit/647f4c578ad5f32dc89a724c851336252b25bf8a))  - (goliatone)
+- Data migration for reset processing ([eade632](https://github.com/goliatone/go-users/commit/eade6329be7f38bce6e2186bfb2cc961719747b6))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.22.1 ([b9dcb2d](https://github.com/goliatone/go-users/commit/b9dcb2d0c9e14078d8882c4f9ed3c005d2909acf))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Code quality ([b7c56fe](https://github.com/goliatone/go-users/commit/b7c56fe1c54331a8d383e8c8bd24fa0403764176))  - (goliatone)
+- Update deps ([3c092f6](https://github.com/goliatone/go-users/commit/3c092f6c235de56c369ae6ab2c597ce21ff39c93))  - (goliatone)
+- Update test ([625cc70](https://github.com/goliatone/go-users/commit/625cc7068603c27510644f2c14059848a5abf4b3))  - (goliatone)
+
 # [0.22.1](https://github.com/goliatone/go-users/compare/v0.22.0...v0.22.1) - (2026-04-23)
 
 ## <!-- 13 -->📦 Bumps
