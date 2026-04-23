@@ -144,6 +144,18 @@ func (a *UsersAdapter) ResetPassword(ctx context.Context, id uuid.UUID, password
 	return a.repo.ResetPassword(ctx, id, passwordHash)
 }
 
+// ResetPasswordAndClearTemporaryPassword delegates to go-auth's transactional
+// reset primitive so permanent password changes cannot leave stale temporary
+// password metadata behind.
+func (a *UsersAdapter) ResetPasswordAndClearTemporaryPassword(ctx context.Context, id uuid.UUID, passwordHash string) error {
+	if resetRepo, ok := a.repo.(interface {
+		ResetPasswordAndClearTemporaryPassword(context.Context, uuid.UUID, string) error
+	}); ok {
+		return resetRepo.ResetPasswordAndClearTemporaryPassword(ctx, id, passwordHash)
+	}
+	return types.ErrTemporaryPasswordResetUnsupported
+}
+
 func toAuthUser(user *auth.User) *types.AuthUser {
 	if user == nil {
 		return nil
@@ -199,8 +211,27 @@ func mergeAuthUserUpdate(user *types.AuthUser, current *auth.User) *auth.User {
 	if current == nil {
 		return record
 	}
-	record.PasswordHash = current.PasswordHash
+	preserveAuthManagedFields(record, current)
 	return record
+}
+
+func preserveAuthManagedFields(record, current *auth.User) {
+	if record == nil || current == nil {
+		return
+	}
+	record.ExternalID = current.ExternalID
+	record.ExternalIDProvider = current.ExternalIDProvider
+	record.Phone = current.Phone
+	record.PasswordHash = current.PasswordHash
+	record.EmailValidated = current.EmailValidated
+	record.LoginAttempts = current.LoginAttempts
+	record.LoginAttemptAt = current.LoginAttemptAt
+	record.LoggedInAt = current.LoggedInAt
+	record.SuspendedAt = current.SuspendedAt
+	record.ResetedAt = current.ResetedAt
+	record.CreatedAt = current.CreatedAt
+	record.UpdatedAt = current.UpdatedAt
+	record.DeletedAt = current.DeletedAt
 }
 
 func (a *UsersAdapter) MarkTemporaryPassword(ctx context.Context, id uuid.UUID, issuedAt, expiresAt time.Time) error {
