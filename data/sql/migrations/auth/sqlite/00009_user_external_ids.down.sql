@@ -3,5 +3,5 @@
 
 DROP INDEX IF EXISTS users_external_id_unique;
 
-ALTER TABLE users DROP COLUMN IF EXISTS external_id_provider;
-ALTER TABLE users DROP COLUMN IF EXISTS external_id;
+ALTER TABLE users DROP COLUMN external_id_provider;
+ALTER TABLE users DROP COLUMN external_id;

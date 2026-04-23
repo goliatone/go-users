@@ -3,5 +3,5 @@
 -- Note: SQLite doesn't support DROP COLUMN before version 3.35.0
 -- For older SQLite versions, you would need to recreate the table.
 
-ALTER TABLE custom_roles DROP COLUMN IF EXISTS metadata;
-ALTER TABLE custom_roles DROP COLUMN IF EXISTS role_key;
+ALTER TABLE custom_roles DROP COLUMN metadata;
+ALTER TABLE custom_roles DROP COLUMN role_key;

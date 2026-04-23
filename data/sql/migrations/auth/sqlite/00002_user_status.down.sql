@@ -3,5 +3,5 @@
 -- Note: SQLite doesn't support DROP COLUMN before version 3.35.0
 -- For older SQLite versions, you would need to recreate the table
 
-ALTER TABLE users DROP COLUMN IF EXISTS suspended_at;
-ALTER TABLE users DROP COLUMN IF EXISTS status;
+ALTER TABLE users DROP COLUMN suspended_at;
+ALTER TABLE users DROP COLUMN status;
