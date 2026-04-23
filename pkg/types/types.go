@@ -589,6 +589,8 @@ var (
 	ErrServiceNotReady = errors.New("go-users: service not ready")
 	// ErrMissingAuthRepository occurs when no auth repository was supplied.
 	ErrMissingAuthRepository = errors.New("go-users: missing auth repository")
+	// ErrTemporaryPasswordResetUnsupported occurs when a repository cannot reset a password and clear temporary metadata atomically.
+	ErrTemporaryPasswordResetUnsupported = errors.New("go-users: temporary password reset cleanup unsupported")
 	// ErrMissingRoleRegistry occurs when no role registry was supplied.
 	ErrMissingRoleRegistry = errors.New("go-users: missing role registry")
 	// ErrMissingActivitySink occurs when no activity sink was supplied.
