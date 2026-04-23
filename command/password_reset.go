@@ -101,6 +101,11 @@ func (c *UserPasswordResetCommand) Execute(ctx context.Context, input UserPasswo
 	if err := c.repo.ResetPassword(ctx, input.UserID, input.NewPasswordHash); err != nil {
 		return err
 	}
+	if tempRepo, ok := c.repo.(types.TemporaryPasswordRepository); ok {
+		if err := tempRepo.ClearTemporaryPassword(ctx, input.UserID); err != nil {
+			return err
+		}
+	}
 
 	data := map[string]any{
 		"user_email": user.Email,
