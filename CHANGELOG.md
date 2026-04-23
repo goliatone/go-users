@@ -1,5 +1,26 @@
 # Changelog
 
+# [0.20.0](https://github.com/goliatone/go-users/compare/v0.19.0...v0.20.0) - (2026-04-23)
+
+## <!-- 1 -->🐛 Bug Fixes
+
+- Password reset ([675d02c](https://github.com/goliatone/go-users/commit/675d02cf812a67e013e97019030dc846da44b1a2))  - (goliatone)
+- Reset password ([796d52f](https://github.com/goliatone/go-users/commit/796d52fca7139d55a0c3e5369a4175fdeb7abdaf))  - (goliatone)
+- Merge fields; ([ef3a825](https://github.com/goliatone/go-users/commit/ef3a82510d55273f07aa1293233caee976585813))  - (goliatone)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.20.0 ([01739c0](https://github.com/goliatone/go-users/commit/01739c0f5d98bd2276e17be210b74a365828e9f8))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.19.0 ([119c3fc](https://github.com/goliatone/go-users/commit/119c3fcc01605a46cdc13aff96a9023f2e64c6ce))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update test ([a6119d8](https://github.com/goliatone/go-users/commit/a6119d8636fa7e1894084c5e08a733e2124f3969))  - (goliatone)
+- Update examples ([1755907](https://github.com/goliatone/go-users/commit/1755907b98edd1daa1e2f9ef6e8868073e9f5bc8))  - (goliatone)
+
 # [0.19.0](https://github.com/goliatone/go-users/compare/v0.18.0...v0.19.0) - (2026-04-23)
 
 ## <!-- 1 -->🐛 Bug Fixes
