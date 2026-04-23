@@ -606,7 +606,13 @@ func (a *authRepositoryAdapter) Create(ctx context.Context, input *types.AuthUse
 
 func (a *authRepositoryAdapter) Update(ctx context.Context, input *types.AuthUser) (*types.AuthUser, error) {
 	a.ensureScopeMetadata(input)
-	updated, err := a.repo.Users().Update(ctx, goauth.UserFromDomain(input))
+	record := goauth.UserFromDomain(input)
+	current, err := a.repo.Users().GetByID(ctx, input.ID.String())
+	if err != nil {
+		return nil, err
+	}
+	record.PasswordHash = current.PasswordHash
+	updated, err := a.repo.Users().Update(ctx, record)
 	if err != nil {
 		return nil, err
 	}
