@@ -736,6 +736,55 @@ func TestUserPasswordResetConfirmCommand_BlocksActiveClaimBeforePasswordReset(t 
 	require.Equal(t, "old-hash", repo.passwords[userID])
 }
 
+func TestUserPasswordResetConfirmCommand_TreatsFinalizeReadbackAsSuccess(t *testing.T) {
+	userID := uuid.New()
+	issuedAt := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
+	repo := newFakeAuthRepo()
+	repo.users[userID] = &types.AuthUser{
+		ID:    userID,
+		Email: "user@example.com",
+	}
+
+	resetRepo := newMemoryResetRepo()
+	resetRepo.finalizeErr = errors.New("finalize write uncertain")
+	_, err := resetRepo.CreateReset(context.Background(), types.PasswordResetRecord{
+		UserID:    userID,
+		Email:     "user@example.com",
+		Status:    types.PasswordResetStatusRequested,
+		JTI:       "reset-jti",
+		IssuedAt:  issuedAt,
+		ExpiresAt: issuedAt.Add(time.Hour),
+	})
+	require.NoError(t, err)
+
+	manager := &stubSecureLinkManager{
+		validatePayload: types.SecureLinkPayload{
+			"jti":        "reset-jti",
+			"user_id":    userID.String(),
+			"expires_at": issuedAt.Add(time.Hour).Format(time.RFC3339Nano),
+		},
+	}
+	resetCmd := NewUserPasswordResetCommand(PasswordResetCommandConfig{
+		Repository: repo,
+	})
+	confirmCmd := NewUserPasswordResetConfirmCommand(PasswordResetConfirmConfig{
+		ResetRepository: resetRepo,
+		SecureLinks:     manager,
+		ResetCommand:    resetCmd,
+		Clock:           fixedClock{t: issuedAt},
+	})
+
+	err = confirmCmd.Execute(context.Background(), UserPasswordResetConfirmInput{
+		Token:           "reset-token",
+		NewPasswordHash: "hashed-reset",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, types.PasswordResetStatusChanged, resetRepo.resets["reset-jti"].Status)
+	require.False(t, resetRepo.resets["reset-jti"].UsedAt.IsZero())
+	require.Equal(t, "hashed-reset", repo.passwords[userID])
+}
+
 func TestUserCreateCommand_DefaultsStatusAndLogsActivity(t *testing.T) {
 	repo := newFakeAuthRepo()
 	var recorded types.ActivityRecord
@@ -1356,7 +1405,10 @@ func tokenKey(tokenType types.UserTokenType, jti string) string {
 }
 
 type memoryResetRepo struct {
-	resets map[string]*types.PasswordResetRecord
+	resets      map[string]*types.PasswordResetRecord
+	claimErr    error
+	releaseErr  error
+	finalizeErr error
 }
 
 func newMemoryResetRepo() *memoryResetRepo {
@@ -1418,6 +1470,9 @@ func (m *memoryResetRepo) ClaimReset(_ context.Context, jti string, claimedAt ti
 	if !ok {
 		return repository.NewRecordNotFound()
 	}
+	if m.claimErr != nil {
+		return m.claimErr
+	}
 	if rec.Status == types.PasswordResetStatusChanged || !rec.UsedAt.IsZero() {
 		return repository.SQLExpectedCount(staticSQLResult(0), 1)
 	}
@@ -1436,6 +1491,9 @@ func (m *memoryResetRepo) ReleaseResetClaim(_ context.Context, jti string, claim
 	rec, ok := m.resets[jti]
 	if !ok {
 		return repository.NewRecordNotFound()
+	}
+	if m.releaseErr != nil {
+		return m.releaseErr
 	}
 	if rec.Status != types.PasswordResetStatusProcessing || !rec.UsedAt.IsZero() || !rec.UpdatedAt.Equal(claimedAt) {
 		return errors.New("claim not held")
@@ -1457,7 +1515,7 @@ func (m *memoryResetRepo) FinalizeReset(_ context.Context, jti string, claimedAt
 	rec.UsedAt = resetAt
 	rec.ResetAt = resetAt
 	rec.UpdatedAt = resetAt
-	return nil
+	return m.finalizeErr
 }
 
 type staticSQLResult int64
