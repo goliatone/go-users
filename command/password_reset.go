@@ -99,11 +99,18 @@ func (c *UserPasswordResetCommand) Execute(ctx context.Context, input UserPasswo
 	if err != nil {
 		return err
 	}
-	if err := c.repo.ResetPassword(ctx, input.UserID, input.NewPasswordHash); err != nil {
-		return err
-	}
-	if tempRepo, ok := c.repo.(types.TemporaryPasswordRepository); ok && !input.PreserveTemporaryPasswordMetadata {
-		if err := tempRepo.ClearTemporaryPassword(ctx, input.UserID); err != nil {
+	if input.PreserveTemporaryPasswordMetadata {
+		if err := c.repo.ResetPassword(ctx, input.UserID, input.NewPasswordHash); err != nil {
+			return err
+		}
+	} else if resetRepo, ok := c.repo.(types.TemporaryPasswordResetRepository); ok {
+		if err := resetRepo.ResetPasswordAndClearTemporaryPassword(ctx, input.UserID, input.NewPasswordHash); err != nil {
+			return err
+		}
+	} else if _, ok := c.repo.(types.TemporaryPasswordRepository); ok {
+		return types.ErrTemporaryPasswordResetUnsupported
+	} else {
+		if err := c.repo.ResetPassword(ctx, input.UserID, input.NewPasswordHash); err != nil {
 			return err
 		}
 	}
