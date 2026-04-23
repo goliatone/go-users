@@ -1,5 +1,41 @@
 # Changelog
 
+# [0.19.0](https://github.com/goliatone/go-users/compare/v0.18.0...v0.19.0) - (2026-04-23)
+
+## <!-- 1 -->🐛 Bug Fixes
+
+- Sqlite migrations syntax ([6e1dc80](https://github.com/goliatone/go-users/commit/6e1dc80382703b6c1b860626074d02dc52286c5a))  - (goliatone)
+- Remove hash ([36009f5](https://github.com/goliatone/go-users/commit/36009f5741e209ac2fb9e967f06f42045e02824d))  - (goliatone)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.19.0 ([c893f84](https://github.com/goliatone/go-users/commit/c893f84e57b66028ae9ef22f3080cb1321e07482))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- Linting setup ([c3cb854](https://github.com/goliatone/go-users/commit/c3cb854b3484070e48749259a51762ad453a1656))  - (goliatone)
+- Scope guard ([6819c8b](https://github.com/goliatone/go-users/commit/6819c8b223193ae4664c82fa80093f4475dfc377))  - (goliatone)
+- Bootstrap password service ([ceb6754](https://github.com/goliatone/go-users/commit/ceb6754be509900e075ce86b7792a3ef9d3819ea))  - (goliatone)
+- Temporary password methods ([84c0828](https://github.com/goliatone/go-users/commit/84c0828e8813db91663473d075c311a0d0416906))  - (goliatone)
+- Bootstrap password command ([4612dce](https://github.com/goliatone/go-users/commit/4612dce0bf900828ac250e1ad02b88a901160278))  - (goliatone)
+- Clean temporary password in reset cmd ([6cf93bb](https://github.com/goliatone/go-users/commit/6cf93bbc7c21e9cdacb723c488acfc584d57d07b))  - (goliatone)
+- Repository handle temp password ([34b34a5](https://github.com/goliatone/go-users/commit/34b34a5f439ffdefaac92b9f442ca6b953fab03e))  - (goliatone)
+- Temporary password ([87df7fb](https://github.com/goliatone/go-users/commit/87df7fbe2d0e8cbf98a386a55dcc824db8cfd2f5))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.18.0 ([3435574](https://github.com/goliatone/go-users/commit/343557436227f47941e7b7af52a733e3a12bbe83))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update tasks ([228df4e](https://github.com/goliatone/go-users/commit/228df4e02cd8caff822cbdffbea3a9549df95f18))  - (goliatone)
+- Code quality ([6849c49](https://github.com/goliatone/go-users/commit/6849c4925529d81b64281e97bfadbf3e0e30c123))  - (goliatone)
+- Linters to tasks ([2fcf5fe](https://github.com/goliatone/go-users/commit/2fcf5fe8a294ad4122dd235f290c758138696e83))  - (goliatone)
+- Update test ([e71af08](https://github.com/goliatone/go-users/commit/e71af084d0d8a7a673d850076b2f2c22694827f6))  - (goliatone)
+- Update examples ([d048c59](https://github.com/goliatone/go-users/commit/d048c5918ff4da851f8286ad0641d6bd7cd419ab))  - (goliatone)
+- Update deps ([a813e79](https://github.com/goliatone/go-users/commit/a813e794523dec12dd456d4ab887f5d088a71b3c))  - (goliatone)
+- Update readme ([9bf86c0](https://github.com/goliatone/go-users/commit/9bf86c0260e107e4b033c493f6351468bd99e121))  - (goliatone)
+
 # [0.18.0](https://github.com/goliatone/go-users/compare/v0.17.0...v0.18.0) - (2026-03-21)
 
 ## <!-- 13 -->📦 Bumps
