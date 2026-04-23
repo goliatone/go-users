@@ -86,28 +86,53 @@ func (c *PreferenceUpsertManyCommand) Execute(ctx context.Context, input Prefere
 	if err := input.Validate(); err != nil {
 		return err
 	}
-	level, err := normalizePreferenceLevel(input.Level)
+	bulk, records, err := c.preparePreferenceUpsertMany(ctx, input)
 	if err != nil {
 		return err
+	}
+	var results []types.PreferenceBulkUpsertResult
+	switch bulk.mode {
+	case types.PreferenceBulkModeTransactional:
+		results, err = c.executeTransactional(ctx, input, records)
+	case types.PreferenceBulkModeBestEffort:
+		results, err = c.executeBestEffortUpserts(ctx, input, records, bulk.scope)
+	}
+	if input.Results != nil {
+		*input.Results = append((*input.Results)[:0], results...)
+	}
+	return err
+}
+
+func (c *PreferenceUpsertManyCommand) preparePreferenceUpsertMany(ctx context.Context, input PreferenceUpsertManyInput) (preferenceBulkContext, []types.PreferenceRecord, error) {
+	level, err := normalizePreferenceLevel(input.Level)
+	if err != nil {
+		return preferenceBulkContext{}, nil, err
 	}
 	mode, err := normalizePreferenceBulkMode(input.Mode)
 	if err != nil {
-		return err
+		return preferenceBulkContext{}, nil, err
 	}
 	scope, err := c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionPreferencesWrite, input.UserID)
 	if err != nil {
-		return err
+		return preferenceBulkContext{}, nil, err
 	}
-
 	values, keys, err := normalizeBulkValues(input.Values)
 	if err != nil {
-		return err
+		return preferenceBulkContext{}, nil, err
 	}
+	records, err := buildPreferenceRecords(input, scope, level, values, keys)
+	if err != nil {
+		return preferenceBulkContext{}, nil, err
+	}
+	return preferenceBulkContext{level: level, mode: mode, scope: scope, keys: keys}, records, nil
+}
+
+func buildPreferenceRecords(input PreferenceUpsertManyInput, scope types.ScopeFilter, level types.PreferenceLevel, values map[string]any, keys []string) ([]types.PreferenceRecord, error) {
 	records := make([]types.PreferenceRecord, 0, len(keys))
 	for _, key := range keys {
-		payload, payloadErr := coercePreferencePayload(values[key])
-		if payloadErr != nil {
-			return payloadErr
+		payload, err := coercePreferencePayload(values[key])
+		if err != nil {
+			return nil, err
 		}
 		records = append(records, types.PreferenceRecord{
 			UserID:    input.UserID,
@@ -119,50 +144,32 @@ func (c *PreferenceUpsertManyCommand) Execute(ctx context.Context, input Prefere
 			CreatedBy: input.Actor.ID,
 		})
 	}
+	return records, nil
+}
 
+func (c *PreferenceUpsertManyCommand) executeBestEffortUpserts(ctx context.Context, input PreferenceUpsertManyInput, records []types.PreferenceRecord, scope types.ScopeFilter) ([]types.PreferenceBulkUpsertResult, error) {
 	results := make([]types.PreferenceBulkUpsertResult, 0, len(records))
-	switch mode {
-	case types.PreferenceBulkModeTransactional:
-		results, err = c.executeTransactional(ctx, input, records)
-		if err != nil {
-			if input.Results != nil {
-				*input.Results = append((*input.Results)[:0], results...)
-			}
-			return err
+	var errs []error
+	for _, record := range records {
+		saved, upsertErr := c.repo.UpsertPreference(ctx, record)
+		result := types.PreferenceBulkUpsertResult{Key: record.Key}
+		if upsertErr != nil {
+			result.Err = upsertErr
+			errs = append(errs, fmt.Errorf("preference %q: %w", record.Key, upsertErr))
+		} else {
+			result.Record = saved
+			emitPreferenceHook(ctx, c.hooks, types.PreferenceEvent{
+				UserID:     input.UserID,
+				Scope:      scope,
+				Key:        record.Key,
+				Action:     "preference.upsert",
+				ActorID:    input.Actor.ID,
+				OccurredAt: now(c.clock),
+			})
 		}
-	case types.PreferenceBulkModeBestEffort:
-		var errs []error
-		for _, record := range records {
-			saved, upsertErr := c.repo.UpsertPreference(ctx, record)
-			result := types.PreferenceBulkUpsertResult{Key: record.Key}
-			if upsertErr != nil {
-				result.Err = upsertErr
-				errs = append(errs, fmt.Errorf("preference %q: %w", record.Key, upsertErr))
-			} else {
-				result.Record = saved
-				emitPreferenceHook(ctx, c.hooks, types.PreferenceEvent{
-					UserID:     input.UserID,
-					Scope:      scope,
-					Key:        record.Key,
-					Action:     "preference.upsert",
-					ActorID:    input.Actor.ID,
-					OccurredAt: now(c.clock),
-				})
-			}
-			results = append(results, result)
-		}
-		if input.Results != nil {
-			*input.Results = append((*input.Results)[:0], results...)
-		}
-		if len(errs) > 0 {
-			return errors.Join(errs...)
-		}
+		results = append(results, result)
 	}
-
-	if input.Results != nil {
-		*input.Results = append((*input.Results)[:0], results...)
-	}
-	return nil
+	return results, errors.Join(errs...)
 }
 
 func (c *PreferenceUpsertManyCommand) executeTransactional(ctx context.Context, input PreferenceUpsertManyInput, records []types.PreferenceRecord) ([]types.PreferenceBulkUpsertResult, error) {
