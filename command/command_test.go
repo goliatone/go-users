@@ -224,10 +224,12 @@ func TestUserPasswordResetCommand_UsesAtomicTemporaryMetadataCleanup(t *testing.
 
 func TestUserPasswordResetCommand_DoesNotChangePasswordWhenAtomicCleanupFails(t *testing.T) {
 	userID := uuid.New()
+	issuedAt := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
 	repo := newFakeAuthRepo()
 	repo.users[userID] = &types.AuthUser{
-		ID:    userID,
-		Email: "user@example.com",
+		ID:       userID,
+		Email:    "user@example.com",
+		Metadata: types.MarkTemporaryPasswordMetadata(nil, issuedAt, issuedAt.Add(time.Hour)),
 	}
 	repo.passwords[userID] = "old-hash"
 	repo.resetAndClearErr = errors.New("atomic reset failed")
@@ -248,6 +250,34 @@ func TestUserPasswordResetCommand_DoesNotChangePasswordWhenAtomicCleanupFails(t 
 	require.True(t, repo.resetAndClearCalled)
 	require.Equal(t, uuid.Nil, repo.lastResetUserID)
 	require.Equal(t, "old-hash", repo.passwords[userID])
+}
+
+func TestUserPasswordResetCommand_AllowsNonTemporaryResetWithoutAtomicCleanup(t *testing.T) {
+	userID := uuid.New()
+	repo := newFakeAuthRepo()
+	repo.users[userID] = &types.AuthUser{
+		ID:    userID,
+		Email: "user@example.com",
+	}
+	repo.passwords[userID] = "old-hash"
+	repo.resetAndClearErr = errors.New("should not be used")
+
+	cmd := NewUserPasswordResetCommand(PasswordResetCommandConfig{
+		Repository: repo,
+	})
+
+	err := cmd.Execute(context.Background(), UserPasswordResetInput{
+		UserID:          userID,
+		NewPasswordHash: "new-hash",
+		Actor: types.ActorRef{
+			ID: uuid.New(),
+		},
+	})
+
+	require.NoError(t, err)
+	require.False(t, repo.resetAndClearCalled)
+	require.Equal(t, userID, repo.lastResetUserID)
+	require.Equal(t, "new-hash", repo.passwords[userID])
 }
 
 func TestUserInviteCommand_GeneratesTokenAndActivity(t *testing.T) {
