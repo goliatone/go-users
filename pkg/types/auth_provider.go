@@ -11,18 +11,17 @@ import (
 // Fields mirror the values go-users needs to orchestrate lifecycle, profile,
 // and preference flows without binding to go-auth structs.
 type AuthUser struct {
-	ID           uuid.UUID
-	Role         string
-	Status       LifecycleState
-	Email        string
-	Username     string
-	FirstName    string
-	LastName     string
-	PasswordHash string
-	Metadata     map[string]any
-	CreatedAt    *time.Time
-	UpdatedAt    *time.Time
-	Raw          any
+	ID        uuid.UUID
+	Role      string
+	Status    LifecycleState
+	Email     string
+	Username  string
+	FirstName string
+	LastName  string
+	Metadata  map[string]any
+	CreatedAt *time.Time
+	UpdatedAt *time.Time
+	Raw       any
 }
 
 // LifecycleTransition describes an allowed move between states.
