@@ -1,5 +1,30 @@
 # Changelog
 
+# [0.21.0](https://github.com/goliatone/go-users/compare/v0.20.0...v0.21.0) - (2026-04-23)
+
+## <!-- 1 -->🐛 Bug Fixes
+
+- Preserve temporary password meta ([06bd038](https://github.com/goliatone/go-users/commit/06bd038b1339a469a2e83e9f2b99590f8481a5d3))  - (goliatone)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.21.0 ([27c8fe7](https://github.com/goliatone/go-users/commit/27c8fe720af17348a4fa7a46ea231d5a45d46bde))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- New temp pwd reset error ([c9bf213](https://github.com/goliatone/go-users/commit/c9bf213aed68250b8ccc89af34744401f50caac1))  - (goliatone)
+- Reset password and clear temp data ([f4eda8f](https://github.com/goliatone/go-users/commit/f4eda8f137839390ace0c8b1ed749a8887ddd3aa))  - (goliatone)
+- Reset temporary password ([220cf41](https://github.com/goliatone/go-users/commit/220cf4117efcb0c87f9898bbb9ba541a1161f5c0))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.20.0 ([3b80f7d](https://github.com/goliatone/go-users/commit/3b80f7dcd4b35520ac1e3bbec781dbfb4fa50a91))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update test ([31d8c57](https://github.com/goliatone/go-users/commit/31d8c5743eea2f0685361e4741efb72db2f6bce3))  - (goliatone)
+- Update deps ([c0b0c24](https://github.com/goliatone/go-users/commit/c0b0c245fa36c45cb416cf8ecf1462e56411b40a))  - (goliatone)
+
 # [0.20.0](https://github.com/goliatone/go-users/compare/v0.19.0...v0.20.0) - (2026-04-23)
 
 ## <!-- 1 -->🐛 Bug Fixes
