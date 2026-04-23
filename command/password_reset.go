@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"maps"
 	"strings"
 	"time"
 
@@ -157,9 +158,7 @@ func cloneAuthUser(user *types.AuthUser) *types.AuthUser {
 	clone := *user
 	if len(user.Metadata) > 0 {
 		clone.Metadata = make(map[string]any, len(user.Metadata))
-		for key, value := range user.Metadata {
-			clone.Metadata[key] = value
-		}
+		maps.Copy(clone.Metadata, user.Metadata)
 	}
 	return &clone
 }
