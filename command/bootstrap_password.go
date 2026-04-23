@@ -141,20 +141,15 @@ func (c *UserBootstrapPasswordCommand) Execute(ctx context.Context, input UserBo
 		return nil
 	}
 
-	if resetErr := c.reset.Execute(ctx, UserPasswordResetInput{
-		UserID:          existing.ID,
-		NewPasswordHash: strings.TrimSpace(input.PasswordHash),
-		Actor:           input.Actor,
-		Scope:           input.Scope,
-	}); resetErr != nil {
-		return resetErr
-	}
 	refreshed, err := c.markTemporary(ctx, existing.ID, issuedAt, expiresAt)
 	if err != nil {
 		return err
 	}
 	if refreshed != nil {
 		existing = refreshed
+	}
+	if resetErr := c.resetTemporaryPassword(ctx, existing.ID, strings.TrimSpace(input.PasswordHash), input.Actor, input.Scope); resetErr != nil {
+		return resetErr
 	}
 	setBootstrapResult(input.Result, existing, false, expiresAt)
 	return nil
@@ -172,22 +167,27 @@ func (c *UserBootstrapPasswordCommand) createBootstrapUser(ctx context.Context, 
 	}); err != nil {
 		return nil, err
 	}
-	if err := c.reset.Execute(ctx, UserPasswordResetInput{
-		UserID:          result.ID,
-		NewPasswordHash: strings.TrimSpace(input.PasswordHash),
-		Actor:           input.Actor,
-		Scope:           input.Scope,
-	}); err != nil {
-		return nil, err
-	}
 	refreshed, err := c.markTemporary(ctx, result.ID, issuedAt, expiresAt)
 	if err != nil {
+		return nil, err
+	}
+	if err := c.resetTemporaryPassword(ctx, result.ID, strings.TrimSpace(input.PasswordHash), input.Actor, input.Scope); err != nil {
 		return nil, err
 	}
 	if refreshed != nil {
 		return refreshed, nil
 	}
 	return result, nil
+}
+
+func (c *UserBootstrapPasswordCommand) resetTemporaryPassword(ctx context.Context, id uuid.UUID, passwordHash string, actor types.ActorRef, filter types.ScopeFilter) error {
+	return c.reset.Execute(ctx, UserPasswordResetInput{
+		UserID:                            id,
+		NewPasswordHash:                   passwordHash,
+		Actor:                             actor,
+		Scope:                             filter,
+		PreserveTemporaryPasswordMetadata: true,
+	})
 }
 
 func (c *UserBootstrapPasswordCommand) markTemporary(ctx context.Context, id uuid.UUID, issuedAt, expiresAt time.Time) (*types.AuthUser, error) {
