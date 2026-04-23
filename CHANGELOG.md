@@ -1,5 +1,24 @@
 # Changelog
 
+# [0.22.0](https://github.com/goliatone/go-users/compare/v0.21.0...v0.22.0) - (2026-04-23)
+
+## <!-- 1 -->🐛 Bug Fixes
+
+- Check for temporary password meta in reset ([2cfe63a](https://github.com/goliatone/go-users/commit/2cfe63a033fb9f1bc29f13080d98eaee8324b9cc))  - (goliatone)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.22.0 ([8147191](https://github.com/goliatone/go-users/commit/814719193a4536b41f273e0edc2bc53fc25bcbd3))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.21.0 ([6661bb8](https://github.com/goliatone/go-users/commit/6661bb80b885bd4c0ea322b135d0641a985a6856))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update readme ([a0969e7](https://github.com/goliatone/go-users/commit/a0969e7ec1c03b345ff6c37d9c8c35cab5cf9f28))  - (goliatone)
+- Update test ([e0e1aef](https://github.com/goliatone/go-users/commit/e0e1aeff15b3d264d9e8addfc8ab040bb75caabe))  - (goliatone)
+
 # [0.21.0](https://github.com/goliatone/go-users/compare/v0.20.0...v0.21.0) - (2026-04-23)
 
 ## <!-- 1 -->🐛 Bug Fixes
