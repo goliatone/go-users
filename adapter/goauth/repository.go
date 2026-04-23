@@ -76,9 +76,14 @@ func (a *UsersAdapter) Create(ctx context.Context, input *types.AuthUser) (*type
 	return toAuthUser(created), nil
 }
 
-// Update delegates to go-auth's repository.
+// Update delegates to go-auth's repository while preserving auth-managed fields
+// that are intentionally absent from types.AuthUser.
 func (a *UsersAdapter) Update(ctx context.Context, input *types.AuthUser) (*types.AuthUser, error) {
-	record := fromAuthUser(input)
+	current, err := a.repo.GetByID(ctx, input.ID.String())
+	if err != nil {
+		return nil, err
+	}
+	record := mergeAuthUserUpdate(input, current)
 	updated, err := a.repo.Update(ctx, record)
 	if err != nil {
 		return nil, err
@@ -184,6 +189,18 @@ func fromAuthUser(user *types.AuthUser) *auth.User {
 		LastName:  user.LastName,
 		Metadata:  copyMetadata(user.Metadata),
 	}
+}
+
+func mergeAuthUserUpdate(user *types.AuthUser, current *auth.User) *auth.User {
+	record := fromAuthUser(user)
+	if record == nil {
+		return nil
+	}
+	if current == nil {
+		return record
+	}
+	record.PasswordHash = current.PasswordHash
+	return record
 }
 
 func (a *UsersAdapter) MarkTemporaryPassword(ctx context.Context, id uuid.UUID, issuedAt, expiresAt time.Time) error {
