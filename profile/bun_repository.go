@@ -3,6 +3,7 @@ package profile
 import (
 	"context"
 	"errors"
+	"maps"
 
 	repository "github.com/goliatone/go-repository-bun"
 	"github.com/goliatone/go-users/pkg/types"
@@ -212,8 +213,6 @@ func cloneMap(origin map[string]any) map[string]any {
 		return nil
 	}
 	out := make(map[string]any, len(origin))
-	for k, v := range origin {
-		out[k] = v
-	}
+	maps.Copy(out, origin)
 	return out
 }

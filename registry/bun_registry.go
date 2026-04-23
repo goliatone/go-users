@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"errors"
+	"maps"
 	"strings"
 
 	repository "github.com/goliatone/go-repository-bun"
@@ -432,9 +433,7 @@ func copyMetadata(values map[string]any) map[string]any {
 		return map[string]any{}
 	}
 	out := make(map[string]any, len(values))
-	for key, value := range values {
-		out[key] = value
-	}
+	maps.Copy(out, values)
 	return out
 }
 

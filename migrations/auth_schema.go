@@ -96,16 +96,10 @@ func ValidateAuthSchema(ctx context.Context, db *sql.DB, dialect string, opts ..
 	if db == nil {
 		return errors.New("migrations: db required")
 	}
-	normalized := strings.ToLower(strings.TrimSpace(dialect))
-	switch normalized {
-	case "postgres", "postgresql":
-		normalized = "postgres"
-	case "sqlite", "sqlite3":
-		normalized = "sqlite"
-	default:
-		return fmt.Errorf("migrations: unsupported dialect %q", dialect)
+	normalized, err := normalizeAuthSchemaDialect(dialect)
+	if err != nil {
+		return err
 	}
-
 	cfg := authSchemaConfig{
 		checks: DefaultAuthSchemaChecks,
 	}
@@ -118,31 +112,10 @@ func ValidateAuthSchema(ctx context.Context, db *sql.DB, dialect string, opts ..
 		return nil
 	}
 
-	missingTables := make([]string, 0)
-	missingColumns := make(map[string][]string)
-	for _, check := range cfg.checks {
-		if strings.TrimSpace(check.Table) == "" {
-			continue
-		}
-		cols, err := fetchColumns(ctx, db, normalized, check.Table)
-		if err != nil {
-			return err
-		}
-		if len(cols) == 0 {
-			missingTables = append(missingTables, check.Table)
-			continue
-		}
-		for _, col := range check.Columns {
-			normalizedCol := strings.ToLower(strings.TrimSpace(col))
-			if normalizedCol == "" {
-				continue
-			}
-			if !cols[normalizedCol] {
-				missingColumns[check.Table] = append(missingColumns[check.Table], normalizedCol)
-			}
-		}
+	missingTables, missingColumns, err := collectAuthSchemaMissing(ctx, db, normalized, cfg.checks)
+	if err != nil {
+		return err
 	}
-
 	if len(missingTables) == 0 && len(missingColumns) == 0 {
 		return nil
 	}
@@ -150,6 +123,46 @@ func ValidateAuthSchema(ctx context.Context, db *sql.DB, dialect string, opts ..
 	return &AuthSchemaValidationError{
 		MissingTables:  missingTables,
 		MissingColumns: missingColumns,
+	}
+}
+
+func normalizeAuthSchemaDialect(dialect string) (string, error) {
+	switch normalized := strings.ToLower(strings.TrimSpace(dialect)); normalized {
+	case "postgres", "postgresql":
+		return "postgres", nil
+	case "sqlite", "sqlite3":
+		return "sqlite", nil
+	default:
+		return "", fmt.Errorf("migrations: unsupported dialect %q", dialect)
+	}
+}
+
+func collectAuthSchemaMissing(ctx context.Context, db *sql.DB, dialect string, checks []AuthSchemaCheck) ([]string, map[string][]string, error) {
+	missingTables := make([]string, 0)
+	missingColumns := make(map[string][]string)
+	for _, check := range checks {
+		if strings.TrimSpace(check.Table) == "" {
+			continue
+		}
+		cols, err := fetchColumns(ctx, db, dialect, check.Table)
+		if err != nil {
+			return nil, nil, err
+		}
+		if len(cols) == 0 {
+			missingTables = append(missingTables, check.Table)
+			continue
+		}
+		appendMissingColumns(missingColumns, check, cols)
+	}
+	return missingTables, missingColumns, nil
+}
+
+func appendMissingColumns(missing map[string][]string, check AuthSchemaCheck, cols map[string]bool) {
+	for _, col := range check.Columns {
+		normalizedCol := strings.ToLower(strings.TrimSpace(col))
+		if normalizedCol != "" && !cols[normalizedCol] {
+			missing[check.Table] = append(missing[check.Table], normalizedCol)
+		}
 	}
 }
 
