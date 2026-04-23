@@ -423,10 +423,7 @@ func normalizeMemoryPagination(pagination types.Pagination, total int) (int, int
 	if limit > 200 {
 		limit = 200
 	}
-	offset := max(pagination.Offset, 0)
-	if offset > total {
-		offset = total
-	}
+	offset := min(max(pagination.Offset, 0), total)
 	return limit, offset
 }
 
