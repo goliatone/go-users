@@ -7,6 +7,7 @@ import (
 	auth "github.com/goliatone/go-auth"
 	"github.com/goliatone/go-users/pkg/types"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 )
 
 func TestToAuthUser(t *testing.T) {
@@ -25,21 +26,12 @@ func TestToAuthUser(t *testing.T) {
 	}
 
 	result := toAuthUser(user)
-	if result == nil {
-		t.Fatalf("expected user to be converted")
-	}
-	if result.Email != user.Email || result.Username != user.Username {
-		t.Fatalf("expected email/username to be copied")
-	}
-	if result.Status != types.LifecycleState(user.Status) {
-		t.Fatalf("expected status to match")
-	}
-	if result.Metadata["foo"] != "bar" {
-		t.Fatalf("expected metadata to be copied")
-	}
-	if result.Raw != user {
-		t.Fatalf("expected raw pointer to be preserved")
-	}
+	require.NotNil(t, result)
+	require.Equal(t, user.Email, result.Email)
+	require.Equal(t, user.Username, result.Username)
+	require.Equal(t, types.LifecycleState(user.Status), result.Status)
+	require.Equal(t, "bar", result.Metadata["foo"])
+	require.Same(t, user, result.Raw)
 }
 
 func TestBuildGoAuthOptions(t *testing.T) {
@@ -50,7 +42,31 @@ func TestBuildGoAuthOptions(t *testing.T) {
 		},
 		Force: true,
 	})
-	if len(opts) != 3 {
-		t.Fatalf("expected 3 transition options, got %d", len(opts))
+	require.Len(t, opts, 3)
+}
+
+func TestMergeAuthUserUpdatePreservesCurrentPasswordHash(t *testing.T) {
+	userID := uuid.New()
+	current := &auth.User{
+		ID:           userID,
+		Email:        "before@example.com",
+		PasswordHash: "existing-hash",
 	}
+	input := &types.AuthUser{
+		ID:       userID,
+		Email:    "after@example.com",
+		Username: "after",
+		Raw: &auth.User{
+			ID:           userID,
+			Email:        "after@example.com",
+			PasswordHash: "",
+		},
+	}
+
+	record := mergeAuthUserUpdate(input, current)
+
+	require.NotNil(t, record)
+	require.Equal(t, "after@example.com", record.Email)
+	require.Equal(t, "after", record.Username)
+	require.Equal(t, "existing-hash", record.PasswordHash)
 }
