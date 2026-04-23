@@ -99,20 +99,21 @@ func (c *UserPasswordResetCommand) Execute(ctx context.Context, input UserPasswo
 	if err != nil {
 		return err
 	}
+	needsTemporaryCleanup := types.HasTemporaryPasswordMetadata(user.Metadata)
 	if input.PreserveTemporaryPasswordMetadata {
 		if err := c.repo.ResetPassword(ctx, input.UserID, input.NewPasswordHash); err != nil {
 			return err
 		}
-	} else if resetRepo, ok := c.repo.(types.TemporaryPasswordResetRepository); ok {
+	} else if needsTemporaryCleanup {
+		resetRepo, ok := c.repo.(types.TemporaryPasswordResetRepository)
+		if !ok {
+			return types.ErrTemporaryPasswordResetUnsupported
+		}
 		if err := resetRepo.ResetPasswordAndClearTemporaryPassword(ctx, input.UserID, input.NewPasswordHash); err != nil {
 			return err
 		}
-	} else if _, ok := c.repo.(types.TemporaryPasswordRepository); ok {
-		return types.ErrTemporaryPasswordResetUnsupported
-	} else {
-		if err := c.repo.ResetPassword(ctx, input.UserID, input.NewPasswordHash); err != nil {
-			return err
-		}
+	} else if err := c.repo.ResetPassword(ctx, input.UserID, input.NewPasswordHash); err != nil {
+		return err
 	}
 
 	data := map[string]any{
