@@ -175,6 +175,7 @@ func TestUserPasswordResetCommand_ClearsTemporaryMetadataByDefault(t *testing.T)
 	cmd := NewUserPasswordResetCommand(PasswordResetCommandConfig{
 		Repository: repo,
 	})
+	result := &UserPasswordResetResult{}
 
 	err := cmd.Execute(context.Background(), UserPasswordResetInput{
 		UserID:          userID,
@@ -182,12 +183,17 @@ func TestUserPasswordResetCommand_ClearsTemporaryMetadataByDefault(t *testing.T)
 		Actor: types.ActorRef{
 			ID: uuid.New(),
 		},
+		Result: result,
 	})
 
 	require.NoError(t, err)
 	require.NotContains(t, repo.users[userID].Metadata, types.TemporaryPasswordMetadataKey)
 	require.NotContains(t, repo.users[userID].Metadata, types.PasswordChangeRequiredMetadataKey)
 	require.Equal(t, "value", repo.users[userID].Metadata["keep"])
+	require.NotNil(t, result.User)
+	require.NotContains(t, result.User.Metadata, types.TemporaryPasswordMetadataKey)
+	require.NotContains(t, result.User.Metadata, types.PasswordChangeRequiredMetadataKey)
+	require.Equal(t, "value", result.User.Metadata["keep"])
 }
 
 func TestUserPasswordResetCommand_UsesAtomicTemporaryMetadataCleanup(t *testing.T) {
@@ -585,14 +591,88 @@ func TestUserPasswordResetConfirmCommand_ConsumesToken(t *testing.T) {
 		ResetCommand:    resetCmd,
 		Clock:           fixedClock{t: issuedAt},
 	})
+	result := &UserPasswordResetConfirmResult{}
+
+	err = confirmCmd.Execute(context.Background(), UserPasswordResetConfirmInput{
+		Token:           "reset-token",
+		NewPasswordHash: "hashed-reset",
+		Result:          result,
+	})
+	require.NoError(t, err)
+	require.Equal(t, types.PasswordResetStatusChanged, resetRepo.resets["reset-jti"].Status)
+	require.Equal(t, userID, repo.lastResetUserID)
+	require.NotNil(t, result.User)
+	require.Equal(t, userID, result.User.ID)
+}
+
+func TestUserPasswordResetConfirmCommand_DoesNotConsumeTokenWhenResetFails(t *testing.T) {
+	userID := uuid.New()
+	issuedAt := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
+	repo := newFakeAuthRepo()
+	repo.users[userID] = &types.AuthUser{
+		ID:    userID,
+		Email: "user@example.com",
+		Metadata: types.MarkTemporaryPasswordMetadata(map[string]any{
+			"keep": "value",
+		}, issuedAt, issuedAt.Add(time.Hour)),
+	}
+	repo.passwords[userID] = "old-hash"
+	repo.resetAndClearErr = errors.New("atomic reset failed")
+
+	resetRepo := newMemoryResetRepo()
+	_, err := resetRepo.CreateReset(context.Background(), types.PasswordResetRecord{
+		UserID:    userID,
+		Email:     "user@example.com",
+		Status:    types.PasswordResetStatusRequested,
+		JTI:       "reset-jti",
+		IssuedAt:  issuedAt,
+		ExpiresAt: issuedAt.Add(time.Hour),
+	})
+	require.NoError(t, err)
+
+	manager := &stubSecureLinkManager{
+		validatePayload: types.SecureLinkPayload{
+			"jti":        "reset-jti",
+			"user_id":    userID.String(),
+			"expires_at": issuedAt.Add(time.Hour).Format(time.RFC3339Nano),
+		},
+	}
+	resetCmd := NewUserPasswordResetCommand(PasswordResetCommandConfig{
+		Repository: repo,
+	})
+	confirmCmd := NewUserPasswordResetConfirmCommand(PasswordResetConfirmConfig{
+		ResetRepository: resetRepo,
+		SecureLinks:     manager,
+		ResetCommand:    resetCmd,
+		Clock:           fixedClock{t: issuedAt},
+	})
 
 	err = confirmCmd.Execute(context.Background(), UserPasswordResetConfirmInput{
 		Token:           "reset-token",
 		NewPasswordHash: "hashed-reset",
 	})
+
+	require.EqualError(t, err, "atomic reset failed")
+	require.Equal(t, types.PasswordResetStatusRequested, resetRepo.resets["reset-jti"].Status)
+	require.True(t, resetRepo.resets["reset-jti"].UsedAt.IsZero())
+	require.Equal(t, "old-hash", repo.passwords[userID])
+
+	repo.resetAndClearErr = nil
+	result := &UserPasswordResetConfirmResult{}
+	err = confirmCmd.Execute(context.Background(), UserPasswordResetConfirmInput{
+		Token:           "reset-token",
+		NewPasswordHash: "hashed-reset",
+		Result:          result,
+	})
+
 	require.NoError(t, err)
 	require.Equal(t, types.PasswordResetStatusChanged, resetRepo.resets["reset-jti"].Status)
-	require.Equal(t, userID, repo.lastResetUserID)
+	require.False(t, resetRepo.resets["reset-jti"].UsedAt.IsZero())
+	require.Equal(t, "hashed-reset", repo.passwords[userID])
+	require.NotNil(t, result.User)
+	require.NotContains(t, result.User.Metadata, types.TemporaryPasswordMetadataKey)
+	require.NotContains(t, result.User.Metadata, types.PasswordChangeRequiredMetadataKey)
+	require.Equal(t, "value", result.User.Metadata["keep"])
 }
 
 func TestUserCreateCommand_DefaultsStatusAndLogsActivity(t *testing.T) {

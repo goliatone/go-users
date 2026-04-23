@@ -100,20 +100,12 @@ func (c *UserPasswordResetCommand) Execute(ctx context.Context, input UserPasswo
 		return err
 	}
 	needsTemporaryCleanup := types.HasTemporaryPasswordMetadata(user.Metadata)
-	if input.PreserveTemporaryPasswordMetadata {
-		if err := c.repo.ResetPassword(ctx, input.UserID, input.NewPasswordHash); err != nil {
-			return err
-		}
-	} else if needsTemporaryCleanup {
-		resetRepo, ok := c.repo.(types.TemporaryPasswordResetRepository)
-		if !ok {
-			return types.ErrTemporaryPasswordResetUnsupported
-		}
-		if err := resetRepo.ResetPasswordAndClearTemporaryPassword(ctx, input.UserID, input.NewPasswordHash); err != nil {
-			return err
-		}
-	} else if err := c.repo.ResetPassword(ctx, input.UserID, input.NewPasswordHash); err != nil {
+	resultUser := cloneAuthUser(user)
+	if err := c.resetPassword(ctx, input, needsTemporaryCleanup); err != nil {
 		return err
+	}
+	if !input.PreserveTemporaryPasswordMetadata && needsTemporaryCleanup {
+		resultUser.Metadata = types.ClearTemporaryPasswordMetadata(resultUser.Metadata)
 	}
 
 	data := map[string]any{
@@ -141,7 +133,33 @@ func (c *UserPasswordResetCommand) Execute(ctx context.Context, input UserPasswo
 	logActivity(ctx, c.sink, record)
 	emitActivityHook(ctx, c.hooks, record)
 	if input.Result != nil {
-		input.Result.User = user
+		input.Result.User = resultUser
 	}
 	return nil
+}
+
+func (c *UserPasswordResetCommand) resetPassword(ctx context.Context, input UserPasswordResetInput, needsTemporaryCleanup bool) error {
+	if input.PreserveTemporaryPasswordMetadata || !needsTemporaryCleanup {
+		return c.repo.ResetPassword(ctx, input.UserID, input.NewPasswordHash)
+	}
+
+	resetRepo, ok := c.repo.(types.TemporaryPasswordResetRepository)
+	if !ok {
+		return types.ErrTemporaryPasswordResetUnsupported
+	}
+	return resetRepo.ResetPasswordAndClearTemporaryPassword(ctx, input.UserID, input.NewPasswordHash)
+}
+
+func cloneAuthUser(user *types.AuthUser) *types.AuthUser {
+	if user == nil {
+		return nil
+	}
+	clone := *user
+	if len(user.Metadata) > 0 {
+		clone.Metadata = make(map[string]any, len(user.Metadata))
+		for key, value := range user.Metadata {
+			clone.Metadata[key] = value
+		}
+	}
+	return &clone
 }

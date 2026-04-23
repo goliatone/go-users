@@ -76,7 +76,7 @@ func NewUserPasswordResetConfirmCommand(cfg PasswordResetConfirmConfig) *UserPas
 
 var _ gocommand.Commander[UserPasswordResetConfirmInput] = (*UserPasswordResetConfirmCommand)(nil)
 
-// Execute validates the securelink token, consumes it, and applies the reset.
+// Execute validates the securelink token, applies the reset, and then consumes it.
 func (c *UserPasswordResetConfirmCommand) Execute(ctx context.Context, input UserPasswordResetConfirmInput) error {
 	if c.manager == nil {
 		return types.ErrMissingSecureLinkManager
@@ -99,11 +99,6 @@ func (c *UserPasswordResetConfirmCommand) Execute(ctx context.Context, input Use
 		return err
 	}
 
-	consumedAt := now(c.clock)
-	if err := c.resets.ConsumeReset(ctx, jti, consumedAt); err != nil {
-		return c.passwordResetConsumeError(ctx, jti, consumedAt, err)
-	}
-
 	resetScope := scopeFromPayload(payload)
 	if resetScope.TenantID == uuid.Nil && resetScope.OrgID == uuid.Nil {
 		resetScope = input.Scope
@@ -122,6 +117,9 @@ func (c *UserPasswordResetConfirmCommand) Execute(ctx context.Context, input Use
 	}
 
 	usedAt := now(c.clock)
+	if err := c.resets.ConsumeReset(ctx, jti, usedAt); err != nil {
+		return c.passwordResetConsumeError(ctx, jti, usedAt, err)
+	}
 	if err := c.resets.UpdateResetStatus(ctx, jti, types.PasswordResetStatusChanged, usedAt); err != nil {
 		return err
 	}
