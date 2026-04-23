@@ -61,6 +61,8 @@ var (
 	ErrTokenExpired = errors.New("go-users: token expired")
 	// ErrTokenAlreadyUsed indicates the token has already been consumed.
 	ErrTokenAlreadyUsed = errors.New("go-users: token already used")
+	// ErrTokenInProgress indicates another reset confirmation currently owns the token claim.
+	ErrTokenInProgress = errors.New("go-users: token reset already in progress")
 	// ErrTokenUserMismatch indicates the token user id mismatch.
 	ErrTokenUserMismatch = errors.New("go-users: token user mismatch")
 	// ErrResetIdentifierRequired indicates a reset identifier was missing.
