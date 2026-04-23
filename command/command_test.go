@@ -8,6 +8,7 @@ import (
 	"time"
 
 	featuregate "github.com/goliatone/go-featuregate/gate"
+	repository "github.com/goliatone/go-repository-bun"
 	"github.com/goliatone/go-users/pkg/types"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -500,7 +501,8 @@ func TestUserBootstrapPasswordCommand_CreatesTemporaryUser(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, result.Created)
 	require.Equal(t, fixed.Add(DefaultTemporaryPasswordTTL), result.ExpiresAt)
-	require.Equal(t, "hashed-temp", result.User.PasswordHash)
+	require.Equal(t, result.User.ID, repo.lastResetUserID)
+	require.Equal(t, "hashed-temp", repo.lastResetHash)
 	require.Equal(t, true, result.User.Metadata[types.TemporaryPasswordMetadataKey])
 	require.Equal(t, true, result.User.Metadata[types.PasswordChangeRequiredMetadataKey])
 	require.Equal(t, fixed.Format(time.RFC3339Nano), result.User.Metadata[types.TemporaryPasswordIssuedAtMetadataKey])
@@ -511,11 +513,10 @@ func TestUserBootstrapPasswordCommand_RefreshesExistingTemporaryUser(t *testing.
 	userID := uuid.New()
 	repo := newFakeAuthRepo()
 	repo.users[userID] = &types.AuthUser{
-		ID:           userID,
-		Email:        "bootstrap@example.com",
-		Username:     "bootstrap",
-		Role:         "admin",
-		PasswordHash: "old-hash",
+		ID:       userID,
+		Email:    "bootstrap@example.com",
+		Username: "bootstrap",
+		Role:     "admin",
 		Metadata: map[string]any{
 			"keep": "value",
 		},
@@ -544,7 +545,6 @@ func TestUserBootstrapPasswordCommand_RefreshesExistingTemporaryUser(t *testing.
 	require.False(t, result.Created)
 	require.Equal(t, userID, repo.lastResetUserID)
 	require.Equal(t, "new-hash", repo.lastResetHash)
-	require.Equal(t, "new-hash", result.User.PasswordHash)
 	require.Equal(t, "value", result.User.Metadata["keep"])
 	require.Equal(t, true, result.User.Metadata[types.TemporaryPasswordMetadataKey])
 	require.Equal(t, fixed.Add(2*time.Hour), result.ExpiresAt)
@@ -737,6 +737,7 @@ func TestPreferenceCommands_LogEvents(t *testing.T) {
 
 type fakeAuthRepo struct {
 	users                  map[uuid.UUID]*types.AuthUser
+	passwords              map[uuid.UUID]string
 	transitionCalled       bool
 	lastTransitionReason   string
 	lastTransitionMetadata map[string]any
@@ -748,14 +749,15 @@ type fakeAuthRepo struct {
 
 func newFakeAuthRepo() *fakeAuthRepo {
 	return &fakeAuthRepo{
-		users: make(map[uuid.UUID]*types.AuthUser),
+		users:     make(map[uuid.UUID]*types.AuthUser),
+		passwords: make(map[uuid.UUID]string),
 	}
 }
 
 func (f *fakeAuthRepo) GetByID(_ context.Context, id uuid.UUID) (*types.AuthUser, error) {
 	user, ok := f.users[id]
 	if !ok {
-		return nil, errors.New("not found")
+		return nil, repository.NewRecordNotFound()
 	}
 	return user, nil
 }
@@ -763,7 +765,7 @@ func (f *fakeAuthRepo) GetByID(_ context.Context, id uuid.UUID) (*types.AuthUser
 func (f *fakeAuthRepo) GetByIdentifier(_ context.Context, identifier string) (*types.AuthUser, error) {
 	needle := strings.TrimSpace(identifier)
 	if needle == "" {
-		return nil, errors.New("not found")
+		return nil, repository.NewRecordNotFound()
 	}
 	for _, user := range f.users {
 		if strings.EqualFold(strings.TrimSpace(user.Email), needle) ||
@@ -771,7 +773,7 @@ func (f *fakeAuthRepo) GetByIdentifier(_ context.Context, identifier string) (*t
 			return user, nil
 		}
 	}
-	return nil, errors.New("not found")
+	return nil, repository.NewRecordNotFound()
 }
 
 func (f *fakeAuthRepo) Create(_ context.Context, input *types.AuthUser) (*types.AuthUser, error) {
@@ -811,18 +813,17 @@ func (f *fakeAuthRepo) AllowedTransitions(context.Context, uuid.UUID) ([]types.L
 func (f *fakeAuthRepo) ResetPassword(_ context.Context, id uuid.UUID, hash string) error {
 	f.lastResetUserID = id
 	f.lastResetHash = hash
-	user, ok := f.users[id]
-	if !ok {
-		return errors.New("not found")
+	if _, ok := f.users[id]; !ok {
+		return repository.NewRecordNotFound()
 	}
-	user.PasswordHash = hash
+	f.passwords[id] = hash
 	return nil
 }
 
 func (f *fakeAuthRepo) MarkTemporaryPassword(_ context.Context, id uuid.UUID, issuedAt, expiresAt time.Time) error {
 	user, ok := f.users[id]
 	if !ok {
-		return errors.New("not found")
+		return repository.NewRecordNotFound()
 	}
 	user.Metadata = types.MarkTemporaryPasswordMetadata(user.Metadata, issuedAt, expiresAt)
 	return nil
@@ -831,7 +832,7 @@ func (f *fakeAuthRepo) MarkTemporaryPassword(_ context.Context, id uuid.UUID, is
 func (f *fakeAuthRepo) ClearTemporaryPassword(_ context.Context, id uuid.UUID) error {
 	user, ok := f.users[id]
 	if !ok {
-		return errors.New("not found")
+		return repository.NewRecordNotFound()
 	}
 	user.Metadata = types.ClearTemporaryPasswordMetadata(user.Metadata)
 	return nil
