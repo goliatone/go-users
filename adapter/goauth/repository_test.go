@@ -45,12 +45,21 @@ func TestBuildGoAuthOptions(t *testing.T) {
 	require.Len(t, opts, 3)
 }
 
-func TestMergeAuthUserUpdatePreservesCurrentPasswordHash(t *testing.T) {
+func TestMergeAuthUserUpdatePreservesAuthManagedFields(t *testing.T) {
 	userID := uuid.New()
+	now := time.Now()
 	current := &auth.User{
-		ID:           userID,
-		Email:        "before@example.com",
-		PasswordHash: "existing-hash",
+		ID:                 userID,
+		Email:              "before@example.com",
+		ExternalID:         "external-1",
+		ExternalIDProvider: "auth0",
+		Phone:              "+15551234567",
+		PasswordHash:       "existing-hash",
+		EmailValidated:     true,
+		LoginAttempts:      2,
+		LoginAttemptAt:     &now,
+		LoggedInAt:         &now,
+		ResetedAt:          &now,
 	}
 	input := &types.AuthUser{
 		ID:       userID,
@@ -68,5 +77,13 @@ func TestMergeAuthUserUpdatePreservesCurrentPasswordHash(t *testing.T) {
 	require.NotNil(t, record)
 	require.Equal(t, "after@example.com", record.Email)
 	require.Equal(t, "after", record.Username)
+	require.Equal(t, "external-1", record.ExternalID)
+	require.Equal(t, "auth0", record.ExternalIDProvider)
+	require.Equal(t, "+15551234567", record.Phone)
 	require.Equal(t, "existing-hash", record.PasswordHash)
+	require.True(t, record.EmailValidated)
+	require.Equal(t, 2, record.LoginAttempts)
+	require.Same(t, current.LoginAttemptAt, record.LoginAttemptAt)
+	require.Same(t, current.LoggedInAt, record.LoggedInAt)
+	require.Same(t, current.ResetedAt, record.ResetedAt)
 }

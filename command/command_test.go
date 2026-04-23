@@ -190,6 +190,66 @@ func TestUserPasswordResetCommand_ClearsTemporaryMetadataByDefault(t *testing.T)
 	require.Equal(t, "value", repo.users[userID].Metadata["keep"])
 }
 
+func TestUserPasswordResetCommand_UsesAtomicTemporaryMetadataCleanup(t *testing.T) {
+	userID := uuid.New()
+	issuedAt := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
+	repo := newFakeAuthRepo()
+	repo.users[userID] = &types.AuthUser{
+		ID:    userID,
+		Email: "user@example.com",
+		Metadata: types.MarkTemporaryPasswordMetadata(map[string]any{
+			"keep": "value",
+		}, issuedAt, issuedAt.Add(time.Hour)),
+	}
+	repo.passwords[userID] = "old-hash"
+
+	cmd := NewUserPasswordResetCommand(PasswordResetCommandConfig{
+		Repository: repo,
+	})
+
+	err := cmd.Execute(context.Background(), UserPasswordResetInput{
+		UserID:          userID,
+		NewPasswordHash: "new-hash",
+		Actor: types.ActorRef{
+			ID: uuid.New(),
+		},
+	})
+
+	require.NoError(t, err)
+	require.True(t, repo.resetAndClearCalled)
+	require.Equal(t, "new-hash", repo.passwords[userID])
+	require.NotContains(t, repo.users[userID].Metadata, types.TemporaryPasswordMetadataKey)
+	require.Equal(t, "value", repo.users[userID].Metadata["keep"])
+}
+
+func TestUserPasswordResetCommand_DoesNotChangePasswordWhenAtomicCleanupFails(t *testing.T) {
+	userID := uuid.New()
+	repo := newFakeAuthRepo()
+	repo.users[userID] = &types.AuthUser{
+		ID:    userID,
+		Email: "user@example.com",
+	}
+	repo.passwords[userID] = "old-hash"
+	repo.resetAndClearErr = errors.New("atomic reset failed")
+
+	cmd := NewUserPasswordResetCommand(PasswordResetCommandConfig{
+		Repository: repo,
+	})
+
+	err := cmd.Execute(context.Background(), UserPasswordResetInput{
+		UserID:          userID,
+		NewPasswordHash: "new-hash",
+		Actor: types.ActorRef{
+			ID: uuid.New(),
+		},
+	})
+
+	require.EqualError(t, err, "atomic reset failed")
+	require.True(t, repo.resetAndClearCalled)
+	require.Equal(t, uuid.Nil, repo.lastResetUserID)
+	require.Equal(t, "old-hash", repo.passwords[userID])
+}
+
 func TestUserInviteCommand_GeneratesTokenAndActivity(t *testing.T) {
 	repo := newFakeAuthRepo()
 	tokenRepo := newMemoryTokenRepo()
@@ -833,6 +893,8 @@ type fakeAuthRepo struct {
 	users                  map[uuid.UUID]*types.AuthUser
 	passwords              map[uuid.UUID]string
 	markTemporaryErr       error
+	resetAndClearCalled    bool
+	resetAndClearErr       error
 	transitionCalled       bool
 	lastTransitionReason   string
 	lastTransitionMetadata map[string]any
@@ -913,6 +975,20 @@ func (f *fakeAuthRepo) ResetPassword(_ context.Context, id uuid.UUID, hash strin
 	}
 	f.passwords[id] = hash
 	return nil
+}
+
+func (f *fakeAuthRepo) ResetPasswordAndClearTemporaryPassword(_ context.Context, id uuid.UUID, hash string) error {
+	f.resetAndClearCalled = true
+	if f.resetAndClearErr != nil {
+		return f.resetAndClearErr
+	}
+	if _, ok := f.users[id]; !ok {
+		return repository.NewRecordNotFound()
+	}
+	f.lastResetUserID = id
+	f.lastResetHash = hash
+	f.passwords[id] = hash
+	return f.ClearTemporaryPassword(context.Background(), id)
 }
 
 func (f *fakeAuthRepo) MarkTemporaryPassword(_ context.Context, id uuid.UUID, issuedAt, expiresAt time.Time) error {
