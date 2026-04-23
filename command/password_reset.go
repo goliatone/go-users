@@ -101,12 +101,8 @@ func (c *UserPasswordResetCommand) Execute(ctx context.Context, input UserPasswo
 		return err
 	}
 	needsTemporaryCleanup := types.HasTemporaryPasswordMetadata(user.Metadata)
-	resultUser := cloneAuthUser(user)
 	if err := c.resetPassword(ctx, input, needsTemporaryCleanup); err != nil {
 		return err
-	}
-	if !input.PreserveTemporaryPasswordMetadata && needsTemporaryCleanup {
-		resultUser.Metadata = types.ClearTemporaryPasswordMetadata(resultUser.Metadata)
 	}
 
 	data := map[string]any{
@@ -134,7 +130,7 @@ func (c *UserPasswordResetCommand) Execute(ctx context.Context, input UserPasswo
 	logActivity(ctx, c.sink, record)
 	emitActivityHook(ctx, c.hooks, record)
 	if input.Result != nil {
-		input.Result.User = resultUser
+		input.Result.User = c.resultUser(ctx, input.UserID, user, input.PreserveTemporaryPasswordMetadata, needsTemporaryCleanup)
 	}
 	return nil
 }
@@ -156,9 +152,21 @@ func cloneAuthUser(user *types.AuthUser) *types.AuthUser {
 		return nil
 	}
 	clone := *user
+	clone.Raw = nil
 	if len(user.Metadata) > 0 {
 		clone.Metadata = make(map[string]any, len(user.Metadata))
 		maps.Copy(clone.Metadata, user.Metadata)
 	}
 	return &clone
+}
+
+func (c *UserPasswordResetCommand) resultUser(ctx context.Context, id uuid.UUID, fallback *types.AuthUser, preserveTemporaryPasswordMetadata, needsTemporaryCleanup bool) *types.AuthUser {
+	if refreshed, err := c.repo.GetByID(ctx, id); err == nil && refreshed != nil {
+		return cloneAuthUser(refreshed)
+	}
+	result := cloneAuthUser(fallback)
+	if !preserveTemporaryPasswordMetadata && needsTemporaryCleanup {
+		result.Metadata = types.ClearTemporaryPasswordMetadata(result.Metadata)
+	}
+	return result
 }
