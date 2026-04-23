@@ -9,4 +9,7 @@ var (
 	ErrMissingUserTokenRepository = errors.New("go-users: missing user token repository")
 	// ErrMissingPasswordResetRepository occurs when reset persistence is unavailable.
 	ErrMissingPasswordResetRepository = errors.New("go-users: missing password reset repository")
+	// ErrMissingPasswordResetLifecycleRepository occurs when reset confirmation
+	// requires safe claim/finalize support that the repository does not expose.
+	ErrMissingPasswordResetLifecycleRepository = errors.New("go-users: missing password reset lifecycle repository")
 )

@@ -50,10 +50,11 @@ type UserTokenRepository interface {
 type PasswordResetStatus string
 
 const (
-	PasswordResetStatusUnknown   PasswordResetStatus = "unknown"
-	PasswordResetStatusRequested PasswordResetStatus = "requested"
-	PasswordResetStatusExpired   PasswordResetStatus = "expired"
-	PasswordResetStatusChanged   PasswordResetStatus = "changed"
+	PasswordResetStatusUnknown    PasswordResetStatus = "unknown"
+	PasswordResetStatusRequested  PasswordResetStatus = "requested"
+	PasswordResetStatusProcessing PasswordResetStatus = "processing"
+	PasswordResetStatusExpired    PasswordResetStatus = "expired"
+	PasswordResetStatusChanged    PasswordResetStatus = "changed"
 )
 
 // PasswordResetRecord captures password reset lifecycle metadata.
@@ -78,4 +79,12 @@ type PasswordResetRepository interface {
 	GetResetByJTI(ctx context.Context, jti string) (*PasswordResetRecord, error)
 	ConsumeReset(ctx context.Context, jti string, usedAt time.Time) error
 	UpdateResetStatus(ctx context.Context, jti string, status PasswordResetStatus, usedAt time.Time) error
+}
+
+// PasswordResetLifecycleRepository is an optional extension that provides an
+// exclusive claim/finalize flow for password-reset confirmation.
+type PasswordResetLifecycleRepository interface {
+	ClaimReset(ctx context.Context, jti string, claimedAt time.Time, staleAfter time.Duration) error
+	ReleaseResetClaim(ctx context.Context, jti string, claimedAt time.Time) error
+	FinalizeReset(ctx context.Context, jti string, claimedAt, resetAt time.Time) error
 }
