@@ -251,6 +251,21 @@ function go:fmt {
     "${gofmt_bin}" -w "${files[@]}"
 }
 
+function go:fmt:packages {
+    local go_bin
+    local -a patterns=()
+
+    go_bin=$(_go:bin) || return 1
+    _go:quality:prepare_env || return 1
+    if [ "$#" -gt 0 ]; then
+        patterns=("$@")
+    else
+        patterns=("./...")
+    fi
+
+    "${go_bin}" fmt "${patterns[@]}"
+}
+
 function go:fmt:check {
     local gofmt_bin
     local -a files=()
@@ -273,6 +288,21 @@ function go:fmt:check {
         echo "${unformatted}"
         return 1
     fi
+}
+
+function go:fix {
+    local go_bin
+    local -a patterns=()
+
+    go_bin=$(_go:bin) || return 1
+    _go:quality:prepare_env || return 1
+    if [ "$#" -gt 0 ]; then
+        patterns=("$@")
+    else
+        patterns=("./...")
+    fi
+
+    "${go_bin}" fix "${patterns[@]}"
 }
 
 function go:test {
@@ -517,6 +547,8 @@ function go:quality:pr {
 }
 
 function go:quality:all {
+    go:fix "$@" || return 1
+    go:fmt:packages "$@" || return 1
     go:fmt:check || return 1
     go:test "$@" || return 1
     go:race "$@" || return 1
