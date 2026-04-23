@@ -371,11 +371,6 @@ func cloneStrings(values []string) []string {
 	return out
 }
 
-//go:fix inline
-func boolPtr(value bool) *bool {
-	return new(value)
-}
-
 func intersectScopeFilters(base, requested types.ScopeFilter) (types.ScopeFilter, error) {
 	out := base.Clone()
 	if requested.TenantID != uuid.Nil {

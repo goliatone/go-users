@@ -257,9 +257,6 @@ func must(action string, err error) {
 	}
 }
 
-//go:fix inline
-func strPtr(s string) *string { return new(s) }
-
 func keysOf(m map[string]any) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {
