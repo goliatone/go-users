@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"errors"
+	"maps"
 	"strings"
 	"time"
 
@@ -37,9 +38,7 @@ func (s ScopeFilter) Clone() ScopeFilter {
 	}
 	if len(s.Labels) > 0 {
 		clone.Labels = make(map[string]uuid.UUID, len(s.Labels))
-		for k, v := range s.Labels {
-			clone.Labels[k] = v
-		}
+		maps.Copy(clone.Labels, s.Labels)
 	}
 	return clone
 }

@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"maps"
 	"time"
 
 	"github.com/google/uuid"
@@ -63,9 +64,7 @@ func WithTransitionMetadata(metadata map[string]any) TransitionOption {
 		if cfg.Metadata == nil {
 			cfg.Metadata = make(map[string]any, len(metadata))
 		}
-		for k, v := range metadata {
-			cfg.Metadata[k] = v
-		}
+		maps.Copy(cfg.Metadata, metadata)
 	}
 }
 
