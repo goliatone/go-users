@@ -2,6 +2,7 @@ package goauth
 
 import (
 	"context"
+	"maps"
 	"time"
 
 	auth "github.com/goliatone/go-auth"
@@ -234,8 +235,6 @@ func copyMetadata(origin map[string]any) map[string]any {
 		return nil
 	}
 	out := make(map[string]any, len(origin))
-	for k, v := range origin {
-		out[k] = v
-	}
+	maps.Copy(out, origin)
 	return out
 }

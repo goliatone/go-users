@@ -3,6 +3,7 @@ package preferences
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 
 	i18n "github.com/goliatone/go-i18n"
@@ -132,9 +133,7 @@ func resolutionPayload(level types.PreferenceLevel, snapshot, defaults, base map
 	payload := snapshot
 	if level == types.PreferenceLevelSystem {
 		payload = mergeMaps(defaults, base)
-		for key, value := range snapshot {
-			payload[key] = value
-		}
+		maps.Copy(payload, snapshot)
 	}
 	if payload == nil {
 		payload = make(map[string]any)
@@ -204,17 +203,13 @@ func snapshotFromRecords(records []types.PreferenceRecord) (map[string]any, map[
 func mergeMaps(base map[string]any, overlay map[string]any) map[string]any {
 	out := make(map[string]any)
 	if len(base) > 0 {
-		for k, v := range base {
-			out[k] = v
-		}
+		maps.Copy(out, base)
 	}
 	if len(overlay) > 0 {
 		if len(out) == 0 {
 			out = make(map[string]any, len(overlay))
 		}
-		for k, v := range overlay {
-			out[k] = v
-		}
+		maps.Copy(out, overlay)
 	}
 	return out
 }
