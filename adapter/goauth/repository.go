@@ -153,7 +153,14 @@ func (a *UsersAdapter) ResetPasswordAndClearTemporaryPassword(ctx context.Contex
 	}); ok {
 		return resetRepo.ResetPasswordAndClearTemporaryPassword(ctx, id, passwordHash)
 	}
-	return types.ErrTemporaryPasswordResetUnsupported
+	record, err := a.repo.GetByID(ctx, id.String())
+	if err != nil {
+		return err
+	}
+	if types.HasTemporaryPasswordMetadata(record.Metadata) {
+		return types.ErrTemporaryPasswordResetUnsupported
+	}
+	return a.repo.ResetPassword(ctx, id, passwordHash)
 }
 
 func toAuthUser(user *auth.User) *types.AuthUser {
