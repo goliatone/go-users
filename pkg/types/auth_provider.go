@@ -11,17 +11,18 @@ import (
 // Fields mirror the values go-users needs to orchestrate lifecycle, profile,
 // and preference flows without binding to go-auth structs.
 type AuthUser struct {
-	ID        uuid.UUID
-	Role      string
-	Status    LifecycleState
-	Email     string
-	Username  string
-	FirstName string
-	LastName  string
-	Metadata  map[string]any
-	CreatedAt *time.Time
-	UpdatedAt *time.Time
-	Raw       any
+	ID           uuid.UUID
+	Role         string
+	Status       LifecycleState
+	Email        string
+	Username     string
+	FirstName    string
+	LastName     string
+	PasswordHash string
+	Metadata     map[string]any
+	CreatedAt    *time.Time
+	UpdatedAt    *time.Time
+	Raw          any
 }
 
 // LifecycleTransition describes an allowed move between states.
@@ -87,4 +88,12 @@ type AuthRepository interface {
 	UpdateStatus(ctx context.Context, actor ActorRef, id uuid.UUID, next LifecycleState, opts ...TransitionOption) (*AuthUser, error)
 	AllowedTransitions(ctx context.Context, id uuid.UUID) ([]LifecycleTransition, error)
 	ResetPassword(ctx context.Context, id uuid.UUID, passwordHash string) error
+}
+
+// TemporaryPasswordRepository is an optional extension for stores that can
+// update temporary-password metadata without changing the AuthRepository
+// contract used by existing callers.
+type TemporaryPasswordRepository interface {
+	MarkTemporaryPassword(ctx context.Context, id uuid.UUID, issuedAt, expiresAt time.Time) error
+	ClearTemporaryPassword(ctx context.Context, id uuid.UUID) error
 }
