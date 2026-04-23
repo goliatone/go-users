@@ -8,6 +8,7 @@ import (
 	goerrors "github.com/goliatone/go-errors"
 	repository "github.com/goliatone/go-repository-bun"
 	"github.com/goliatone/go-users/pkg/types"
+	"github.com/goliatone/go-users/scope"
 	"github.com/google/uuid"
 )
 
@@ -66,6 +67,10 @@ type BootstrapPasswordCommandConfig struct {
 	Create     *UserCreateCommand
 	Reset      *UserPasswordResetCommand
 	Clock      types.Clock
+	Activity   types.ActivitySink
+	Hooks      types.Hooks
+	Logger     types.Logger
+	ScopeGuard scope.Guard
 }
 
 // NewUserBootstrapPasswordCommand constructs the bootstrap handler.
@@ -79,6 +84,10 @@ func NewUserBootstrapPasswordCommand(cfg BootstrapPasswordCommandConfig) *UserBo
 		create = NewUserCreateCommand(UserCreateCommandConfig{
 			Repository: cfg.Repository,
 			Clock:      clock,
+			Activity:   cfg.Activity,
+			Hooks:      cfg.Hooks,
+			Logger:     cfg.Logger,
+			ScopeGuard: cfg.ScopeGuard,
 		})
 	}
 	reset := cfg.Reset
@@ -86,6 +95,10 @@ func NewUserBootstrapPasswordCommand(cfg BootstrapPasswordCommandConfig) *UserBo
 		reset = NewUserPasswordResetCommand(PasswordResetCommandConfig{
 			Repository: cfg.Repository,
 			Clock:      clock,
+			Activity:   cfg.Activity,
+			Hooks:      cfg.Hooks,
+			Logger:     cfg.Logger,
+			ScopeGuard: cfg.ScopeGuard,
 		})
 	}
 	return &UserBootstrapPasswordCommand{
@@ -136,21 +149,12 @@ func (c *UserBootstrapPasswordCommand) Execute(ctx context.Context, input UserBo
 	}); err != nil {
 		return err
 	}
-	if tempRepo, ok := c.repo.(types.TemporaryPasswordRepository); ok {
-		if err := tempRepo.MarkTemporaryPassword(ctx, existing.ID, issuedAt, expiresAt); err != nil {
-			return err
-		}
-		if refreshed, err := c.repo.GetByID(ctx, existing.ID); err == nil && refreshed != nil {
-			existing = refreshed
-		}
-	} else {
-		existing.PasswordHash = strings.TrimSpace(input.PasswordHash)
-		existing.Metadata = types.MarkTemporaryPasswordMetadata(existing.Metadata, issuedAt, expiresAt)
-		if updated, err := c.repo.Update(ctx, existing); err != nil {
-			return err
-		} else if updated != nil {
-			existing = updated
-		}
+	refreshed, err := c.markTemporary(ctx, existing.ID, issuedAt, expiresAt)
+	if err != nil {
+		return err
+	}
+	if refreshed != nil {
+		existing = refreshed
 	}
 	setBootstrapResult(input.Result, existing, false, expiresAt)
 	return nil
@@ -158,8 +162,6 @@ func (c *UserBootstrapPasswordCommand) Execute(ctx context.Context, input UserBo
 
 func (c *UserBootstrapPasswordCommand) createBootstrapUser(ctx context.Context, input UserBootstrapPasswordInput, issuedAt, expiresAt time.Time) (*types.AuthUser, error) {
 	user := *input.User
-	user.PasswordHash = strings.TrimSpace(input.PasswordHash)
-	user.Metadata = types.MarkTemporaryPasswordMetadata(input.User.Metadata, issuedAt, expiresAt)
 	result := &types.AuthUser{}
 	if err := c.create.Execute(ctx, UserCreateInput{
 		User:   &user,
@@ -170,7 +172,38 @@ func (c *UserBootstrapPasswordCommand) createBootstrapUser(ctx context.Context, 
 	}); err != nil {
 		return nil, err
 	}
+	if err := c.reset.Execute(ctx, UserPasswordResetInput{
+		UserID:          result.ID,
+		NewPasswordHash: strings.TrimSpace(input.PasswordHash),
+		Actor:           input.Actor,
+		Scope:           input.Scope,
+	}); err != nil {
+		return nil, err
+	}
+	refreshed, err := c.markTemporary(ctx, result.ID, issuedAt, expiresAt)
+	if err != nil {
+		return nil, err
+	}
+	if refreshed != nil {
+		return refreshed, nil
+	}
 	return result, nil
+}
+
+func (c *UserBootstrapPasswordCommand) markTemporary(ctx context.Context, id uuid.UUID, issuedAt, expiresAt time.Time) (*types.AuthUser, error) {
+	if tempRepo, ok := c.repo.(types.TemporaryPasswordRepository); ok {
+		if err := tempRepo.MarkTemporaryPassword(ctx, id, issuedAt, expiresAt); err != nil {
+			return nil, err
+		}
+		return c.repo.GetByID(ctx, id)
+	}
+
+	user, err := c.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	user.Metadata = types.MarkTemporaryPasswordMetadata(user.Metadata, issuedAt, expiresAt)
+	return c.repo.Update(ctx, user)
 }
 
 func setBootstrapResult(result *UserBootstrapPasswordResult, user *types.AuthUser, created bool, expiresAt time.Time) {
@@ -187,6 +220,5 @@ func isBootstrapUserNotFound(err error) bool {
 		return false
 	}
 	return repository.IsRecordNotFound(err) ||
-		goerrors.IsNotFound(err) ||
-		strings.Contains(strings.ToLower(err.Error()), "not found")
+		goerrors.IsNotFound(err)
 }
