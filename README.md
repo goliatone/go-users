@@ -124,7 +124,7 @@ err = users.Commands().UserBootstrapPassword.Execute(ctx, command.UserBootstrapP
 })
 ```
 
-When the local `go-auth` user provider reads this metadata, expired temporary passwords are rejected. A normal password reset/change clears the temporary-password metadata for repositories that implement `types.TemporaryPasswordRepository`.
+When the local `go-auth` user provider reads this metadata, expired temporary passwords are rejected. Missing or malformed expiry metadata is treated as expired. A normal password reset/change clears the temporary-password metadata in the same repository operation for repositories that implement `types.TemporaryPasswordResetRepository`; repositories that support temporary-password metadata should implement this atomic cleanup path.
 
 ## Queries
 
