@@ -3,7 +3,7 @@ module github.com/goliatone/go-users
 go 1.26.0
 
 require (
-	github.com/goliatone/go-auth v0.42.0
+	github.com/goliatone/go-auth v0.43.0
 	github.com/goliatone/go-command v0.19.0
 	github.com/goliatone/go-crud v0.23.0
 	github.com/goliatone/go-errors v0.10.0
@@ -55,6 +55,7 @@ require (
 	github.com/gofiber/template/django/v3 v3.1.14 // indirect
 	github.com/gofiber/utils v1.2.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
+	github.com/goliatone/go-auth/adapters/featuregate v0.43.0 // indirect
 	github.com/goliatone/go-composite-fs v0.3.0 // indirect
 	github.com/goliatone/go-logger v0.8.0 // indirect
 	github.com/goliatone/go-print v0.4.1 // indirect
