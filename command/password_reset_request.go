@@ -122,55 +122,62 @@ func (c *UserPasswordResetRequestCommand) Execute(ctx context.Context, input Use
 		return err
 	}
 
-	var user *types.AuthUser
-	var err error
-	if input.UserID != uuid.Nil {
-		user, err = c.repo.GetByID(ctx, input.UserID)
-	} else {
-		user, err = c.repo.GetByIdentifier(ctx, strings.TrimSpace(input.Identifier))
-	}
+	user, err := c.resolvePasswordResetUser(ctx, input)
 	if err != nil {
 		return err
 	}
 	if user == nil {
 		return ErrUserNotFound
 	}
-	if enabled, err := featureEnabled(ctx, c.featureGate, featureUsersPasswordReset, input.Scope, user.ID); err != nil {
-		return err
+	if enabled, featureErr := featureEnabled(ctx, c.featureGate, featureUsersPasswordReset, input.Scope, user.ID); featureErr != nil {
+		return featureErr
 	} else if !enabled {
 		return ErrPasswordResetDisabled
 	}
 
-	issuedAt := now(c.clock)
-	expiresAt := issuedAt.Add(c.tokenTTL)
-	jti := c.idGen.UUID().String()
-
-	payload := buildSecureLinkPayload(
-		SecureLinkActionPasswordReset,
-		user,
-		input.Scope,
-		jti,
-		issuedAt,
-		expiresAt,
-		secureLinkSourceDefault,
-	)
-	token, err := c.manager.Generate(c.route, payload)
+	token, jti, issuedAt, expiresAt, err := c.issuePasswordResetLink(user, input.Scope)
 	if err != nil {
 		return err
 	}
+	if err := c.recordPasswordReset(ctx, user, input.Scope, jti, issuedAt, expiresAt); err != nil {
+		return err
+	}
 
-	if _, err := c.resets.CreateReset(ctx, types.PasswordResetRecord{
+	c.emitPasswordResetRequestActivity(ctx, user, input, jti, issuedAt, expiresAt)
+	setPasswordResetRequestResult(input.Result, user, token, expiresAt)
+	return nil
+}
+
+func (c *UserPasswordResetRequestCommand) resolvePasswordResetUser(ctx context.Context, input UserPasswordResetRequestInput) (*types.AuthUser, error) {
+	if input.UserID != uuid.Nil {
+		return c.repo.GetByID(ctx, input.UserID)
+	}
+	return c.repo.GetByIdentifier(ctx, strings.TrimSpace(input.Identifier))
+}
+
+func (c *UserPasswordResetRequestCommand) issuePasswordResetLink(user *types.AuthUser, scope types.ScopeFilter) (string, string, time.Time, time.Time, error) {
+	issuedAt := now(c.clock)
+	expiresAt := issuedAt.Add(c.tokenTTL)
+	jti := c.idGen.UUID().String()
+	payload := buildSecureLinkPayload(SecureLinkActionPasswordReset, user, scope, jti, issuedAt, expiresAt, secureLinkSourceDefault)
+	token, err := c.manager.Generate(c.route, payload)
+	return token, jti, issuedAt, expiresAt, err
+}
+
+func (c *UserPasswordResetRequestCommand) recordPasswordReset(ctx context.Context, user *types.AuthUser, scope types.ScopeFilter, jti string, issuedAt, expiresAt time.Time) error {
+	_, err := c.resets.CreateReset(ctx, types.PasswordResetRecord{
 		UserID:    user.ID,
 		Email:     user.Email,
 		Status:    types.PasswordResetStatusRequested,
 		JTI:       jti,
 		IssuedAt:  issuedAt,
 		ExpiresAt: expiresAt,
-		Scope:     input.Scope,
-	}); err != nil {
-		return err
-	}
+		Scope:     scope,
+	})
+	return err
+}
 
+func (c *UserPasswordResetRequestCommand) emitPasswordResetRequestActivity(ctx context.Context, user *types.AuthUser, input UserPasswordResetRequestInput, jti string, issuedAt, expiresAt time.Time) {
 	actor := input.Actor
 	if actor.ID == uuid.Nil {
 		actor = types.ActorRef{ID: user.ID, Type: "user"}
@@ -197,14 +204,14 @@ func (c *UserPasswordResetRequestCommand) Execute(ctx context.Context, input Use
 	}
 	logActivity(ctx, c.sink, record)
 	emitActivityHook(ctx, c.hooks, record)
+}
 
-	if input.Result != nil {
-		*input.Result = UserPasswordResetRequestResult{
+func setPasswordResetRequestResult(result *UserPasswordResetRequestResult, user *types.AuthUser, token string, expiresAt time.Time) {
+	if result != nil {
+		*result = UserPasswordResetRequestResult{
 			User:      user,
 			Token:     token,
 			ExpiresAt: expiresAt,
 		}
 	}
-
-	return nil
 }

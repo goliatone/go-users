@@ -320,8 +320,8 @@ func (s *UserService) Show(ctx crud.Context, id string, _ []repository.SelectCri
 	if err != nil {
 		return nil, err
 	}
-	if err := enforceUserRowAccess(res.Actor, userID); err != nil {
-		return nil, err
+	if accessErr := enforceUserRowAccess(res.Actor, userID); accessErr != nil {
+		return nil, accessErr
 	}
 	authUser, err := s.repo.GetByID(ctx.UserContext(), userID)
 	if err != nil {

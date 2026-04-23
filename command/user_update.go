@@ -93,13 +93,13 @@ func (c *UserUpdateCommand) Execute(ctx context.Context, input UserUpdateInput) 
 
 	user := normalizeAuthUser(input.User)
 	if user != nil && user.Status != "" {
-		current, err := c.repo.GetByID(ctx, user.ID)
-		if err != nil {
-			return err
+		current, currentErr := c.repo.GetByID(ctx, user.ID)
+		if currentErr != nil {
+			return currentErr
 		}
 		if current != nil && current.Status != user.Status && c.policy != nil {
-			if err := c.policy.Validate(current.Status, user.Status); err != nil {
-				return err
+			if policyErr := c.policy.Validate(current.Status, user.Status); policyErr != nil {
+				return policyErr
 			}
 		}
 	}

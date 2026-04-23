@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/goliatone/go-users/pkg/types"
@@ -32,6 +33,61 @@ func safeActivitySink(sink types.ActivitySink) types.ActivitySink {
 
 func safeScopeGuard(g scope.Guard) scope.Guard {
 	return scope.Ensure(g)
+}
+
+type secureLinkRuntimeConfig struct {
+	SecureLinks  types.SecureLinkManager
+	Clock        types.Clock
+	IDGen        types.IDGenerator
+	Activity     types.ActivitySink
+	Hooks        types.Hooks
+	Logger       types.Logger
+	TokenTTL     time.Duration
+	DefaultTTL   time.Duration
+	ScopeGuard   scope.Guard
+	Route        string
+	DefaultRoute string
+}
+
+type secureLinkRuntime struct {
+	manager  types.SecureLinkManager
+	clock    types.Clock
+	idGen    types.IDGenerator
+	sink     types.ActivitySink
+	hooks    types.Hooks
+	logger   types.Logger
+	tokenTTL time.Duration
+	guard    scope.Guard
+	route    string
+}
+
+func newSecureLinkRuntime(cfg secureLinkRuntimeConfig) secureLinkRuntime {
+	ttl := cfg.TokenTTL
+	if ttl == 0 && cfg.SecureLinks != nil {
+		ttl = cfg.SecureLinks.GetExpiration()
+	}
+	if ttl == 0 {
+		ttl = cfg.DefaultTTL
+	}
+	idGen := cfg.IDGen
+	if idGen == nil {
+		idGen = types.UUIDGenerator{}
+	}
+	route := strings.TrimSpace(cfg.Route)
+	if route == "" {
+		route = cfg.DefaultRoute
+	}
+	return secureLinkRuntime{
+		manager:  cfg.SecureLinks,
+		clock:    safeClock(cfg.Clock),
+		idGen:    idGen,
+		sink:     safeActivitySink(cfg.Activity),
+		hooks:    safeHooks(cfg.Hooks),
+		logger:   safeLogger(cfg.Logger),
+		tokenTTL: ttl,
+		guard:    safeScopeGuard(cfg.ScopeGuard),
+		route:    route,
+	}
 }
 
 func now(clock types.Clock) time.Time {

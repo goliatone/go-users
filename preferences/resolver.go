@@ -65,9 +65,9 @@ func (r *Resolver) Resolve(ctx context.Context, input ResolveInput) (types.Prefe
 			Level:  level,
 			Keys:   input.Keys,
 		}
-		recs, err := r.repo.ListPreferences(ctx, filter)
-		if err != nil {
-			return types.PreferenceSnapshot{}, err
+		recs, listErr := r.repo.ListPreferences(ctx, filter)
+		if listErr != nil {
+			return types.PreferenceSnapshot{}, listErr
 		}
 		snapshot, idMap, versionMap := snapshotFromRecords(recs)
 		keyRecords[level] = idMap
@@ -87,9 +87,9 @@ func (r *Resolver) Resolve(ctx context.Context, input ResolveInput) (types.Prefe
 			payload = make(map[string]any)
 		}
 		payload = normalizeLocalePreferencePayload(payload)
-		meta, err := scopeIDs(level, input.UserID, input.Scope)
-		if err != nil {
-			return types.PreferenceSnapshot{}, err
+		meta, scopeErr := scopeIDs(level, input.UserID, input.Scope)
+		if scopeErr != nil {
+			return types.PreferenceSnapshot{}, scopeErr
 		}
 		layerScopeMeta[level] = meta
 		layerValues[level] = cloneMap(payload)
@@ -412,17 +412,4 @@ func buildEffectiveVersions(traces []types.PreferenceTrace) map[string]int {
 		return nil
 	}
 	return versions
-}
-
-func toLevel(name string) types.PreferenceLevel {
-	switch name {
-	case "user":
-		return types.PreferenceLevelUser
-	case "org":
-		return types.PreferenceLevelOrg
-	case "tenant":
-		return types.PreferenceLevelTenant
-	default:
-		return types.PreferenceLevelSystem
-	}
 }

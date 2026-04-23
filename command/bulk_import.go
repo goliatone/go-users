@@ -128,13 +128,9 @@ func (c *BulkUserImportCommand) Execute(ctx context.Context, input BulkUserImpor
 			continue
 		}
 
-		if created != nil {
-			result.UserID = created.ID
-			result.Email = created.Email
-			result.Status = created.Status
-		} else {
-			result.Status = resolveAuthUserStatus(normalized, statusOverride)
-		}
+		result.UserID = created.ID
+		result.Email = created.Email
+		result.Status = created.Status
 		results = append(results, result)
 	}
 

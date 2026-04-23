@@ -83,34 +83,32 @@ type RegistrationRequestConfig struct {
 
 // NewUserRegistrationRequestCommand constructs the registration handler.
 func NewUserRegistrationRequestCommand(cfg RegistrationRequestConfig) *UserRegistrationRequestCommand {
-	ttl := cfg.TokenTTL
-	if ttl == 0 && cfg.SecureLinks != nil {
-		ttl = cfg.SecureLinks.GetExpiration()
-	}
-	if ttl == 0 {
-		ttl = defaultRegistrationTTL
-	}
-	idGen := cfg.IDGen
-	if idGen == nil {
-		idGen = types.UUIDGenerator{}
-	}
-	route := strings.TrimSpace(cfg.Route)
-	if route == "" {
-		route = SecureLinkRouteRegister
-	}
+	runtime := newSecureLinkRuntime(secureLinkRuntimeConfig{
+		SecureLinks:  cfg.SecureLinks,
+		Clock:        cfg.Clock,
+		IDGen:        cfg.IDGen,
+		Activity:     cfg.Activity,
+		Hooks:        cfg.Hooks,
+		Logger:       cfg.Logger,
+		TokenTTL:     cfg.TokenTTL,
+		DefaultTTL:   defaultRegistrationTTL,
+		ScopeGuard:   cfg.ScopeGuard,
+		Route:        cfg.Route,
+		DefaultRoute: SecureLinkRouteRegister,
+	})
 	return &UserRegistrationRequestCommand{
 		repo:        cfg.Repository,
 		tokens:      cfg.TokenRepository,
-		manager:     cfg.SecureLinks,
-		clock:       safeClock(cfg.Clock),
-		idGen:       idGen,
-		sink:        safeActivitySink(cfg.Activity),
-		hooks:       safeHooks(cfg.Hooks),
-		logger:      safeLogger(cfg.Logger),
-		tokenTTL:    ttl,
-		guard:       safeScopeGuard(cfg.ScopeGuard),
+		manager:     runtime.manager,
+		clock:       runtime.clock,
+		idGen:       runtime.idGen,
+		sink:        runtime.sink,
+		hooks:       runtime.hooks,
+		logger:      runtime.logger,
+		tokenTTL:    runtime.tokenTTL,
+		guard:       runtime.guard,
 		featureGate: cfg.FeatureGate,
-		route:       route,
+		route:       runtime.route,
 	}
 }
 

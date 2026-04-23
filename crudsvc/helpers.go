@@ -22,25 +22,6 @@ func queryUUID(ctx crud.Context, key string) uuid.UUID {
 	return id
 }
 
-func queryUUIDSlice(ctx crud.Context, key string) []uuid.UUID {
-	raw := strings.TrimSpace(ctx.Query(key))
-	if raw == "" {
-		return nil
-	}
-	parts := strings.Split(raw, ",")
-	ids := make([]uuid.UUID, 0, len(parts))
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		if id, err := uuid.Parse(part); err == nil {
-			ids = append(ids, id)
-		}
-	}
-	return ids
-}
-
 func queryStringSlice(ctx crud.Context, key string) []string {
 	raw := strings.TrimSpace(ctx.Query(key))
 	if raw == "" {

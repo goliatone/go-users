@@ -113,9 +113,9 @@ func (r *Repository) UpsertProfile(ctx context.Context, profile types.UserProfil
 		}
 		rec.TenantID = scopeUUID(profile.Scope.TenantID)
 		rec.OrgID = scopeUUID(profile.Scope.OrgID)
-		updated, err := r.Update(ctx, rec)
-		if err != nil {
-			return nil, err
+		updated, updateErr := r.Update(ctx, rec)
+		if updateErr != nil {
+			return nil, updateErr
 		}
 		return toDomain(updated), nil
 	case repository.IsRecordNotFound(err):
@@ -127,9 +127,9 @@ func (r *Repository) UpsertProfile(ctx context.Context, profile types.UserProfil
 		}
 		rec.TenantID = scopeUUID(profile.Scope.TenantID)
 		rec.OrgID = scopeUUID(profile.Scope.OrgID)
-		created, err := r.Create(ctx, rec)
-		if err != nil {
-			return nil, err
+		created, createErr := r.Create(ctx, rec)
+		if createErr != nil {
+			return nil, createErr
 		}
 		return toDomain(created), nil
 	default:

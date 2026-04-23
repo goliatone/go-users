@@ -46,17 +46,17 @@ func (r *Repository) UpdateActivityDataWithOptions(ctx context.Context, id uuid.
 	db := r.getDB()
 	if db == nil {
 		entry.Data = mergeActivityData(entry.Data, missing)
-		_, err := r.Update(ctx, entry)
-		return err
+		_, updateErr := r.Update(ctx, entry)
+		return updateErr
 	}
 
 	if db.Dialect().Name() == dialect.PG {
-		_, err := db.NewUpdate().
+		_, execErr := db.NewUpdate().
 			Table("user_activity").
 			Set("data = data || ?::jsonb", missing).
 			Where("id = ?", id).
 			Exec(ctx)
-		return err
+		return execErr
 	}
 
 	merged := mergeActivityData(entry.Data, missing)

@@ -154,7 +154,7 @@ func TestService_MultiTenantIsolation(t *testing.T) {
 	require.NoError(t, err)
 	val, ok := snapshot.Effective["notifications.email"]
 	require.True(t, ok)
-	if pref, ok := val.(map[string]any); ok {
+	if pref, isMap := val.(map[string]any); isMap {
 		require.Equal(t, "daily", pref["frequency"])
 	} else {
 		require.Equal(t, "daily", val)

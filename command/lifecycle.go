@@ -102,8 +102,8 @@ func (c *UserLifecycleTransitionCommand) Execute(ctx context.Context, input User
 	if err != nil {
 		return err
 	}
-	if err := c.enforcePolicy(current, input.Target); err != nil {
-		return err
+	if policyErr := c.enforcePolicy(current, input.Target); policyErr != nil {
+		return policyErr
 	}
 	opts := make([]types.TransitionOption, 0, 2)
 	if input.Reason != "" {

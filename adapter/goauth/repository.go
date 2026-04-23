@@ -95,8 +95,8 @@ func (a *UsersAdapter) UpdateStatus(ctx context.Context, actor types.ActorRef, i
 	current := types.LifecycleState(record.Status)
 	config := configFromOptions(opts...)
 	if a.policy != nil && !config.Force {
-		if err := a.policy.Validate(current, next); err != nil {
-			return nil, err
+		if validateErr := a.policy.Validate(current, next); validateErr != nil {
+			return nil, validateErr
 		}
 	}
 

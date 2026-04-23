@@ -105,9 +105,9 @@ func (c *PreferenceUpsertManyCommand) Execute(ctx context.Context, input Prefere
 	}
 	records := make([]types.PreferenceRecord, 0, len(keys))
 	for _, key := range keys {
-		payload, err := coercePreferencePayload(values[key])
-		if err != nil {
-			return err
+		payload, payloadErr := coercePreferencePayload(values[key])
+		if payloadErr != nil {
+			return payloadErr
 		}
 		records = append(records, types.PreferenceRecord{
 			UserID:    input.UserID,

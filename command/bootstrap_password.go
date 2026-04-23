@@ -133,21 +133,21 @@ func (c *UserBootstrapPasswordCommand) Execute(ctx context.Context, input UserBo
 		return err
 	}
 	if existing == nil {
-		created, err := c.createBootstrapUser(ctx, input, issuedAt, expiresAt)
-		if err != nil {
-			return err
+		created, createErr := c.createBootstrapUser(ctx, input, issuedAt, expiresAt)
+		if createErr != nil {
+			return createErr
 		}
 		setBootstrapResult(input.Result, created, true, expiresAt)
 		return nil
 	}
 
-	if err := c.reset.Execute(ctx, UserPasswordResetInput{
+	if resetErr := c.reset.Execute(ctx, UserPasswordResetInput{
 		UserID:          existing.ID,
 		NewPasswordHash: strings.TrimSpace(input.PasswordHash),
 		Actor:           input.Actor,
 		Scope:           input.Scope,
-	}); err != nil {
-		return err
+	}); resetErr != nil {
+		return resetErr
 	}
 	refreshed, err := c.markTemporary(ctx, existing.ID, issuedAt, expiresAt)
 	if err != nil {

@@ -261,7 +261,7 @@ func (r *RoleRegistry) ListRoles(ctx context.Context, filter types.RoleFilter) (
 				Offset(pagination.Offset)
 
 			if len(filter.RoleIDs) > 0 {
-				q = q.Where("id IN (?)", bun.In(filter.RoleIDs))
+				q = q.Where("id IN (?)", bun.List(filter.RoleIDs))
 			}
 			if filter.Keyword != "" {
 				keyword := "%" + strings.ToLower(strings.TrimSpace(filter.Keyword)) + "%"
@@ -314,10 +314,10 @@ func (r *RoleRegistry) ListAssignments(ctx context.Context, filter types.RoleAss
 				q = q.Where("role_id = ?", filter.RoleID)
 			}
 			if len(filter.UserIDs) > 0 {
-				q = q.Where("user_id IN (?)", bun.In(filter.UserIDs))
+				q = q.Where("user_id IN (?)", bun.List(filter.UserIDs))
 			}
 			if len(filter.RoleIDs) > 0 {
-				q = q.Where("role_id IN (?)", bun.In(filter.RoleIDs))
+				q = q.Where("role_id IN (?)", bun.List(filter.RoleIDs))
 			}
 			return q
 		},
@@ -361,7 +361,7 @@ func (r *RoleRegistry) loadRoleNames(ctx context.Context, assignments []*RoleAss
 		return map[uuid.UUID]string{}, nil
 	}
 	records, _, err := r.roles.List(ctx, func(q *bun.SelectQuery) *bun.SelectQuery {
-		return q.Where("id IN (?)", bun.In(roleIDs))
+		return q.Where("id IN (?)", bun.List(roleIDs))
 	})
 	if err != nil {
 		return nil, err

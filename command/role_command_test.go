@@ -40,7 +40,6 @@ func TestAssignRoleCommand_ValidatesUser(t *testing.T) {
 
 type fakeRoleRegistry struct {
 	lastMutation types.RoleMutation
-	lastDelete   uuid.UUID
 	lastAssign   struct {
 		UserID uuid.UUID
 		RoleID uuid.UUID

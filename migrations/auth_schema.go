@@ -173,7 +173,7 @@ func fetchColumnsPostgres(ctx context.Context, db *sql.DB, table string) (map[st
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	cols := make(map[string]bool)
 	for rows.Next() {
@@ -195,7 +195,7 @@ func fetchColumnsSQLite(ctx context.Context, db *sql.DB, table string) (map[stri
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	cols := make(map[string]bool)
 	for rows.Next() {

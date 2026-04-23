@@ -118,9 +118,9 @@ func ProfileSources(profile MigrationProfile, opts ...ProfileOption) ([]ProfileS
 
 	sources := make([]ProfileSource, 0, 3)
 	if resolved == ProfileStandalone {
-		authFS, err := fs.Sub(users.GetAuthBootstrapMigrationsFS(), "data/sql/migrations/auth")
-		if err != nil {
-			return nil, fmt.Errorf("migrations: load auth bootstrap migrations: %w", err)
+		authFS, authErr := fs.Sub(users.GetAuthBootstrapMigrationsFS(), "data/sql/migrations/auth")
+		if authErr != nil {
+			return nil, fmt.Errorf("migrations: load auth bootstrap migrations: %w", authErr)
 		}
 		sources = append(sources, ProfileSource{
 			Name:              "auth-bootstrap",
@@ -131,9 +131,9 @@ func ProfileSources(profile MigrationProfile, opts ...ProfileOption) ([]ProfileS
 		})
 
 		if includeAuthExtras {
-			extrasFS, err := fs.Sub(users.GetAuthExtrasMigrationsFS(), "data/sql/migrations/auth_extras")
-			if err != nil {
-				return nil, fmt.Errorf("migrations: load auth extras migrations: %w", err)
+			extrasFS, extrasErr := fs.Sub(users.GetAuthExtrasMigrationsFS(), "data/sql/migrations/auth_extras")
+			if extrasErr != nil {
+				return nil, fmt.Errorf("migrations: load auth extras migrations: %w", extrasErr)
 			}
 			sources = append(sources, ProfileSource{
 				Name:              "auth-extras",

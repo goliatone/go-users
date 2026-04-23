@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	repository "github.com/goliatone/go-repository-bun"
 	"github.com/goliatone/go-users/pkg/types"
@@ -177,24 +178,45 @@ func (r *Repository) ActivityStats(ctx context.Context, filter types.ActivitySta
 }
 
 func applyActivityFilter(q *bun.SelectQuery, filter types.ActivityFilter) *bun.SelectQuery {
-	if filter.Scope.TenantID != uuid.Nil {
-		q = q.Where("tenant_id = ?", filter.Scope.TenantID)
+	q = applyActivityScopeFilter(q, filter.Scope)
+	q = applyActivityActorFilter(q, filter.UserID, filter.ActorID)
+	q = applyActivityObjectFilter(q, filter)
+	q = applyActivityChannelFilter(q, filter)
+	q = applyMachineActivityFilter(q, filter.MachineActivityEnabled, filter.MachineActorTypes, filter.MachineDataKeys)
+	q = applyActivityTimeFilter(q, filter.Since, filter.Until)
+	if strings.TrimSpace(filter.Keyword) != "" {
+		keyword := "%" + strings.ToLower(strings.TrimSpace(filter.Keyword)) + "%"
+		q = q.Where("LOWER(verb) LIKE ? OR LOWER(object_type) LIKE ? OR LOWER(object_id) LIKE ?", keyword, keyword, keyword)
 	}
-	if filter.Scope.OrgID != uuid.Nil {
-		q = q.Where("org_id = ?", filter.Scope.OrgID)
+	return q
+}
+
+func applyActivityScopeFilter(q *bun.SelectQuery, scope types.ScopeFilter) *bun.SelectQuery {
+	if scope.TenantID != uuid.Nil {
+		q = q.Where("tenant_id = ?", scope.TenantID)
 	}
-	if filter.UserID != uuid.Nil && filter.ActorID != uuid.Nil {
-		q = q.Where("(user_id = ? OR actor_id = ?)", filter.UserID, filter.ActorID)
-	} else {
-		if filter.UserID != uuid.Nil {
-			q = q.Where("user_id = ?", filter.UserID)
-		}
-		if filter.ActorID != uuid.Nil {
-			q = q.Where("actor_id = ?", filter.ActorID)
-		}
+	if scope.OrgID != uuid.Nil {
+		q = q.Where("org_id = ?", scope.OrgID)
 	}
+	return q
+}
+
+func applyActivityActorFilter(q *bun.SelectQuery, userID, actorID uuid.UUID) *bun.SelectQuery {
+	if userID != uuid.Nil && actorID != uuid.Nil {
+		return q.Where("(user_id = ? OR actor_id = ?)", userID, actorID)
+	}
+	if userID != uuid.Nil {
+		q = q.Where("user_id = ?", userID)
+	}
+	if actorID != uuid.Nil {
+		q = q.Where("actor_id = ?", actorID)
+	}
+	return q
+}
+
+func applyActivityObjectFilter(q *bun.SelectQuery, filter types.ActivityFilter) *bun.SelectQuery {
 	if len(filter.Verbs) > 0 {
-		q = q.Where("verb IN (?)", bun.In(filter.Verbs))
+		q = q.Where("verb IN (?)", bun.List(filter.Verbs))
 	}
 	if filter.ObjectType != "" {
 		q = q.Where("object_type = ?", filter.ObjectType)
@@ -202,24 +224,27 @@ func applyActivityFilter(q *bun.SelectQuery, filter types.ActivityFilter) *bun.S
 	if filter.ObjectID != "" {
 		q = q.Where("object_id = ?", filter.ObjectID)
 	}
+	return q
+}
+
+func applyActivityChannelFilter(q *bun.SelectQuery, filter types.ActivityFilter) *bun.SelectQuery {
 	if len(filter.Channels) > 0 {
-		q = q.Where("channel IN (?)", bun.In(filter.Channels))
+		q = q.Where("channel IN (?)", bun.List(filter.Channels))
 	} else if filter.Channel != "" {
 		q = q.Where("channel = ?", filter.Channel)
 	}
 	if len(filter.ChannelDenylist) > 0 {
-		q = q.Where("channel NOT IN (?)", bun.In(filter.ChannelDenylist))
+		q = q.Where("channel NOT IN (?)", bun.List(filter.ChannelDenylist))
 	}
-	q = applyMachineActivityFilter(q, filter.MachineActivityEnabled, filter.MachineActorTypes, filter.MachineDataKeys)
-	if filter.Since != nil && !filter.Since.IsZero() {
-		q = q.Where("created_at >= ?", filter.Since)
+	return q
+}
+
+func applyActivityTimeFilter(q *bun.SelectQuery, since, until *time.Time) *bun.SelectQuery {
+	if since != nil && !since.IsZero() {
+		q = q.Where("created_at >= ?", since)
 	}
-	if filter.Until != nil && !filter.Until.IsZero() {
-		q = q.Where("created_at <= ?", filter.Until)
-	}
-	if strings.TrimSpace(filter.Keyword) != "" {
-		keyword := "%" + strings.ToLower(strings.TrimSpace(filter.Keyword)) + "%"
-		q = q.Where("LOWER(verb) LIKE ? OR LOWER(object_type) LIKE ? OR LOWER(object_id) LIKE ?", keyword, keyword, keyword)
+	if until != nil && !until.IsZero() {
+		q = q.Where("created_at <= ?", until)
 	}
 	return q
 }
@@ -248,7 +273,7 @@ func applyActivityStatsFilter(q *bun.SelectQuery, filter types.ActivityStatsFilt
 		q = q.Where("created_at <= ?", filter.Until)
 	}
 	if len(filter.Verbs) > 0 {
-		q = q.Where("verb IN (?)", bun.In(filter.Verbs))
+		q = q.Where("verb IN (?)", bun.List(filter.Verbs))
 	}
 	q = applyMachineActivityFilter(q, filter.MachineActivityEnabled, filter.MachineActorTypes, filter.MachineDataKeys)
 	return q
@@ -283,11 +308,11 @@ func applyMachineActivityFilterPostgres(q *bun.SelectQuery, actorTypes, dataKeys
 	}
 	if len(actorTypes) > 0 {
 		conditions = append(conditions, "data ->> 'actor_type' IN (?)")
-		args = append(args, bun.In(actorTypes))
+		args = append(args, bun.List(actorTypes))
 		conditions = append(conditions, "data ->> 'actorType' IN (?)")
-		args = append(args, bun.In(actorTypes))
+		args = append(args, bun.List(actorTypes))
 		conditions = append(conditions, "data -> 'actor' ->> 'type' IN (?)")
-		args = append(args, bun.In(actorTypes))
+		args = append(args, bun.List(actorTypes))
 	}
 	if len(conditions) == 0 {
 		return q

@@ -85,34 +85,32 @@ type InviteCommandConfig struct {
 
 // NewUserInviteCommand constructs the invite handler.
 func NewUserInviteCommand(cfg InviteCommandConfig) *UserInviteCommand {
-	ttl := cfg.TokenTTL
-	if ttl == 0 && cfg.SecureLinks != nil {
-		ttl = cfg.SecureLinks.GetExpiration()
-	}
-	if ttl == 0 {
-		ttl = defaultInviteTTL
-	}
-	idGen := cfg.IDGen
-	if idGen == nil {
-		idGen = types.UUIDGenerator{}
-	}
-	route := strings.TrimSpace(cfg.Route)
-	if route == "" {
-		route = SecureLinkRouteInviteAccept
-	}
+	runtime := newSecureLinkRuntime(secureLinkRuntimeConfig{
+		SecureLinks:  cfg.SecureLinks,
+		Clock:        cfg.Clock,
+		IDGen:        cfg.IDGen,
+		Activity:     cfg.Activity,
+		Hooks:        cfg.Hooks,
+		Logger:       cfg.Logger,
+		TokenTTL:     cfg.TokenTTL,
+		DefaultTTL:   defaultInviteTTL,
+		ScopeGuard:   cfg.ScopeGuard,
+		Route:        cfg.Route,
+		DefaultRoute: SecureLinkRouteInviteAccept,
+	})
 	return &UserInviteCommand{
 		repo:        cfg.Repository,
 		tokens:      cfg.TokenRepository,
-		manager:     cfg.SecureLinks,
-		clock:       safeClock(cfg.Clock),
-		idGen:       idGen,
-		sink:        safeActivitySink(cfg.Activity),
-		hooks:       safeHooks(cfg.Hooks),
-		logger:      safeLogger(cfg.Logger),
-		tokenTTL:    ttl,
-		guard:       safeScopeGuard(cfg.ScopeGuard),
+		manager:     runtime.manager,
+		clock:       runtime.clock,
+		idGen:       runtime.idGen,
+		sink:        runtime.sink,
+		hooks:       runtime.hooks,
+		logger:      runtime.logger,
+		tokenTTL:    runtime.tokenTTL,
+		guard:       runtime.guard,
 		featureGate: cfg.FeatureGate,
-		route:       route,
+		route:       runtime.route,
 	}
 }
 
@@ -136,75 +134,92 @@ func (c *UserInviteCommand) Execute(ctx context.Context, input UserInviteInput) 
 	if err != nil {
 		return err
 	}
-	if enabled, err := featureEnabled(ctx, c.featureGate, featureUsersInvite, scope, uuid.Nil); err != nil {
-		return err
+	if enabled, featureErr := featureEnabled(ctx, c.featureGate, featureUsersInvite, scope, uuid.Nil); featureErr != nil {
+		return featureErr
 	} else if !enabled {
 		return ErrInviteDisabled
 	}
 
-	metadata := cloneMap(input.Metadata)
-	user := &types.AuthUser{
+	created, err := c.createInviteUser(ctx, input)
+	if err != nil {
+		return err
+	}
+
+	token, jti, issuedAt, expiresAt, err := c.issueInviteLink(created, scope)
+	if err != nil {
+		return err
+	}
+	if err := c.recordInviteToken(ctx, created.ID, jti, issuedAt, expiresAt); err != nil {
+		return err
+	}
+
+	created, err = c.updateInviteMetadata(ctx, created, input.Actor, scope, jti, issuedAt, expiresAt)
+	if err != nil {
+		return err
+	}
+	c.emitInviteActivity(ctx, created, input.Actor, scope, jti, issuedAt, expiresAt)
+	setInviteResult(input.Result, created, token, expiresAt)
+	return nil
+}
+
+func (c *UserInviteCommand) createInviteUser(ctx context.Context, input UserInviteInput) (*types.AuthUser, error) {
+	return c.repo.Create(ctx, &types.AuthUser{
 		Email:     strings.TrimSpace(input.Email),
 		Username:  strings.TrimSpace(input.Username),
 		FirstName: strings.TrimSpace(input.FirstName),
 		LastName:  strings.TrimSpace(input.LastName),
 		Role:      input.Role,
 		Status:    types.LifecycleStatePending,
-		Metadata:  metadata,
-	}
-	created, err := c.repo.Create(ctx, user)
-	if err != nil {
-		return err
-	}
+		Metadata:  cloneMap(input.Metadata),
+	})
+}
 
+func (c *UserInviteCommand) issueInviteLink(user *types.AuthUser, scope types.ScopeFilter) (string, string, time.Time, time.Time, error) {
 	issuedAt := now(c.clock)
 	expiresAt := issuedAt.Add(c.tokenTTL)
 	jti := c.idGen.UUID().String()
-
-	payload := buildSecureLinkPayload(
-		SecureLinkActionInvite,
-		created,
-		scope,
-		jti,
-		issuedAt,
-		expiresAt,
-		secureLinkSourceDefault,
-	)
+	payload := buildSecureLinkPayload(SecureLinkActionInvite, user, scope, jti, issuedAt, expiresAt, secureLinkSourceDefault)
 	token, err := c.manager.Generate(c.route, payload)
-	if err != nil {
-		return err
-	}
+	return token, jti, issuedAt, expiresAt, err
+}
 
-	if _, err := c.tokens.CreateToken(ctx, types.UserToken{
-		UserID:    created.ID,
+func (c *UserInviteCommand) recordInviteToken(ctx context.Context, userID uuid.UUID, jti string, issuedAt, expiresAt time.Time) error {
+	_, err := c.tokens.CreateToken(ctx, types.UserToken{
+		UserID:    userID,
 		Type:      types.UserTokenInvite,
 		JTI:       jti,
 		Status:    types.UserTokenStatusIssued,
 		IssuedAt:  issuedAt,
 		ExpiresAt: expiresAt,
-	}); err != nil {
-		return err
-	}
+	})
+	return err
+}
 
-	attachTokenMetadata(created, "invite", tokenMetadata(jti, issuedAt, expiresAt, input.Actor, scope))
-	if updated, err := c.repo.Update(ctx, created); err != nil {
-		return err
-	} else if updated != nil {
-		created = updated
+func (c *UserInviteCommand) updateInviteMetadata(ctx context.Context, user *types.AuthUser, actor types.ActorRef, scope types.ScopeFilter, jti string, issuedAt, expiresAt time.Time) (*types.AuthUser, error) {
+	attachTokenMetadata(user, "invite", tokenMetadata(jti, issuedAt, expiresAt, actor, scope))
+	updated, err := c.repo.Update(ctx, user)
+	if err != nil {
+		return nil, err
 	}
+	if updated != nil {
+		return updated, nil
+	}
+	return user, nil
+}
 
+func (c *UserInviteCommand) emitInviteActivity(ctx context.Context, user *types.AuthUser, actor types.ActorRef, scope types.ScopeFilter, jti string, issuedAt, expiresAt time.Time) {
 	record := types.ActivityRecord{
-		UserID:     created.ID,
-		ActorID:    input.Actor.ID,
+		UserID:     user.ID,
+		ActorID:    actor.ID,
 		Verb:       "user.invite",
 		ObjectType: "user",
-		ObjectID:   created.ID.String(),
+		ObjectID:   user.ID.String(),
 		Channel:    "invites",
 		TenantID:   scope.TenantID,
 		OrgID:      scope.OrgID,
 		Data: map[string]any{
-			"email":      created.Email,
-			"role":       created.Role,
+			"email":      user.Email,
+			"role":       user.Role,
 			"jti":        jti,
 			"expires_at": expiresAt,
 		},
@@ -212,16 +227,16 @@ func (c *UserInviteCommand) Execute(ctx context.Context, input UserInviteInput) 
 	}
 	logActivity(ctx, c.sink, record)
 	emitActivityHook(ctx, c.hooks, record)
+}
 
-	if input.Result != nil {
-		*input.Result = UserInviteResult{
-			User:      created,
+func setInviteResult(result *UserInviteResult, user *types.AuthUser, token string, expiresAt time.Time) {
+	if result != nil {
+		*result = UserInviteResult{
+			User:      user,
 			Token:     token,
 			ExpiresAt: expiresAt,
 		}
 	}
-
-	return nil
 }
 
 func cloneMap(src map[string]any) map[string]any {

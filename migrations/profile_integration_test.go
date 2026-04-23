@@ -260,9 +260,9 @@ func canonicalGoAuthMigrationsRoot(t *testing.T) fs.FS {
 			path == "sqlite/0001_auth0_identifiers.down.sql" {
 			return nil
 		}
-		data, err := fs.ReadFile(root, path)
-		if err != nil {
-			return err
+		data, readErr := fs.ReadFile(root, path)
+		if readErr != nil {
+			return readErr
 		}
 		filtered[path] = &fstest.MapFile{Data: data}
 		return nil
@@ -295,7 +295,7 @@ func mustTableColumns(t *testing.T, db *sql.DB, table string) []string {
 	if err != nil {
 		t.Fatalf("table info %s: %v", table, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	cols := make([]string, 0, 16)
 	for rows.Next() {
@@ -326,7 +326,7 @@ func mustNamedIndexes(t *testing.T, db *sql.DB, table string) []string {
 	if err != nil {
 		t.Fatalf("index list %s: %v", table, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	indexes := make([]string, 0, 8)
 	for rows.Next() {

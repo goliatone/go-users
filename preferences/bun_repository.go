@@ -136,7 +136,7 @@ func (r *Repository) ListPreferences(ctx context.Context, filter types.Preferenc
 				Where("org_id = ?", ids.org).
 				OrderExpr("key ASC")
 			if len(keys) > 0 {
-				q = q.Where("lower(key) IN (?)", bun.In(keys))
+				q = q.Where("lower(key) IN (?)", bun.List(keys))
 			}
 			return q
 		},
@@ -179,9 +179,9 @@ func (r *Repository) UpsertPreference(ctx context.Context, record types.Preferen
 		payload.CreatedBy = existing.CreatedBy
 		payload.Version = existing.Version + 1
 		payload.UpdatedAt = now
-		updated, err := r.Update(writeCtx, payload)
-		if err != nil {
-			return nil, err
+		updated, updateErr := r.Update(writeCtx, payload)
+		if updateErr != nil {
+			return nil, updateErr
 		}
 		return toDomainPtr(updated), nil
 	case repository.IsRecordNotFound(err):
@@ -192,9 +192,9 @@ func (r *Repository) UpsertPreference(ctx context.Context, record types.Preferen
 		if payload.CreatedBy == uuid.Nil {
 			payload.CreatedBy = payload.UpdatedBy
 		}
-		created, err := r.Create(writeCtx, payload)
-		if err != nil {
-			return nil, err
+		created, createErr := r.Create(writeCtx, payload)
+		if createErr != nil {
+			return nil, createErr
 		}
 		return toDomainPtr(created), nil
 	default:

@@ -34,16 +34,16 @@ func TestMigrationsApplyToSQLite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to load auth bootstrap migrations: %v", err)
 	}
-	if err := applyFilesystem(ctx, db, authFS); err != nil {
-		t.Fatalf("failed to apply auth bootstrap migrations: %v", err)
+	if applyErr := applyFilesystem(ctx, db, authFS); applyErr != nil {
+		t.Fatalf("failed to apply auth bootstrap migrations: %v", applyErr)
 	}
 
 	extrasFS, err := fs.Sub(users.GetAuthExtrasMigrationsFS(), "data/sql/migrations/auth_extras/sqlite")
 	if err != nil {
 		t.Fatalf("failed to load auth extras migrations: %v", err)
 	}
-	if err := applyFilesystem(ctx, db, extrasFS); err != nil {
-		t.Fatalf("failed to apply auth extras migrations: %v", err)
+	if applyErr := applyFilesystem(ctx, db, extrasFS); applyErr != nil {
+		t.Fatalf("failed to apply auth extras migrations: %v", applyErr)
 	}
 
 	coreFS, err := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations/sqlite")
