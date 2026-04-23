@@ -2,6 +2,7 @@ package goauth
 
 import (
 	"context"
+	"time"
 
 	auth "github.com/goliatone/go-auth"
 	"github.com/goliatone/go-users/pkg/types"
@@ -142,17 +143,18 @@ func toAuthUser(user *auth.User) *types.AuthUser {
 		return nil
 	}
 	return &types.AuthUser{
-		ID:        user.ID,
-		Role:      string(user.Role),
-		Status:    types.LifecycleState(user.Status),
-		Email:     user.Email,
-		Username:  user.Username,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-		Metadata:  copyMetadata(user.Metadata),
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Raw:       user,
+		ID:           user.ID,
+		Role:         string(user.Role),
+		Status:       types.LifecycleState(user.Status),
+		Email:        user.Email,
+		Username:     user.Username,
+		FirstName:    user.FirstName,
+		LastName:     user.LastName,
+		PasswordHash: user.PasswordHash,
+		Metadata:     copyMetadata(user.Metadata),
+		CreatedAt:    user.CreatedAt,
+		UpdatedAt:    user.UpdatedAt,
+		Raw:          user,
 	}
 }
 
@@ -169,19 +171,41 @@ func fromAuthUser(user *types.AuthUser) *auth.User {
 		clone.Username = user.Username
 		clone.FirstName = user.FirstName
 		clone.LastName = user.LastName
+		clone.PasswordHash = user.PasswordHash
 		clone.Metadata = copyMetadata(user.Metadata)
 		return &clone
 	}
 	return &auth.User{
-		ID:        user.ID,
-		Role:      auth.UserRole(user.Role),
-		Status:    auth.UserStatus(user.Status),
-		Email:     user.Email,
-		Username:  user.Username,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
-		Metadata:  copyMetadata(user.Metadata),
+		ID:           user.ID,
+		Role:         auth.UserRole(user.Role),
+		Status:       auth.UserStatus(user.Status),
+		Email:        user.Email,
+		Username:     user.Username,
+		FirstName:    user.FirstName,
+		LastName:     user.LastName,
+		PasswordHash: user.PasswordHash,
+		Metadata:     copyMetadata(user.Metadata),
 	}
+}
+
+func (a *UsersAdapter) MarkTemporaryPassword(ctx context.Context, id uuid.UUID, issuedAt, expiresAt time.Time) error {
+	record, err := a.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	record.Metadata = types.MarkTemporaryPasswordMetadata(record.Metadata, issuedAt, expiresAt)
+	_, err = a.Update(ctx, record)
+	return err
+}
+
+func (a *UsersAdapter) ClearTemporaryPassword(ctx context.Context, id uuid.UUID) error {
+	record, err := a.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	record.Metadata = types.ClearTemporaryPasswordMetadata(record.Metadata)
+	_, err = a.Update(ctx, record)
+	return err
 }
 
 func buildGoAuthOptions(cfg types.TransitionConfig) []auth.TransitionOption {
