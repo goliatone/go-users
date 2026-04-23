@@ -95,3 +95,9 @@ type TemporaryPasswordRepository interface {
 	MarkTemporaryPassword(ctx context.Context, id uuid.UUID, issuedAt, expiresAt time.Time) error
 	ClearTemporaryPassword(ctx context.Context, id uuid.UUID) error
 }
+
+// TemporaryPasswordResetRepository is an optional extension for stores that can
+// reset a password and clear temporary-password metadata atomically.
+type TemporaryPasswordResetRepository interface {
+	ResetPasswordAndClearTemporaryPassword(ctx context.Context, id uuid.UUID, passwordHash string) error
+}
