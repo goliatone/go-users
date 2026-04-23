@@ -33,6 +33,7 @@ type Commands struct {
 	BulkUserTransition       *command.BulkUserTransitionCommand
 	BulkUserImport           *command.BulkUserImportCommand
 	UserCreate               *command.UserCreateCommand
+	UserBootstrapPassword    *command.UserBootstrapPasswordCommand
 	UserUpdate               *command.UserUpdateCommand
 	UserInvite               *command.UserInviteCommand
 	UserRegistrationRequest  *command.UserRegistrationRequestCommand
@@ -335,6 +336,12 @@ func (s *Service) buildCommands() Commands {
 		BulkUserTransition:      command.NewBulkUserTransitionCommand(lifecycle),
 		BulkUserImport:          command.NewBulkUserImportCommand(userCreate),
 		UserCreate:              userCreate,
+		UserBootstrapPassword: command.NewUserBootstrapPasswordCommand(command.BootstrapPasswordCommandConfig{
+			Repository: s.cfg.AuthRepository,
+			Create:     userCreate,
+			Reset:      userPasswordReset,
+			Clock:      s.cfg.Clock,
+		}),
 		UserUpdate: command.NewUserUpdateCommand(command.UserUpdateCommandConfig{
 			Repository: s.cfg.AuthRepository,
 			Policy:     s.cfg.TransitionPolicy,
