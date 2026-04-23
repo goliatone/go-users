@@ -11,8 +11,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 	"testing/fstest"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/goliatone/go-auth"
@@ -378,8 +378,8 @@ func WithPersistence(ctx context.Context, app *App) error {
 // filterAuthMigrations skips legacy auth0 migrations that sort before users table creation.
 func filterAuthMigrations(root fs.FS) (fs.FS, error) {
 	exclude := map[string]struct{}{
-		"0001_auth0_identifiers.up.sql":       {},
-		"0001_auth0_identifiers.down.sql":     {},
+		"0001_auth0_identifiers.up.sql":          {},
+		"0001_auth0_identifiers.down.sql":        {},
 		"sqlite/0001_auth0_identifiers.up.sql":   {},
 		"sqlite/0001_auth0_identifiers.down.sql": {},
 	}

@@ -108,16 +108,16 @@ func seedDemoUsers(ctx context.Context, app *App) error {
 		}
 
 		user := &auth.User{
-			ID:             uuid.New(),
-			Role:           auth.RoleAdmin,
-			Status:         auth.UserStatusActive,
-			FirstName:      acct.FirstName,
-			LastName:       acct.LastName,
-			Username:       acct.Username,
-			Email:          acct.Email,
-			PasswordHash:   passwordHash,
-			EmailValidated: true,
-			ExternalID:     acct.Email,
+			ID:                 uuid.New(),
+			Role:               auth.RoleAdmin,
+			Status:             auth.UserStatusActive,
+			FirstName:          acct.FirstName,
+			LastName:           acct.LastName,
+			Username:           acct.Username,
+			Email:              acct.Email,
+			PasswordHash:       passwordHash,
+			EmailValidated:     true,
+			ExternalID:         acct.Email,
 			ExternalIDProvider: "seed",
 		}
 
