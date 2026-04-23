@@ -87,6 +87,38 @@ var _ gocommand.Commander[UserPasswordResetConfirmInput] = (*UserPasswordResetCo
 
 // Execute validates the securelink token, applies the reset, and then consumes it.
 func (c *UserPasswordResetConfirmCommand) Execute(ctx context.Context, input UserPasswordResetConfirmInput) error {
+	if err := c.validateExecuteInput(input); err != nil {
+		return err
+	}
+
+	payload, jti, record, expiresAt, err := c.resolveResetToken(ctx, input.Token)
+	if err != nil {
+		return err
+	}
+	err = c.enforceResetScope(ctx, payload, input.Scope)
+	if err != nil {
+		return err
+	}
+	lifecycleRepo, err := c.passwordResetLifecycleRepo()
+	if err != nil {
+		return err
+	}
+	claimedAt := now(c.clock)
+	err = lifecycleRepo.ClaimReset(ctx, jti, claimedAt, c.claimTTL)
+	if err != nil {
+		return c.passwordResetClaimError(ctx, jti, claimedAt, err)
+	}
+
+	result, err := c.executePasswordReset(ctx, record, payload, input, jti, expiresAt)
+	if err != nil {
+		c.releaseResetClaim(ctx, lifecycleRepo, jti, claimedAt)
+		return err
+	}
+
+	return c.finalizePasswordReset(ctx, lifecycleRepo, input.Result, jti, claimedAt, result)
+}
+
+func (c *UserPasswordResetConfirmCommand) validateExecuteInput(input UserPasswordResetConfirmInput) error {
 	if c.manager == nil {
 		return types.ErrMissingSecureLinkManager
 	}
@@ -96,30 +128,18 @@ func (c *UserPasswordResetConfirmCommand) Execute(ctx context.Context, input Use
 	if c.resetCmd == nil {
 		return ErrResetCommandRequired
 	}
-	if err := input.Validate(); err != nil {
-		return err
-	}
+	return input.Validate()
+}
 
-	payload, jti, record, expiresAt, err := c.resolveResetToken(ctx, input.Token)
-	if err != nil {
-		return err
-	}
-	if err := c.enforceResetScope(ctx, payload, input.Scope); err != nil {
-		return err
-	}
+func (c *UserPasswordResetConfirmCommand) passwordResetLifecycleRepo() (types.PasswordResetLifecycleRepository, error) {
 	lifecycleRepo, ok := c.resets.(types.PasswordResetLifecycleRepository)
 	if !ok {
-		return types.ErrMissingPasswordResetLifecycleRepository
+		return nil, types.ErrMissingPasswordResetLifecycleRepository
 	}
-	claimedAt := now(c.clock)
-	if err := lifecycleRepo.ClaimReset(ctx, jti, claimedAt, c.claimTTL); err != nil {
-		return c.passwordResetClaimError(ctx, jti, claimedAt, err)
-	}
+	return lifecycleRepo, nil
+}
 
-	resetScope := scopeFromPayload(payload)
-	if resetScope.TenantID == uuid.Nil && resetScope.OrgID == uuid.Nil {
-		resetScope = input.Scope
-	}
+func (c *UserPasswordResetConfirmCommand) executePasswordReset(ctx context.Context, record *types.PasswordResetRecord, payload types.SecureLinkPayload, input UserPasswordResetConfirmInput, jti string, expiresAt time.Time) (*UserPasswordResetResult, error) {
 	result := &UserPasswordResetResult{}
 	if err := c.resetCmd.Execute(ctx, UserPasswordResetInput{
 		UserID:          record.UserID,
@@ -127,28 +147,41 @@ func (c *UserPasswordResetConfirmCommand) Execute(ctx context.Context, input Use
 		TokenJTI:        jti,
 		TokenExpiresAt:  expiresAt,
 		Actor:           types.ActorRef{ID: record.UserID, Type: "user"},
-		Scope:           resetScope,
+		Scope:           c.resetScopeFromPayload(payload, input.Scope),
 		Result:          result,
 	}); err != nil {
-		c.releaseResetClaim(ctx, lifecycleRepo, jti, claimedAt)
-		return err
+		return nil, err
 	}
+	return result, nil
+}
 
+func (c *UserPasswordResetConfirmCommand) resetScopeFromPayload(payload types.SecureLinkPayload, fallback types.ScopeFilter) types.ScopeFilter {
+	resetScope := scopeFromPayload(payload)
+	if resetScope.TenantID == uuid.Nil && resetScope.OrgID == uuid.Nil {
+		return fallback
+	}
+	return resetScope
+}
+
+func (c *UserPasswordResetConfirmCommand) finalizePasswordReset(ctx context.Context, repo types.PasswordResetLifecycleRepository, output *UserPasswordResetConfirmResult, jti string, claimedAt time.Time, result *UserPasswordResetResult) error {
 	usedAt := now(c.clock)
-	if err := lifecycleRepo.FinalizeReset(ctx, jti, claimedAt, usedAt); err != nil {
+	if err := repo.FinalizeReset(ctx, jti, claimedAt, usedAt); err != nil {
 		if c.passwordResetFinalized(ctx, jti) {
-			if input.Result != nil {
-				input.Result.User = result.User
-			}
+			assignPasswordResetConfirmUser(output, result)
 			return nil
 		}
 		return err
 	}
 
-	if input.Result != nil {
-		input.Result.User = result.User
-	}
+	assignPasswordResetConfirmUser(output, result)
 	return nil
+}
+
+func assignPasswordResetConfirmUser(output *UserPasswordResetConfirmResult, result *UserPasswordResetResult) {
+	if output == nil {
+		return
+	}
+	output.User = result.User
 }
 
 func (c *UserPasswordResetConfirmCommand) resolveResetToken(ctx context.Context, token string) (types.SecureLinkPayload, string, *types.PasswordResetRecord, time.Time, error) {
