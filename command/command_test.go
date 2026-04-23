@@ -476,6 +476,80 @@ func TestUserCreateCommand_DefaultsStatusAndLogsActivity(t *testing.T) {
 	require.Equal(t, result.ID, recorded.UserID)
 }
 
+func TestUserBootstrapPasswordCommand_CreatesTemporaryUser(t *testing.T) {
+	repo := newFakeAuthRepo()
+	actor := types.ActorRef{ID: uuid.New(), Type: "system"}
+	fixed := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
+	cmd := NewUserBootstrapPasswordCommand(BootstrapPasswordCommandConfig{
+		Repository: repo,
+		Clock:      fixedClock{t: fixed},
+	})
+
+	result := &UserBootstrapPasswordResult{}
+	err := cmd.Execute(context.Background(), UserBootstrapPasswordInput{
+		User: &types.AuthUser{
+			Email:    "bootstrap@example.com",
+			Username: "bootstrap",
+			Role:     "admin",
+		},
+		PasswordHash: "hashed-temp",
+		Actor:        actor,
+		Result:       result,
+	})
+
+	require.NoError(t, err)
+	require.True(t, result.Created)
+	require.Equal(t, fixed.Add(DefaultTemporaryPasswordTTL), result.ExpiresAt)
+	require.Equal(t, "hashed-temp", result.User.PasswordHash)
+	require.Equal(t, true, result.User.Metadata[types.TemporaryPasswordMetadataKey])
+	require.Equal(t, true, result.User.Metadata[types.PasswordChangeRequiredMetadataKey])
+	require.Equal(t, fixed.Format(time.RFC3339Nano), result.User.Metadata[types.TemporaryPasswordIssuedAtMetadataKey])
+	require.Equal(t, fixed.Add(DefaultTemporaryPasswordTTL).Format(time.RFC3339Nano), result.User.Metadata[types.TemporaryPasswordExpiresAtMetadataKey])
+}
+
+func TestUserBootstrapPasswordCommand_RefreshesExistingTemporaryUser(t *testing.T) {
+	userID := uuid.New()
+	repo := newFakeAuthRepo()
+	repo.users[userID] = &types.AuthUser{
+		ID:           userID,
+		Email:        "bootstrap@example.com",
+		Username:     "bootstrap",
+		Role:         "admin",
+		PasswordHash: "old-hash",
+		Metadata: map[string]any{
+			"keep": "value",
+		},
+	}
+	actor := types.ActorRef{ID: uuid.New(), Type: "system"}
+	fixed := time.Date(2026, 4, 22, 12, 0, 0, 0, time.UTC)
+	cmd := NewUserBootstrapPasswordCommand(BootstrapPasswordCommandConfig{
+		Repository: repo,
+		Clock:      fixedClock{t: fixed},
+	})
+
+	result := &UserBootstrapPasswordResult{}
+	err := cmd.Execute(context.Background(), UserBootstrapPasswordInput{
+		User: &types.AuthUser{
+			Email:    "bootstrap@example.com",
+			Username: "bootstrap",
+			Role:     "admin",
+		},
+		PasswordHash: "new-hash",
+		TTL:          2 * time.Hour,
+		Actor:        actor,
+		Result:       result,
+	})
+
+	require.NoError(t, err)
+	require.False(t, result.Created)
+	require.Equal(t, userID, repo.lastResetUserID)
+	require.Equal(t, "new-hash", repo.lastResetHash)
+	require.Equal(t, "new-hash", result.User.PasswordHash)
+	require.Equal(t, "value", result.User.Metadata["keep"])
+	require.Equal(t, true, result.User.Metadata[types.TemporaryPasswordMetadataKey])
+	require.Equal(t, fixed.Add(2*time.Hour), result.ExpiresAt)
+}
+
 func TestUserUpdateCommand_LogsActivity(t *testing.T) {
 	userID := uuid.New()
 	repo := newFakeAuthRepo()
@@ -737,6 +811,29 @@ func (f *fakeAuthRepo) AllowedTransitions(context.Context, uuid.UUID) ([]types.L
 func (f *fakeAuthRepo) ResetPassword(_ context.Context, id uuid.UUID, hash string) error {
 	f.lastResetUserID = id
 	f.lastResetHash = hash
+	user, ok := f.users[id]
+	if !ok {
+		return errors.New("not found")
+	}
+	user.PasswordHash = hash
+	return nil
+}
+
+func (f *fakeAuthRepo) MarkTemporaryPassword(_ context.Context, id uuid.UUID, issuedAt, expiresAt time.Time) error {
+	user, ok := f.users[id]
+	if !ok {
+		return errors.New("not found")
+	}
+	user.Metadata = types.MarkTemporaryPasswordMetadata(user.Metadata, issuedAt, expiresAt)
+	return nil
+}
+
+func (f *fakeAuthRepo) ClearTemporaryPassword(_ context.Context, id uuid.UUID) error {
+	user, ok := f.users[id]
+	if !ok {
+		return errors.New("not found")
+	}
+	user.Metadata = types.ClearTemporaryPasswordMetadata(user.Metadata)
 	return nil
 }
 

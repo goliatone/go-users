@@ -99,6 +99,33 @@ Gated flows and keys:
 
 Scope handling: `go-users` resolves gates with the scope derived from `types.ScopeFilter` and (for password reset requests) the target user ID. If no scope identifiers are set, the gate falls back to context-based scope resolution. Gate errors are returned to the caller.
 
+## Temporary bootstrap passwords
+
+Use `service.Commands().UserBootstrapPassword` when a deployment needs a bootstrapped user with a temporary password. The command creates the user when missing or refreshes the existing user's password through `UserPasswordReset`, marks metadata with `password_temporary`, `password_change_required`, `password_temporary_issued_at`, and `password_temporary_expires_at`, and defaults expiry to 24 hours.
+
+Callers still own password generation and hashing:
+
+```go
+hash, err := auth.HashPassword(generatedPassword)
+if err != nil {
+	return err
+}
+
+result := &command.UserBootstrapPasswordResult{}
+err = users.Commands().UserBootstrapPassword.Execute(ctx, command.UserBootstrapPasswordInput{
+	User: &types.AuthUser{
+		Email:    "admin@example.com",
+		Username: "admin",
+		Role:     "admin",
+	},
+	PasswordHash: hash,
+	Actor:        types.ActorRef{ID: systemActorID, Type: "system"},
+	Result:       result,
+})
+```
+
+When the local `go-auth` user provider reads this metadata, expired temporary passwords are rejected. A normal password reset/change clears the temporary-password metadata for repositories that implement `types.TemporaryPasswordRepository`.
+
 ## Queries
 
 - `UserInventory`: list, filter, and search users.
