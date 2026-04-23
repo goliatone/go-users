@@ -54,7 +54,7 @@ func TestRepository_Stats(t *testing.T) {
 	store, err := NewRepository(RepositoryConfig{DB: db})
 	require.NoError(t, err)
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		require.NoError(t, store.Log(ctx, types.ActivityRecord{
 			Verb:       "user.lifecycle.transition",
 			ObjectType: "user",

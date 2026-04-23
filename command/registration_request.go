@@ -121,87 +121,112 @@ func (c *UserRegistrationRequestCommand) Execute(ctx context.Context, input User
 	if err := input.Validate(); err != nil {
 		return err
 	}
-	scope := input.Scope.Clone()
-	if input.Actor.ID != uuid.Nil {
-		var err error
-		scope, err = c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionUsersWrite, uuid.Nil)
-		if err != nil {
-			return err
-		}
-	}
-	if enabled, err := featureEnabled(ctx, c.featureGate, featuregate.FeatureUsersSignup, scope, uuid.Nil); err != nil {
+	scope, err := c.registrationScope(ctx, input)
+	if err != nil {
 		return err
-	} else if !enabled {
+	}
+	if featureErr := c.ensureRegistrationEnabled(ctx, scope); featureErr != nil {
+		return featureErr
+	}
+	created, err := c.createRegistrationUser(ctx, input)
+	if err != nil {
+		return err
+	}
+	token, jti, issuedAt, expiresAt, err := c.issueRegistrationLink(created, scope)
+	if err != nil {
+		return err
+	}
+	if recordErr := c.recordRegistrationToken(ctx, created.ID, jti, issuedAt, expiresAt); recordErr != nil {
+		return recordErr
+	}
+	created, err = c.updateRegistrationMetadata(ctx, created, input.Actor, scope, jti, issuedAt, expiresAt)
+	if err != nil {
+		return err
+	}
+	c.emitRegistrationActivity(ctx, created, input.Actor, scope, jti, issuedAt, expiresAt)
+	setRegistrationResult(input.Result, created, token, expiresAt)
+	return nil
+}
+
+func (c *UserRegistrationRequestCommand) registrationScope(ctx context.Context, input UserRegistrationRequestInput) (types.ScopeFilter, error) {
+	if input.Actor.ID == uuid.Nil {
+		return input.Scope.Clone(), nil
+	}
+	return c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionUsersWrite, uuid.Nil)
+}
+
+func (c *UserRegistrationRequestCommand) ensureRegistrationEnabled(ctx context.Context, scope types.ScopeFilter) error {
+	enabled, err := featureEnabled(ctx, c.featureGate, featuregate.FeatureUsersSignup, scope, uuid.Nil)
+	if err != nil {
+		return err
+	}
+	if !enabled {
 		return ErrSignupDisabled
 	}
+	return nil
+}
 
-	metadata := cloneMap(input.Metadata)
-	user := &types.AuthUser{
+func (c *UserRegistrationRequestCommand) createRegistrationUser(ctx context.Context, input UserRegistrationRequestInput) (*types.AuthUser, error) {
+	return c.repo.Create(ctx, &types.AuthUser{
 		Email:     strings.TrimSpace(input.Email),
 		Username:  strings.TrimSpace(input.Username),
 		FirstName: strings.TrimSpace(input.FirstName),
 		LastName:  strings.TrimSpace(input.LastName),
 		Role:      input.Role,
 		Status:    types.LifecycleStatePending,
-		Metadata:  metadata,
-	}
-	created, err := c.repo.Create(ctx, user)
-	if err != nil {
-		return err
-	}
+		Metadata:  cloneMap(input.Metadata),
+	})
+}
 
+func (c *UserRegistrationRequestCommand) issueRegistrationLink(user *types.AuthUser, scope types.ScopeFilter) (string, string, time.Time, time.Time, error) {
 	issuedAt := now(c.clock)
 	expiresAt := issuedAt.Add(c.tokenTTL)
 	jti := c.idGen.UUID().String()
-
-	payload := buildSecureLinkPayload(
-		SecureLinkActionRegister,
-		created,
-		scope,
-		jti,
-		issuedAt,
-		expiresAt,
-		secureLinkSourceDefault,
-	)
+	payload := buildSecureLinkPayload(SecureLinkActionRegister, user, scope, jti, issuedAt, expiresAt, secureLinkSourceDefault)
 	token, err := c.manager.Generate(c.route, payload)
-	if err != nil {
-		return err
-	}
+	return token, jti, issuedAt, expiresAt, err
+}
 
-	if _, err := c.tokens.CreateToken(ctx, types.UserToken{
-		UserID:    created.ID,
+func (c *UserRegistrationRequestCommand) recordRegistrationToken(ctx context.Context, userID uuid.UUID, jti string, issuedAt, expiresAt time.Time) error {
+	_, err := c.tokens.CreateToken(ctx, types.UserToken{
+		UserID:    userID,
 		Type:      types.UserTokenRegistration,
 		JTI:       jti,
 		Status:    types.UserTokenStatusIssued,
 		IssuedAt:  issuedAt,
 		ExpiresAt: expiresAt,
-	}); err != nil {
-		return err
-	}
+	})
+	return err
+}
 
-	attachTokenMetadata(created, "registration", tokenMetadata(jti, issuedAt, expiresAt, input.Actor, scope))
-	if updated, err := c.repo.Update(ctx, created); err != nil {
-		return err
-	} else if updated != nil {
-		created = updated
+func (c *UserRegistrationRequestCommand) updateRegistrationMetadata(ctx context.Context, user *types.AuthUser, actor types.ActorRef, scope types.ScopeFilter, jti string, issuedAt, expiresAt time.Time) (*types.AuthUser, error) {
+	attachTokenMetadata(user, "registration", tokenMetadata(jti, issuedAt, expiresAt, actor, scope))
+	updated, err := c.repo.Update(ctx, user)
+	if err != nil {
+		return nil, err
 	}
+	if updated != nil {
+		return updated, nil
+	}
+	return user, nil
+}
 
-	actor := input.Actor
+func (c *UserRegistrationRequestCommand) emitRegistrationActivity(ctx context.Context, user *types.AuthUser, actor types.ActorRef, scope types.ScopeFilter, jti string, issuedAt, expiresAt time.Time) {
 	if actor.ID == uuid.Nil {
-		actor = types.ActorRef{ID: created.ID, Type: "user"}
+		actor = types.ActorRef{ID: user.ID, Type: "user"}
 	}
 	record := types.ActivityRecord{
-		UserID:     created.ID,
+		UserID:     user.ID,
 		ActorID:    actor.ID,
 		Verb:       "user.registration.requested",
 		ObjectType: "user",
-		ObjectID:   created.ID.String(),
+		ObjectID:   user.ID.String(),
 		Channel:    "registration",
 		TenantID:   scope.TenantID,
 		OrgID:      scope.OrgID,
 		Data: map[string]any{
-			"email":      created.Email,
-			"role":       created.Role,
+			"email":      user.Email,
+			"role":       user.Role,
 			"jti":        jti,
 			"expires_at": expiresAt,
 		},
@@ -209,16 +234,16 @@ func (c *UserRegistrationRequestCommand) Execute(ctx context.Context, input User
 	}
 	logActivity(ctx, c.sink, record)
 	emitActivityHook(ctx, c.hooks, record)
+}
 
-	if input.Result != nil {
-		*input.Result = UserRegistrationRequestResult{
-			User:      created,
+func setRegistrationResult(result *UserRegistrationRequestResult, user *types.AuthUser, token string, expiresAt time.Time) {
+	if result != nil {
+		*result = UserRegistrationRequestResult{
+			User:      user,
 			Token:     token,
 			ExpiresAt: expiresAt,
 		}
 	}
-
-	return nil
 }
 
 func (c *UserRegistrationRequestCommand) applyRuntime(runtime secureLinkRuntime) {

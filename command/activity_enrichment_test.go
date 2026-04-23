@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"maps"
 	"reflect"
 	"strings"
 	"sync"
@@ -265,7 +266,7 @@ func TestCommand_ConcurrentRunsDoNotOverwriteExistingKeys(t *testing.T) {
 		errCh <- cmdB.Execute(context.Background(), Input{})
 	}()
 
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		require.NoError(t, <-errCh)
 	}
 
@@ -452,9 +453,7 @@ func cloneAnyMap(src map[string]any) map[string]any {
 		return map[string]any{}
 	}
 	out := make(map[string]any, len(src))
-	for key, value := range src {
-		out[key] = value
-	}
+	maps.Copy(out, src)
 	return out
 }
 

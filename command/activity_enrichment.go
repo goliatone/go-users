@@ -102,10 +102,7 @@ type Command struct {
 func New(cfg Config) *Command {
 	schedule := normalizeSchedule(cfg.Schedule)
 	batchSize := normalizeBatchSize(cfg.BatchSize)
-	cutoff := cfg.EnrichedAtCutoff
-	if cutoff < 0 {
-		cutoff = 0
-	}
+	cutoff := max(cfg.EnrichedAtCutoff, 0)
 
 	clock := cfg.Clock
 	if clock == nil {

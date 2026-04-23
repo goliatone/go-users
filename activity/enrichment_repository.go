@@ -3,6 +3,7 @@ package activity
 import (
 	"context"
 	"errors"
+	"maps"
 	"strings"
 	"time"
 
@@ -319,9 +320,7 @@ func missingActivityData(existing, updates map[string]any) map[string]any {
 
 func mergeActivityData(existing, updates map[string]any) map[string]any {
 	merged := cloneMap(existing)
-	for key, value := range updates {
-		merged[key] = value
-	}
+	maps.Copy(merged, updates)
 	return merged
 }
 

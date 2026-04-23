@@ -2,6 +2,7 @@ package activity
 
 import (
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/goliatone/go-auth"
@@ -145,7 +146,7 @@ func BuildFilterFromActor(actor *auth.ActorContext, role string, req types.Activ
 	}
 
 	if !cfg.MachineActivityEnabled && !isSuperadmin {
-		filter.MachineActivityEnabled = boolPtr(false)
+		filter.MachineActivityEnabled = new(false)
 		filter.MachineActorTypes = cloneStrings(cfg.MachineActorTypes)
 		filter.MachineDataKeys = cloneStrings(cfg.MachineDataKeys)
 	}
@@ -320,12 +321,7 @@ func uniqueStrings(values []string) []string {
 }
 
 func containsString(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(values, target)
 }
 
 func intersectStrings(a, b []string) []string {
@@ -375,8 +371,9 @@ func cloneStrings(values []string) []string {
 	return out
 }
 
+//go:fix inline
 func boolPtr(value bool) *bool {
-	return &value
+	return new(value)
 }
 
 func intersectScopeFilters(base, requested types.ScopeFilter) (types.ScopeFilter, error) {

@@ -91,48 +91,12 @@ func (c *UserPasswordResetConfirmCommand) Execute(ctx context.Context, input Use
 		return err
 	}
 
-	payloadMap, err := c.manager.Validate(input.Token)
+	payload, jti, record, expiresAt, err := c.resolveResetToken(ctx, input.Token)
 	if err != nil {
 		return err
 	}
-	payload := types.SecureLinkPayload(payloadMap)
-	jti := payloadString(payload, "jti")
-	if jti == "" {
-		return ErrTokenJTIRequired
-	}
-
-	record, err := c.resets.GetResetByJTI(ctx, jti)
-	if err != nil {
+	if err := c.enforceResetScope(ctx, payload, input.Scope); err != nil {
 		return err
-	}
-	if record == nil {
-		return ErrTokenNotFound
-	}
-	if record.Status == types.PasswordResetStatusChanged || !record.UsedAt.IsZero() {
-		return ErrTokenAlreadyUsed
-	}
-	if record.Status == types.PasswordResetStatusExpired {
-		return ErrTokenExpired
-	}
-
-	expiresAt := record.ExpiresAt
-	if expiresAt.IsZero() {
-		expiresAt = payloadTime(payload, "expires_at")
-	}
-	if !expiresAt.IsZero() && now(c.clock).After(expiresAt) {
-		_ = c.resets.UpdateResetStatus(ctx, jti, types.PasswordResetStatusExpired, time.Time{})
-		return ErrTokenExpired
-	}
-
-	payloadUserID := payloadUUID(payload, "user_id")
-	if payloadUserID != uuid.Nil && record.UserID != uuid.Nil && payloadUserID != record.UserID {
-		return ErrTokenUserMismatch
-	}
-
-	if c.enforcer != nil {
-		if err := c.enforcer(ctx, payload, input.Scope); err != nil {
-			return err
-		}
 	}
 
 	consumedAt := now(c.clock)
@@ -166,6 +130,59 @@ func (c *UserPasswordResetConfirmCommand) Execute(ctx context.Context, input Use
 		input.Result.User = result.User
 	}
 	return nil
+}
+
+func (c *UserPasswordResetConfirmCommand) resolveResetToken(ctx context.Context, token string) (types.SecureLinkPayload, string, *types.PasswordResetRecord, time.Time, error) {
+	payloadMap, err := c.manager.Validate(token)
+	if err != nil {
+		return nil, "", nil, time.Time{}, err
+	}
+	payload := types.SecureLinkPayload(payloadMap)
+	jti := payloadString(payload, "jti")
+	if jti == "" {
+		return nil, "", nil, time.Time{}, ErrTokenJTIRequired
+	}
+	record, err := c.resets.GetResetByJTI(ctx, jti)
+	if err != nil {
+		return nil, "", nil, time.Time{}, err
+	}
+	expiresAt, err := c.validateResetRecord(ctx, jti, payload, record)
+	if err != nil {
+		return nil, "", nil, time.Time{}, err
+	}
+	return payload, jti, record, expiresAt, nil
+}
+
+func (c *UserPasswordResetConfirmCommand) validateResetRecord(ctx context.Context, jti string, payload types.SecureLinkPayload, record *types.PasswordResetRecord) (time.Time, error) {
+	if record == nil {
+		return time.Time{}, ErrTokenNotFound
+	}
+	if record.Status == types.PasswordResetStatusChanged || !record.UsedAt.IsZero() {
+		return time.Time{}, ErrTokenAlreadyUsed
+	}
+	if record.Status == types.PasswordResetStatusExpired {
+		return time.Time{}, ErrTokenExpired
+	}
+	expiresAt := record.ExpiresAt
+	if expiresAt.IsZero() {
+		expiresAt = payloadTime(payload, "expires_at")
+	}
+	if !expiresAt.IsZero() && now(c.clock).After(expiresAt) {
+		_ = c.resets.UpdateResetStatus(ctx, jti, types.PasswordResetStatusExpired, time.Time{})
+		return time.Time{}, ErrTokenExpired
+	}
+	payloadUserID := payloadUUID(payload, "user_id")
+	if payloadUserID != uuid.Nil && record.UserID != uuid.Nil && payloadUserID != record.UserID {
+		return time.Time{}, ErrTokenUserMismatch
+	}
+	return expiresAt, nil
+}
+
+func (c *UserPasswordResetConfirmCommand) enforceResetScope(ctx context.Context, payload types.SecureLinkPayload, scope types.ScopeFilter) error {
+	if c.enforcer == nil {
+		return nil
+	}
+	return c.enforcer(ctx, payload, scope)
 }
 
 func (c *UserPasswordResetConfirmCommand) passwordResetConsumeError(ctx context.Context, jti string, consumedAt time.Time, err error) error {

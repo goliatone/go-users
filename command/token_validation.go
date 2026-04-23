@@ -28,41 +28,64 @@ func newTokenValidator(clock types.Clock, tokens types.UserTokenRepository, mana
 }
 
 func (v tokenValidator) validate(ctx context.Context, token string, tokenType types.UserTokenType, scope types.ScopeFilter) (types.SecureLinkPayload, *types.UserToken, error) {
-	if v.manager == nil {
-		return nil, nil, types.ErrMissingSecureLinkManager
+	if err := v.validateInputs(token, tokenType); err != nil {
+		return nil, nil, err
 	}
-	if v.tokens == nil {
-		return nil, nil, types.ErrMissingUserTokenRepository
-	}
-	if strings.TrimSpace(token) == "" {
-		return nil, nil, ErrTokenRequired
-	}
-	if tokenType == "" {
-		return nil, nil, ErrTokenTypeRequired
-	}
-
-	payloadMap, err := v.manager.Validate(token)
+	payload, err := v.validatePayload(token)
 	if err != nil {
 		return nil, nil, err
 	}
-	payload := types.SecureLinkPayload(payloadMap)
 	jti := payloadString(payload, "jti")
 	if jti == "" {
 		return nil, nil, ErrTokenJTIRequired
 	}
-
-	record, err := v.tokens.GetTokenByJTI(ctx, tokenType, jti)
+	record, err := v.loadUsableToken(ctx, tokenType, jti, payload)
 	if err != nil {
 		return nil, nil, err
 	}
+	if err := v.enforceTokenScope(ctx, payload, scope); err != nil {
+		return nil, nil, err
+	}
+	return payload, record, nil
+}
+
+func (v tokenValidator) validateInputs(token string, tokenType types.UserTokenType) error {
+	if v.manager == nil {
+		return types.ErrMissingSecureLinkManager
+	}
+	if v.tokens == nil {
+		return types.ErrMissingUserTokenRepository
+	}
+	if strings.TrimSpace(token) == "" {
+		return ErrTokenRequired
+	}
+	if tokenType == "" {
+		return ErrTokenTypeRequired
+	}
+	return nil
+}
+
+func (v tokenValidator) validatePayload(token string) (types.SecureLinkPayload, error) {
+	payloadMap, err := v.manager.Validate(token)
+	if err != nil {
+		return nil, err
+	}
+	return types.SecureLinkPayload(payloadMap), nil
+}
+
+func (v tokenValidator) loadUsableToken(ctx context.Context, tokenType types.UserTokenType, jti string, payload types.SecureLinkPayload) (*types.UserToken, error) {
+	record, err := v.tokens.GetTokenByJTI(ctx, tokenType, jti)
+	if err != nil {
+		return nil, err
+	}
 	if record == nil {
-		return nil, nil, ErrTokenNotFound
+		return nil, ErrTokenNotFound
 	}
 	if record.Status == types.UserTokenStatusUsed || !record.UsedAt.IsZero() {
-		return nil, nil, ErrTokenAlreadyUsed
+		return nil, ErrTokenAlreadyUsed
 	}
 	if record.Status == types.UserTokenStatusExpired {
-		return nil, nil, ErrTokenExpired
+		return nil, ErrTokenExpired
 	}
 
 	expiresAt := record.ExpiresAt
@@ -71,21 +94,22 @@ func (v tokenValidator) validate(ctx context.Context, token string, tokenType ty
 	}
 	if !expiresAt.IsZero() && now(v.clock).After(expiresAt) {
 		_ = v.tokens.UpdateTokenStatus(ctx, tokenType, jti, types.UserTokenStatusExpired, time.Time{})
-		return nil, nil, ErrTokenExpired
+		return nil, ErrTokenExpired
 	}
-
 	payloadUserID := payloadUUID(payload, "user_id")
 	if payloadUserID != uuid.Nil && record.UserID != uuid.Nil && payloadUserID != record.UserID {
-		return nil, nil, ErrTokenUserMismatch
+		return nil, ErrTokenUserMismatch
 	}
+	return record, nil
+}
 
+func (v tokenValidator) enforceTokenScope(ctx context.Context, payload types.SecureLinkPayload, scope types.ScopeFilter) error {
 	if v.enforcer != nil {
 		if err := v.enforcer(ctx, payload, scope); err != nil {
-			return nil, nil, err
+			return err
 		}
 	}
-
-	return payload, record, nil
+	return nil
 }
 
 // UserTokenValidateInput validates an onboarding token without consuming it.
