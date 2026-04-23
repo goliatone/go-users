@@ -3,18 +3,18 @@ module github.com/goliatone/go-users
 go 1.26.0
 
 require (
-	github.com/goliatone/go-auth v0.36.0
-	github.com/goliatone/go-command v0.18.0
+	github.com/goliatone/go-auth v0.40.0
+	github.com/goliatone/go-command v0.19.0
 	github.com/goliatone/go-crud v0.23.0
 	github.com/goliatone/go-errors v0.10.0
 	github.com/goliatone/go-featuregate v0.6.0
-	github.com/goliatone/go-i18n v0.3.0
+	github.com/goliatone/go-i18n v0.5.0
 	github.com/goliatone/go-masker v0.1.0
 	github.com/goliatone/go-options v0.7.1
-	github.com/goliatone/go-persistence-bun v0.13.0
+	github.com/goliatone/go-persistence-bun v0.14.0
 	github.com/goliatone/go-repository-bun v0.15.1
 	github.com/goliatone/go-repository-cache v0.7.1
-	github.com/goliatone/go-router v0.53.0
+	github.com/goliatone/go-router v0.57.0
 	github.com/goliatone/go-urlkit v0.6.0
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-sqlite3 v1.14.34
