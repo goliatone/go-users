@@ -2,6 +2,7 @@ package memory
 
 import (
 	"errors"
+	"maps"
 	"strings"
 	"sync"
 	"time"
@@ -90,9 +91,7 @@ func mergeSecureLinkPayloads(payloads []types.SecureLinkPayload) types.SecureLin
 	}
 	merged := make(types.SecureLinkPayload)
 	for _, payload := range payloads {
-		for key, value := range payload {
-			merged[key] = value
-		}
+		maps.Copy(merged, payload)
 	}
 	return merged
 }
@@ -102,8 +101,6 @@ func cloneSecureLinkPayload(payload types.SecureLinkPayload) types.SecureLinkPay
 		return types.SecureLinkPayload{}
 	}
 	copy := make(types.SecureLinkPayload, len(payload))
-	for key, value := range payload {
-		copy[key] = value
-	}
+	maps.Copy(copy, payload)
 	return copy
 }

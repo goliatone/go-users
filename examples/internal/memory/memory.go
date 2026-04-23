@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -130,14 +131,8 @@ func (r *AuthRepository) ListUsers(_ context.Context, filter types.UserInventory
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	offset := filter.Pagination.Offset
-	if offset < 0 {
-		offset = 0
-	}
-	end := offset + limit
-	if end > len(users) {
-		end = len(users)
-	}
+	offset := max(filter.Pagination.Offset, 0)
+	end := min(offset+limit, len(users))
 	page := types.UserInventoryPage{
 		Users:      append([]types.AuthUser{}, users[offset:end]...),
 		Total:      len(users),
@@ -148,12 +143,7 @@ func (r *AuthRepository) ListUsers(_ context.Context, filter types.UserInventory
 }
 
 func containsState(states []types.LifecycleState, state types.LifecycleState) bool {
-	for _, s := range states {
-		if s == state {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(states, state)
 }
 
 func cloneAuthUser(user *types.AuthUser) *types.AuthUser {
@@ -173,9 +163,7 @@ func cloneMap(values map[string]any) map[string]any {
 		return nil
 	}
 	out := make(map[string]any, len(values))
-	for key, value := range values {
-		out[key] = value
-	}
+	maps.Copy(out, values)
 	return out
 }
 
@@ -396,44 +384,50 @@ func (s *ActivityStore) ListActivity(_ context.Context, filter types.ActivityFil
 	defer s.mu.RUnlock()
 	filtered := make([]types.ActivityRecord, 0, len(s.records))
 	for _, record := range s.records {
-		if filter.Scope.TenantID != zeroUUID && record.TenantID != filter.Scope.TenantID {
-			continue
-		}
-		if filter.UserID != zeroUUID && filter.ActorID != zeroUUID {
-			if record.UserID != filter.UserID && record.ActorID != filter.ActorID {
-				continue
-			}
-		} else if filter.UserID != zeroUUID && record.UserID != filter.UserID {
-			continue
-		} else if filter.ActorID != zeroUUID && record.ActorID != filter.ActorID {
-			continue
-		}
-		if len(filter.Verbs) > 0 && !containsVerb(filter.Verbs, record.Verb) {
+		if !matchesActivityFilter(record, filter) {
 			continue
 		}
 		filtered = append(filtered, record)
 	}
-	limit := filter.Pagination.Limit
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 200 {
-		limit = 200
-	}
-	offset := filter.Pagination.Offset
-	if offset < 0 {
-		offset = 0
-	}
-	end := offset + limit
-	if end > len(filtered) {
-		end = len(filtered)
-	}
+	limit, offset := normalizeMemoryPagination(filter.Pagination, len(filtered))
+	end := min(offset+limit, len(filtered))
 	return types.ActivityPage{
 		Records:    append([]types.ActivityRecord{}, filtered[offset:end]...),
 		Total:      len(filtered),
 		NextOffset: end,
 		HasMore:    end < len(filtered),
 	}, nil
+}
+
+func matchesActivityFilter(record types.ActivityRecord, filter types.ActivityFilter) bool {
+	if filter.Scope.TenantID != zeroUUID && record.TenantID != filter.Scope.TenantID {
+		return false
+	}
+	if filter.UserID != zeroUUID && filter.ActorID != zeroUUID {
+		return record.UserID == filter.UserID || record.ActorID == filter.ActorID
+	}
+	if filter.UserID != zeroUUID && record.UserID != filter.UserID {
+		return false
+	}
+	if filter.ActorID != zeroUUID && record.ActorID != filter.ActorID {
+		return false
+	}
+	return len(filter.Verbs) == 0 || containsVerb(filter.Verbs, record.Verb)
+}
+
+func normalizeMemoryPagination(pagination types.Pagination, total int) (int, int) {
+	limit := pagination.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	offset := max(pagination.Offset, 0)
+	if offset > total {
+		offset = total
+	}
+	return limit, offset
 }
 
 func (s *ActivityStore) ActivityStats(_ context.Context, filter types.ActivityStatsFilter) (types.ActivityStats, error) {
@@ -453,12 +447,7 @@ func (s *ActivityStore) ActivityStats(_ context.Context, filter types.ActivitySt
 }
 
 func containsVerb(verbs []string, verb string) bool {
-	for _, v := range verbs {
-		if v == verb {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(verbs, verb)
 }
 
 // ProfileRepository stores profile rows in memory.

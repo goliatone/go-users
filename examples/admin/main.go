@@ -165,8 +165,8 @@ func (a *adminApp) seedTenant(tenantKey string, ctx context.Context, cfg seeding
 		Scope:  scope,
 		Patch: types.ProfilePatch{
 			DisplayName: &display,
-			Locale:      strPtr("en-US"),
-			Timezone:    strPtr("America/New_York"),
+			Locale:      new("en-US"),
+			Timezone:    new("America/New_York"),
 			Contact: map[string]any{
 				"email": cfg.Email,
 				"slack": fmt.Sprintf("#%s-team", tenantKey),
@@ -257,7 +257,8 @@ func must(action string, err error) {
 	}
 }
 
-func strPtr(s string) *string { return &s }
+//go:fix inline
+func strPtr(s string) *string { return new(s) }
 
 func keysOf(m map[string]any) []string {
 	out := make([]string, 0, len(m))
