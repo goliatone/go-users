@@ -13,13 +13,14 @@ import (
 
 // UserPasswordResetInput resets a user's password hash.
 type UserPasswordResetInput struct {
-	UserID          uuid.UUID
-	NewPasswordHash string
-	TokenJTI        string
-	TokenExpiresAt  time.Time
-	Actor           types.ActorRef
-	Scope           types.ScopeFilter
-	Result          *UserPasswordResetResult
+	UserID                            uuid.UUID
+	NewPasswordHash                   string
+	TokenJTI                          string
+	TokenExpiresAt                    time.Time
+	Actor                             types.ActorRef
+	Scope                             types.ScopeFilter
+	PreserveTemporaryPasswordMetadata bool
+	Result                            *UserPasswordResetResult
 }
 
 // Type implements gocommand.Message.
@@ -101,7 +102,7 @@ func (c *UserPasswordResetCommand) Execute(ctx context.Context, input UserPasswo
 	if err := c.repo.ResetPassword(ctx, input.UserID, input.NewPasswordHash); err != nil {
 		return err
 	}
-	if tempRepo, ok := c.repo.(types.TemporaryPasswordRepository); ok {
+	if tempRepo, ok := c.repo.(types.TemporaryPasswordRepository); ok && !input.PreserveTemporaryPasswordMetadata {
 		if err := tempRepo.ClearTemporaryPassword(ctx, input.UserID); err != nil {
 			return err
 		}
