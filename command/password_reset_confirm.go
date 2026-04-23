@@ -48,6 +48,7 @@ type UserPasswordResetConfirmCommand struct {
 	resets   types.PasswordResetRepository
 	resetCmd *UserPasswordResetCommand
 	clock    types.Clock
+	claimTTL time.Duration
 	enforcer types.ScopeEnforcer
 	logger   types.Logger
 }
@@ -58,17 +59,25 @@ type PasswordResetConfirmConfig struct {
 	SecureLinks     types.SecureLinkManager
 	ResetCommand    *UserPasswordResetCommand
 	Clock           types.Clock
+	ClaimTTL        time.Duration
 	ScopeEnforcer   types.ScopeEnforcer
 	Logger          types.Logger
 }
 
+const DefaultPasswordResetClaimTTL = 2 * time.Minute
+
 // NewUserPasswordResetConfirmCommand constructs the confirmation handler.
 func NewUserPasswordResetConfirmCommand(cfg PasswordResetConfirmConfig) *UserPasswordResetConfirmCommand {
+	claimTTL := cfg.ClaimTTL
+	if claimTTL <= 0 {
+		claimTTL = DefaultPasswordResetClaimTTL
+	}
 	return &UserPasswordResetConfirmCommand{
 		manager:  cfg.SecureLinks,
 		resets:   cfg.ResetRepository,
 		resetCmd: cfg.ResetCommand,
 		clock:    safeClock(cfg.Clock),
+		claimTTL: claimTTL,
 		enforcer: cfg.ScopeEnforcer,
 		logger:   safeLogger(cfg.Logger),
 	}
@@ -98,6 +107,14 @@ func (c *UserPasswordResetConfirmCommand) Execute(ctx context.Context, input Use
 	if err := c.enforceResetScope(ctx, payload, input.Scope); err != nil {
 		return err
 	}
+	lifecycleRepo, ok := c.resets.(types.PasswordResetLifecycleRepository)
+	if !ok {
+		return types.ErrMissingPasswordResetLifecycleRepository
+	}
+	claimedAt := now(c.clock)
+	if err := lifecycleRepo.ClaimReset(ctx, jti, claimedAt, c.claimTTL); err != nil {
+		return c.passwordResetClaimError(ctx, jti, claimedAt, err)
+	}
 
 	resetScope := scopeFromPayload(payload)
 	if resetScope.TenantID == uuid.Nil && resetScope.OrgID == uuid.Nil {
@@ -113,14 +130,18 @@ func (c *UserPasswordResetConfirmCommand) Execute(ctx context.Context, input Use
 		Scope:           resetScope,
 		Result:          result,
 	}); err != nil {
+		c.releaseResetClaim(ctx, lifecycleRepo, jti, claimedAt)
 		return err
 	}
 
 	usedAt := now(c.clock)
-	if err := c.resets.ConsumeReset(ctx, jti, usedAt); err != nil {
-		return c.passwordResetConsumeError(ctx, jti, usedAt, err)
-	}
-	if err := c.resets.UpdateResetStatus(ctx, jti, types.PasswordResetStatusChanged, usedAt); err != nil {
+	if err := lifecycleRepo.FinalizeReset(ctx, jti, claimedAt, usedAt); err != nil {
+		if c.passwordResetFinalized(ctx, jti) {
+			if input.Result != nil {
+				input.Result.User = result.User
+			}
+			return nil
+		}
 		return err
 	}
 
@@ -158,6 +179,9 @@ func (c *UserPasswordResetConfirmCommand) validateResetRecord(ctx context.Contex
 	if record.Status == types.PasswordResetStatusChanged || !record.UsedAt.IsZero() {
 		return time.Time{}, ErrTokenAlreadyUsed
 	}
+	if record.Status == types.PasswordResetStatusProcessing && resetClaimActive(record, now(c.clock), c.claimTTL) {
+		return time.Time{}, ErrTokenInProgress
+	}
 	if record.Status == types.PasswordResetStatusExpired {
 		return time.Time{}, ErrTokenExpired
 	}
@@ -183,7 +207,7 @@ func (c *UserPasswordResetConfirmCommand) enforceResetScope(ctx context.Context,
 	return c.enforcer(ctx, payload, scope)
 }
 
-func (c *UserPasswordResetConfirmCommand) passwordResetConsumeError(ctx context.Context, jti string, consumedAt time.Time, err error) error {
+func (c *UserPasswordResetConfirmCommand) passwordResetClaimError(ctx context.Context, jti string, claimedAt time.Time, err error) error {
 	if repository.IsRecordNotFound(err) {
 		return ErrTokenNotFound
 	}
@@ -192,23 +216,61 @@ func (c *UserPasswordResetConfirmCommand) passwordResetConsumeError(ctx context.
 	}
 	latest, lookupErr := c.resets.GetResetByJTI(ctx, jti)
 	if lookupErr != nil {
-		return ErrTokenAlreadyUsed
+		return ErrTokenInProgress
 	}
-	return passwordResetConflictError(latest, consumedAt)
+	return passwordResetConflictError(latest, claimedAt, c.claimTTL)
 }
 
-func passwordResetConflictError(record *types.PasswordResetRecord, consumedAt time.Time) error {
+func passwordResetConflictError(record *types.PasswordResetRecord, claimedAt time.Time, claimTTL time.Duration) error {
 	if record == nil {
 		return ErrTokenNotFound
 	}
-	if !record.ExpiresAt.IsZero() && consumedAt.After(record.ExpiresAt) {
+	if !record.ExpiresAt.IsZero() && claimedAt.After(record.ExpiresAt) {
 		return ErrTokenExpired
 	}
 	if record.Status == types.PasswordResetStatusExpired {
 		return ErrTokenExpired
 	}
+	if record.Status == types.PasswordResetStatusProcessing && resetClaimActive(record, claimedAt, claimTTL) {
+		return ErrTokenInProgress
+	}
 	if record.Status == types.PasswordResetStatusChanged || !record.UsedAt.IsZero() {
 		return ErrTokenAlreadyUsed
 	}
-	return ErrTokenAlreadyUsed
+	return ErrTokenInProgress
+}
+
+func resetClaimActive(record *types.PasswordResetRecord, current time.Time, claimTTL time.Duration) bool {
+	if record == nil || record.Status != types.PasswordResetStatusProcessing {
+		return false
+	}
+	if claimTTL <= 0 {
+		return true
+	}
+	if record.UpdatedAt.IsZero() {
+		return true
+	}
+	return record.UpdatedAt.Add(claimTTL).After(current)
+}
+
+func (c *UserPasswordResetConfirmCommand) releaseResetClaim(ctx context.Context, repo types.PasswordResetLifecycleRepository, jti string, claimedAt time.Time) {
+	if err := repo.ReleaseResetClaim(ctx, jti, claimedAt); err != nil && !c.passwordResetClaimReleased(ctx, jti) {
+		c.logger.Error("failed to release password reset claim", err, "jti", jti)
+	}
+}
+
+func (c *UserPasswordResetConfirmCommand) passwordResetClaimReleased(ctx context.Context, jti string) bool {
+	record, err := c.resets.GetResetByJTI(ctx, jti)
+	if err != nil || record == nil {
+		return false
+	}
+	return record.Status == types.PasswordResetStatusRequested && record.UsedAt.IsZero()
+}
+
+func (c *UserPasswordResetConfirmCommand) passwordResetFinalized(ctx context.Context, jti string) bool {
+	record, err := c.resets.GetResetByJTI(ctx, jti)
+	if err != nil || record == nil {
+		return false
+	}
+	return record.Status == types.PasswordResetStatusChanged && !record.UsedAt.IsZero()
 }
