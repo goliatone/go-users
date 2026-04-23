@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	auth "github.com/goliatone/go-auth"
@@ -17,7 +18,6 @@ import (
 	"github.com/goliatone/go-users/migrations"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
-	"testing/fstest"
 )
 
 type profileTestPersistenceConfig struct {
@@ -117,7 +117,7 @@ func TestProfileStandaloneSQLiteMigrateRollback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("profile sources: %v", err)
 	}
-	registerProfileSources(client, sources)
+	registerProfileSources(t, client, sources)
 
 	if err := client.ValidateDialects(ctx); err != nil {
 		t.Fatalf("validate dialects: %v", err)
@@ -143,17 +143,20 @@ func TestProfileCombinedWithGoAuthSQLiteMigrateRollback(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	authRoot := canonicalGoAuthMigrationsRoot(t)
-	client.RegisterDialectMigrations(
-		authRoot,
-		persistence.WithDialectSourceLabel("go-auth"),
-		persistence.WithValidationTargets("postgres", "sqlite"),
-	)
-
 	sources, err := migrations.ProfileSources(migrations.ProfileCombinedWithAuth)
 	if err != nil {
 		t.Fatalf("profile sources: %v", err)
 	}
-	registerProfileSources(client, sources)
+	registerOrderedSources(t, client, append([]persistence.OrderedMigrationSource{
+		{
+			Name: "go-auth",
+			Root: authRoot,
+			Options: []persistence.DialectMigrationOption{
+				persistence.WithDialectSourceLabel("go-auth"),
+				persistence.WithValidationTargets("postgres", "sqlite"),
+			},
+		},
+	}, orderedProfileSources(sources)...))
 
 	if err := client.ValidateDialects(ctx); err != nil {
 		t.Fatalf("validate dialects: %v", err)
@@ -200,7 +203,13 @@ func newSQLiteClient(t *testing.T, name string) (*persistence.Client, *sql.DB) {
 	return client, db
 }
 
-func registerProfileSources(client *persistence.Client, sources []migrations.ProfileSource) {
+func registerProfileSources(t *testing.T, client *persistence.Client, sources []migrations.ProfileSource) {
+	t.Helper()
+	registerOrderedSources(t, client, orderedProfileSources(sources))
+}
+
+func orderedProfileSources(sources []migrations.ProfileSource) []persistence.OrderedMigrationSource {
+	ordered := make([]persistence.OrderedMigrationSource, 0, len(sources))
 	for _, source := range sources {
 		opts := []persistence.DialectMigrationOption{
 			persistence.WithDialectSourceLabel(source.SourceLabel),
@@ -208,7 +217,19 @@ func registerProfileSources(client *persistence.Client, sources []migrations.Pro
 		if len(source.ValidationTargets) > 0 {
 			opts = append(opts, persistence.WithValidationTargets(source.ValidationTargets...))
 		}
-		client.RegisterDialectMigrations(source.Filesystem, opts...)
+		ordered = append(ordered, persistence.OrderedMigrationSource{
+			Name:    source.Name,
+			Root:    source.Filesystem,
+			Options: opts,
+		})
+	}
+	return ordered
+}
+
+func registerOrderedSources(t *testing.T, client *persistence.Client, sources []persistence.OrderedMigrationSource) {
+	t.Helper()
+	if err := client.RegisterOrderedMigrationSources(sources...); err != nil {
+		t.Fatalf("register ordered migrations: %v", err)
 	}
 }
 
