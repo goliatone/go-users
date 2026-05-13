@@ -30,6 +30,7 @@ import (
 	"github.com/goliatone/go-users/activity"
 	goauth "github.com/goliatone/go-users/adapter/goauth"
 	"github.com/goliatone/go-users/examples/web/config"
+	"github.com/goliatone/go-users/migrations"
 	"github.com/goliatone/go-users/pkg/schema"
 	"github.com/goliatone/go-users/pkg/types"
 	"github.com/goliatone/go-users/preferences"
@@ -325,7 +326,8 @@ func WithPersistence(ctx context.Context, app *App) error {
 
 	bunClient.SetLogger(app.GetLogger("persistence"))
 
-	// Register dialect-aware migrations in two steps to avoid cross-source ordering issues.
+	// Register source-stable ordered migrations so app-level source insertion does not
+	// change persisted marker identity.
 	authRoot, err := fs.Sub(auth.GetMigrationsFS(), "data/sql/migrations")
 	if err != nil {
 		return err
@@ -334,24 +336,27 @@ func WithPersistence(ctx context.Context, app *App) error {
 	if err != nil {
 		return err
 	}
-	bunClient.RegisterDialectMigrations(
+	authSource := persistence.NewStableOrderedMigrationSource(
+		"go-auth",
 		authFS,
-		persistence.WithDialectSourceLabel("."),
-		persistence.WithValidationTargets("postgres", "sqlite"),
+		"go-auth",
+		10,
+		persistence.WithOrderedMigrationDialectOptions(
+			persistence.WithDialectSourceLabel("go-auth"),
+			persistence.WithValidationTargets("postgres", "sqlite"),
+		),
 	)
-	if err := bunClient.Migrate(ctx); err != nil {
-		return err
-	}
-
-	coreFS, err := fs.Sub(users.GetCoreMigrationsFS(), "data/sql/migrations")
+	userSources, err := migrations.StableOrderedProfileSources(
+		migrations.ProfileCombinedWithAuth,
+		migrations.WithProfileCoreDependencies("go-auth"),
+	)
 	if err != nil {
 		return err
 	}
-	bunClient.RegisterDialectMigrations(
-		coreFS,
-		persistence.WithDialectSourceLabel("."),
-		persistence.WithValidationTargets("postgres", "sqlite"),
-	)
+	sources := append([]persistence.OrderedMigrationSource{authSource}, userSources...)
+	if err := bunClient.RegisterOrderedMigrationSources(sources...); err != nil {
+		return err
+	}
 	// Optional: Validate that both dialects have complete migration sets
 	if err := bunClient.ValidateDialects(ctx); err != nil {
 		log.Printf("Warning: dialect validation failed: %v", err)
