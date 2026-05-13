@@ -84,19 +84,16 @@ var CoreMigrationsFS embed.FS       // go-users core tables only
 var AuthBootstrapMigrationsFS embed.FS // users/password_reset + auth columns
 var AuthExtrasMigrationsFS embed.FS    // social_accounts/user_identifiers
 
-// 2. Resolve sources from an explicit install profile
+// 2. Resolve source-stable ordered sources from an explicit install profile
 import "github.com/goliatone/go-users/migrations"
-sources, _ := migrations.ProfileSources(migrations.ProfileCombinedWithAuth)
-// or: migrations.ProfileSources(migrations.ProfileStandalone)
+sources, _ := migrations.StableOrderedProfileSources(
+    migrations.ProfileCombinedWithAuth,
+    migrations.WithProfileCoreDependencies("go-auth"),
+)
+// or: migrations.StableOrderedProfileSources(migrations.ProfileStandalone)
 
-// 3. Register each source with label + validation targets
-for _, source := range sources {
-    client.RegisterDialectMigrations(
-        source.Filesystem,
-        persistence.WithDialectSourceLabel(source.SourceLabel),
-        persistence.WithValidationTargets(source.ValidationTargets...),
-    )
-}
+// 3. Register all stable ordered sources together
+client.RegisterOrderedMigrationSources(sources...)
 ```
 
 ---
@@ -158,10 +155,31 @@ Register auth bootstrap (and auth extras, if used) before core so dependent tabl
 When `go-auth` migrations are already registered, skip auth bootstrap/auth extras
 to avoid duplicate tables.
 
-The recommended path is to use `migrations.ProfileSources`:
+The recommended path is to use `migrations.StableOrderedProfileSources`:
 
 - `migrations.ProfileCombinedWithAuth`: core-only (safe when go-auth is present)
 - `migrations.ProfileStandalone`: auth bootstrap + auth extras + core
+
+Stable profile metadata:
+
+| Profile entry | Source key | Order | Default dependencies |
+| --- | --- | ---: | --- |
+| `auth-bootstrap` | `go-users-auth` | `10` | none |
+| `auth-extras` | `go-users-auth-extras` | `20` | `go-users-auth` |
+| `core` | `go-users` | `30` | standalone depends on the included auth source; combined-with-auth has no default dependency |
+
+Source keys and order values are migration ABI once used in a released
+database. Fresh databases can register stable sources directly. Existing
+databases with positional `ord_*` ordered markers should call
+`BackfillStableOrderedMigrationMarkers` with the complete historical positional
+source list before switching to the stable `ordsrc_*` graph.
+
+Downstream apps own cross-package graph composition. If auth is registered as
+`go-auth-core` and `go-auth-extras`, configure the users edge with
+`migrations.WithProfileCoreDependencies("go-auth-extras")`. If auth is a
+single stable source such as `go-auth`, depend on that key. Keep app-local
+repair and rollout details in the downstream app instead of embedding them in
+`go-users` migration docs.
 
 If you use `GetMigrationsFS()`, register three sub-filesystems:
 `data/sql/migrations/auth`, `data/sql/migrations/auth_extras`, and
@@ -1190,29 +1208,47 @@ func reportMigrationStatus(ctx context.Context, client *persistence.Client) {
 
 ```go
 func registerAllMigrations(client *persistence.Client) error {
-    sources := []struct {
-        name string
-        fsys fs.FS
-        path string
-    }{
-        {"go-auth", auth.GetMigrationsFS(), "data/sql/migrations"},
-        {"go-users-core", users.GetCoreMigrationsFS(), "data/sql/migrations"},
-        {"custom", customMigrationsFS, "sql"},
+    authFS, err := fs.Sub(auth.GetMigrationsFS(), "data/sql/migrations")
+    if err != nil {
+        return err
+    }
+    userSources, err := migrations.StableOrderedProfileSources(
+        migrations.ProfileCombinedWithAuth,
+        migrations.WithProfileCoreDependencies("go-auth"),
+    )
+    if err != nil {
+        return err
+    }
+    customFS, err := fs.Sub(customMigrationsFS, "sql")
+    if err != nil {
+        return err
     }
 
-    for _, src := range sources {
-        subFS, err := fs.Sub(src.fsys, src.path)
-        if err != nil {
-            return fmt.Errorf("failed to load %s migrations: %w", src.name, err)
-        }
-
-        client.RegisterDialectMigrations(subFS,
-            persistence.WithDialectSourceLabel("."),
+    sources := append([]persistence.OrderedMigrationSource{
+        persistence.NewStableOrderedMigrationSource(
+            "go-auth",
+            authFS,
+            "go-auth",
+            10,
+            persistence.WithOrderedMigrationDialectOptions(
+                persistence.WithDialectSourceLabel("go-auth"),
+                persistence.WithValidationTargets("postgres", "sqlite"),
+            ),
+        ),
+    }, userSources...)
+    sources = append(sources, persistence.NewStableOrderedMigrationSource(
+        "custom",
+        customFS,
+        "app-custom",
+        40,
+        persistence.WithOrderedMigrationDependencies("go-users"),
+        persistence.WithOrderedMigrationDialectOptions(
+            persistence.WithDialectSourceLabel("custom"),
             persistence.WithValidationTargets("postgres", "sqlite"),
-        )
-    }
+        ),
+    ))
 
-    return nil
+    return client.RegisterOrderedMigrationSources(sources...)
 }
 ```
 
