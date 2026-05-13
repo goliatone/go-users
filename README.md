@@ -149,6 +149,7 @@ More details live in `docs/MULTITENANCY.md` and `docs/WORKSPACES.md`.
 
 - SQL definitions live under `data/sql/migrations`. Files are numbered and include `.up.sql` and `.down.sql`.
 - Use `migrations.ProfileSources(...)` to resolve deterministic standalone/combined registration sets.
+- Use `migrations.StableOrderedProfileSources(...)` with `RegisterOrderedMigrationSources` for new `go-persistence-bun` registrations so marker names are source-stable.
 - `migrations.ProfileCombinedWithAuth` enforces core-only registration (for installs that already register `go-auth`).
 - `migrations.ProfileStandalone` resolves auth bootstrap + auth extras + core (in dependency order).
 - `migrations.TestMigrationsApplyToSQLite` verifies that the SQL stack applies cleanly to SQLite.
@@ -156,18 +157,22 @@ More details live in `docs/MULTITENANCY.md` and `docs/WORKSPACES.md`.
 - You can replace any repository with your own implementation as long as it satisfies the interface.
 
 ```go
-sources, err := migrations.ProfileSources(migrations.ProfileCombinedWithAuth)
+sources, err := migrations.StableOrderedProfileSources(
+    migrations.ProfileCombinedWithAuth,
+    migrations.WithProfileCoreDependencies("go-auth"),
+)
 if err != nil {
     return err
 }
-for _, source := range sources {
-    client.RegisterDialectMigrations(
-        source.Filesystem,
-        persistence.WithDialectSourceLabel(source.SourceLabel),
-        persistence.WithValidationTargets(source.ValidationTargets...),
-    )
+if err := client.RegisterOrderedMigrationSources(sources...); err != nil {
+    return err
 }
 ```
+
+Fresh databases can register stable sources directly. Databases that already
+used legacy positional `ord_*` ordered markers should run
+`BackfillStableOrderedMigrationMarkers` with the historical positional source
+list before switching to the stable `ordsrc_*` graph.
 
 ### User tables
 
