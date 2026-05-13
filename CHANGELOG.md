@@ -1,5 +1,25 @@
 # Changelog
 
+# [0.24.0](https://github.com/goliatone/go-users/compare/v0.23.1...v0.24.0) - (2026-05-13)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.24.0 ([b81f423](https://github.com/goliatone/go-users/commit/b81f423d20f1f25ea8e47f3dbbbf821417716132))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- Profile ordering for migrations ([5c160bd](https://github.com/goliatone/go-users/commit/5c160bd2755eee5720115de938d16508d3ed65f2))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.23.1 ([b3adb00](https://github.com/goliatone/go-users/commit/b3adb00203fa28e1e1ead670d99aee96a37eb5ec))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update docs ([deb4e4e](https://github.com/goliatone/go-users/commit/deb4e4ec120ea83bf630d31889a29663666f4649))  - (goliatone)
+- Update tests ([ddad450](https://github.com/goliatone/go-users/commit/ddad4505ab97945c177e5f4c950da51ca7dab8fd))  - (goliatone)
+- Update examples ([debc26e](https://github.com/goliatone/go-users/commit/debc26e13f9f8b6950a173634c765f66e01658cb))  - (goliatone)
+
 # [0.23.1](https://github.com/goliatone/go-users/compare/v0.23.0...v0.23.1) - (2026-05-13)
 
 ## <!-- 13 -->📦 Bumps
