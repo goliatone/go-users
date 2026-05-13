@@ -329,7 +329,7 @@ func TestProfileStandaloneBackfillsLegacyPositionalMarkers(t *testing.T) {
 	if err := stable.RegisterOrderedMigrationSources(migrations.StableOrderedSources(profileSources)...); err != nil {
 		t.Fatalf("register stable sources: %v", err)
 	}
-	if err := stable.BackfillStableOrderedMigrationMarkers(ctx, client.DB(), legacySources); err != nil {
+	if err := stable.BackfillStableOrderedMigrationMarkers(ctx, client.DB(), legacyOrderedProfileSourcesForBackfill(profileSources)); err != nil {
 		t.Fatalf("backfill stable markers: %v", err)
 	}
 
@@ -406,6 +406,14 @@ func orderedProfileSources(sources []migrations.ProfileSource) []persistence.Ord
 			Root:    source.Filesystem,
 			Options: opts,
 		})
+	}
+	return ordered
+}
+
+func legacyOrderedProfileSourcesForBackfill(sources []migrations.ProfileSource) []persistence.OrderedMigrationSource {
+	ordered := orderedProfileSources(sources)
+	for idx := range ordered {
+		ordered[idx].SourceKey = sources[idx].SourceKey
 	}
 	return ordered
 }
