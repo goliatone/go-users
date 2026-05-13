@@ -12,6 +12,14 @@ const (
 	defaultCoreSourceLabel          = "go-users"
 	defaultAuthBootstrapSourceLabel = "go-users-auth"
 	defaultAuthExtrasSourceLabel    = "go-users-auth-extras"
+
+	defaultCoreSourceKey          = "go-users"
+	defaultAuthBootstrapSourceKey = "go-users-auth"
+	defaultAuthExtrasSourceKey    = "go-users-auth-extras"
+
+	defaultAuthBootstrapSourceOrder = 10
+	defaultAuthExtrasSourceOrder    = 20
+	defaultCoreSourceOrder          = 30
 )
 
 // MigrationProfile defines which go-users migration tracks should be registered.
@@ -29,6 +37,9 @@ const (
 type ProfileSource struct {
 	Name              string
 	SourceLabel       string
+	SourceKey         string
+	Order             int
+	DependsOn         []string
 	Subdir            string
 	Filesystem        fs.FS
 	ValidationTargets []string
@@ -43,6 +54,7 @@ type profileOptions struct {
 	coreLabel         string
 	authLabel         string
 	authExtrasLabel   string
+	coreDependencies  []string
 }
 
 // WithProfileAuthExtras toggles auth_extras for standalone profiles.
@@ -81,6 +93,17 @@ func WithProfileSourceLabels(coreLabel, authLabel, authExtrasLabel string) Profi
 		if trimmed := strings.TrimSpace(authExtrasLabel); trimmed != "" {
 			opts.authExtrasLabel = trimmed
 		}
+	}
+}
+
+// WithProfileCoreDependencies declares app-owned source-key dependencies for
+// the core go-users profile source.
+func WithProfileCoreDependencies(sourceKeys ...string) ProfileOption {
+	return func(opts *profileOptions) {
+		if opts == nil {
+			return
+		}
+		opts.coreDependencies = normalizeSourceKeys(sourceKeys)
 	}
 }
 
@@ -125,6 +148,8 @@ func ProfileSources(profile MigrationProfile, opts ...ProfileOption) ([]ProfileS
 		sources = append(sources, ProfileSource{
 			Name:              "auth-bootstrap",
 			SourceLabel:       cfg.authLabel,
+			SourceKey:         defaultAuthBootstrapSourceKey,
+			Order:             defaultAuthBootstrapSourceOrder,
 			Subdir:            "data/sql/migrations/auth",
 			Filesystem:        authFS,
 			ValidationTargets: append([]string{}, cfg.validationTargets...),
@@ -138,6 +163,9 @@ func ProfileSources(profile MigrationProfile, opts ...ProfileOption) ([]ProfileS
 			sources = append(sources, ProfileSource{
 				Name:              "auth-extras",
 				SourceLabel:       cfg.authExtrasLabel,
+				SourceKey:         defaultAuthExtrasSourceKey,
+				Order:             defaultAuthExtrasSourceOrder,
+				DependsOn:         []string{defaultAuthBootstrapSourceKey},
 				Subdir:            "data/sql/migrations/auth_extras",
 				Filesystem:        extrasFS,
 				ValidationTargets: append([]string{}, cfg.validationTargets...),
@@ -149,9 +177,20 @@ func ProfileSources(profile MigrationProfile, opts ...ProfileOption) ([]ProfileS
 	if err != nil {
 		return nil, fmt.Errorf("migrations: load core migrations: %w", err)
 	}
+	coreDependencies := append([]string{}, cfg.coreDependencies...)
+	if resolved == ProfileStandalone {
+		if includeAuthExtras {
+			coreDependencies = []string{defaultAuthExtrasSourceKey}
+		} else {
+			coreDependencies = []string{defaultAuthBootstrapSourceKey}
+		}
+	}
 	sources = append(sources, ProfileSource{
 		Name:              "core",
 		SourceLabel:       cfg.coreLabel,
+		SourceKey:         defaultCoreSourceKey,
+		Order:             defaultCoreSourceOrder,
+		DependsOn:         coreDependencies,
 		Subdir:            "data/sql/migrations",
 		Filesystem:        coreFS,
 		ValidationTargets: append([]string{}, cfg.validationTargets...),
@@ -216,6 +255,26 @@ func normalizeTargets(targets []string) []string {
 	}
 	if len(out) == 0 {
 		return []string{"postgres", "sqlite"}
+	}
+	return out
+}
+
+func normalizeSourceKeys(sourceKeys []string) []string {
+	if len(sourceKeys) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(sourceKeys))
+	out := make([]string, 0, len(sourceKeys))
+	for _, sourceKey := range sourceKeys {
+		trimmed := strings.ToLower(strings.TrimSpace(sourceKey))
+		if trimmed == "" {
+			continue
+		}
+		if _, exists := seen[trimmed]; exists {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		out = append(out, trimmed)
 	}
 	return out
 }

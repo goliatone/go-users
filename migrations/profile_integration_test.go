@@ -143,20 +143,25 @@ func TestProfileCombinedWithGoAuthSQLiteMigrateRollback(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	authRoot := canonicalGoAuthMigrationsRoot(t)
-	sources, err := migrations.ProfileSources(migrations.ProfileCombinedWithAuth)
+	sources, err := migrations.ProfileSources(
+		migrations.ProfileCombinedWithAuth,
+		migrations.WithProfileCoreDependencies("go-auth"),
+	)
 	if err != nil {
 		t.Fatalf("profile sources: %v", err)
 	}
 	registerOrderedSources(t, client, append([]persistence.OrderedMigrationSource{
-		{
-			Name: "go-auth",
-			Root: authRoot,
-			Options: []persistence.DialectMigrationOption{
+		persistence.NewStableOrderedMigrationSource(
+			"go-auth",
+			authRoot,
+			"go-auth",
+			10,
+			persistence.WithOrderedMigrationDialectOptions(
 				persistence.WithDialectSourceLabel("go-auth"),
 				persistence.WithValidationTargets("postgres", "sqlite"),
-			},
-		},
-	}, orderedProfileSources(sources)...))
+			),
+		),
+	}, migrations.StableOrderedSources(sources)...))
 
 	if err := client.ValidateDialects(ctx); err != nil {
 		t.Fatalf("validate dialects: %v", err)
@@ -177,6 +182,185 @@ func TestProfileCombinedWithGoAuthSQLiteMigrateRollback(t *testing.T) {
 	}
 	if tableExists(ctx, db, "users") || tableExists(ctx, db, "custom_roles") {
 		t.Fatalf("expected users and custom_roles tables removed after rollback")
+	}
+}
+
+func TestProfileStandaloneStablePlanUsesSourceStableNames(t *testing.T) {
+	ctx := context.Background()
+	client, db := newSQLiteClient(t, "standalone-stable-plan")
+	defer func() { _ = db.Close() }()
+
+	sources, err := migrations.StableOrderedProfileSources(migrations.ProfileStandalone)
+	if err != nil {
+		t.Fatalf("stable profile sources: %v", err)
+	}
+	registerOrderedSources(t, client, sources)
+
+	plan, err := client.Plan(ctx)
+	if err != nil {
+		t.Fatalf("plan stable standalone profile: %v", err)
+	}
+
+	auth := planEntryBySourceAndVersion(t, plan, "auth-bootstrap", "00001")
+	if auth.SyntheticName != "ordsrc_000010_go_users_auth_00001" {
+		t.Fatalf("auth synthetic name = %q", auth.SyntheticName)
+	}
+	assertStablePlanEntry(t, auth, "go_users_auth", 10, nil)
+
+	extras := planEntryBySourceAndVersion(t, plan, "auth-extras", "00010")
+	if extras.SyntheticName != "ordsrc_000020_go_users_auth_extras_00010" {
+		t.Fatalf("auth extras synthetic name = %q", extras.SyntheticName)
+	}
+	assertStablePlanEntry(t, extras, "go_users_auth_extras", 20, []string{"go_users_auth"})
+
+	core := planEntryBySourceAndVersion(t, plan, "core", "00003")
+	if core.SyntheticName != "ordsrc_000030_go_users_00003" {
+		t.Fatalf("core synthetic name = %q", core.SyntheticName)
+	}
+	assertStablePlanEntry(t, core, "go_users", 30, []string{"go_users_auth_extras"})
+}
+
+func TestProfileCombinedStablePlanWithExternalDependency(t *testing.T) {
+	ctx := context.Background()
+	client, db := newSQLiteClient(t, "combined-stable-plan")
+	defer func() { _ = db.Close() }()
+
+	authRoot := canonicalGoAuthMigrationsRoot(t)
+	usersSources, err := migrations.StableOrderedProfileSources(
+		migrations.ProfileCombinedWithAuth,
+		migrations.WithProfileCoreDependencies("go-auth"),
+	)
+	if err != nil {
+		t.Fatalf("stable profile sources: %v", err)
+	}
+	sources := append([]persistence.OrderedMigrationSource{
+		persistence.NewStableOrderedMigrationSource(
+			"go-auth",
+			authRoot,
+			"go-auth",
+			10,
+			persistence.WithOrderedMigrationDialectOptions(
+				persistence.WithDialectSourceLabel("go-auth"),
+				persistence.WithValidationTargets("postgres", "sqlite"),
+			),
+		),
+	}, usersSources...)
+	registerOrderedSources(t, client, sources)
+
+	plan, err := client.Plan(ctx)
+	if err != nil {
+		t.Fatalf("plan stable combined profile: %v", err)
+	}
+
+	core := planEntryBySourceAndVersion(t, plan, "core", "00003")
+	if core.SyntheticName != "ordsrc_000030_go_users_00003" {
+		t.Fatalf("core synthetic name = %q", core.SyntheticName)
+	}
+	assertStablePlanEntry(t, core, "go_users", 30, []string{"go_auth"})
+}
+
+func TestProfileStableNamesSurviveUnrelatedSourceInsertion(t *testing.T) {
+	ctx := context.Background()
+
+	baselineClient, baselineDB := newSQLiteClient(t, "stable-insertion-baseline")
+	defer func() { _ = baselineDB.Close() }()
+	baselineSources, err := migrations.StableOrderedProfileSources(migrations.ProfileStandalone)
+	if err != nil {
+		t.Fatalf("baseline stable profile sources: %v", err)
+	}
+	registerOrderedSources(t, baselineClient, baselineSources)
+	baselinePlan, err := baselineClient.Plan(ctx)
+	if err != nil {
+		t.Fatalf("baseline plan: %v", err)
+	}
+	baselineCore := planEntryBySourceAndVersion(t, baselinePlan, "core", "00003")
+
+	insertedClient, insertedDB := newSQLiteClient(t, "stable-insertion-added")
+	defer func() { _ = insertedDB.Close() }()
+	insertedSources, err := migrations.StableOrderedProfileSources(migrations.ProfileStandalone)
+	if err != nil {
+		t.Fatalf("inserted stable profile sources: %v", err)
+	}
+	unrelated := persistence.NewStableOrderedMigrationSource(
+		"unrelated",
+		fstest.MapFS{
+			"00001_unrelated.up.sql":   {Data: []byte("SELECT 1;")},
+			"00001_unrelated.down.sql": {Data: []byte("SELECT 1;")},
+		},
+		"app-unrelated",
+		25,
+		persistence.WithOrderedMigrationDependencies("go-users-auth-extras"),
+		persistence.WithOrderedMigrationDialectOptions(
+			persistence.WithDialectSourceLabel("app-unrelated"),
+			persistence.WithValidationTargets("sqlite"),
+		),
+	)
+	registerOrderedSources(t, insertedClient, append([]persistence.OrderedMigrationSource{unrelated}, insertedSources...))
+	insertedPlan, err := insertedClient.Plan(ctx)
+	if err != nil {
+		t.Fatalf("inserted plan: %v", err)
+	}
+	insertedCore := planEntryBySourceAndVersion(t, insertedPlan, "core", "00003")
+
+	if insertedCore.SyntheticName != baselineCore.SyntheticName {
+		t.Fatalf("core synthetic name changed after insertion: got %q want %q", insertedCore.SyntheticName, baselineCore.SyntheticName)
+	}
+	if insertedCore.SourceOrder != baselineCore.SourceOrder || insertedCore.SourceKey != baselineCore.SourceKey {
+		t.Fatalf("core stable metadata changed after insertion: got %+v want %+v", insertedCore, baselineCore)
+	}
+}
+
+func TestProfileStandaloneBackfillsLegacyPositionalMarkers(t *testing.T) {
+	ctx := context.Background()
+	client, db := newSQLiteClient(t, "standalone-backfill")
+	defer func() { _ = db.Close() }()
+
+	profileSources, err := migrations.ProfileSources(migrations.ProfileStandalone)
+	if err != nil {
+		t.Fatalf("profile sources: %v", err)
+	}
+	legacySources := orderedProfileSources(profileSources)
+	registerOrderedSources(t, client, legacySources)
+	if err := client.Migrate(ctx); err != nil {
+		t.Fatalf("legacy positional migrate: %v", err)
+	}
+
+	stable := persistence.NewMigrations()
+	if err := stable.RegisterOrderedMigrationSources(migrations.StableOrderedSources(profileSources)...); err != nil {
+		t.Fatalf("register stable sources: %v", err)
+	}
+	if err := stable.BackfillStableOrderedMigrationMarkers(ctx, client.DB(), legacySources); err != nil {
+		t.Fatalf("backfill stable markers: %v", err)
+	}
+
+	plan, err := stable.Plan(ctx, client.DB())
+	if err != nil {
+		t.Fatalf("stable plan after backfill: %v", err)
+	}
+	for _, entry := range plan.Entries {
+		if strings.HasPrefix(entry.SyntheticName, "ordsrc_") && !entry.Applied {
+			t.Fatalf("stable entry %q was not marked applied after backfill", entry.SyntheticName)
+		}
+	}
+
+	core := planEntryBySourceAndVersion(t, plan, "core", "00003")
+	if core.SyntheticName != "ordsrc_000030_go_users_00003" {
+		t.Fatalf("core synthetic name = %q", core.SyntheticName)
+	}
+	if !core.Applied {
+		t.Fatalf("expected core migration to be applied after backfill")
+	}
+
+	var aliasCount int
+	if err := client.DB().NewSelect().
+		TableExpr("bun_ordered_migration_aliases").
+		ColumnExpr("COUNT(*)").
+		Where("stable_name LIKE ?", "ordsrc_%").
+		Scan(ctx, &aliasCount); err != nil {
+		t.Fatalf("count ordered migration aliases: %v", err)
+	}
+	if aliasCount == 0 {
+		t.Fatalf("expected stable ordered migration aliases to be created")
 	}
 }
 
@@ -205,7 +389,7 @@ func newSQLiteClient(t *testing.T, name string) (*persistence.Client, *sql.DB) {
 
 func registerProfileSources(t *testing.T, client *persistence.Client, sources []migrations.ProfileSource) {
 	t.Helper()
-	registerOrderedSources(t, client, orderedProfileSources(sources))
+	registerOrderedSources(t, client, migrations.StableOrderedSources(sources))
 }
 
 func orderedProfileSources(sources []migrations.ProfileSource) []persistence.OrderedMigrationSource {
@@ -230,6 +414,35 @@ func registerOrderedSources(t *testing.T, client *persistence.Client, sources []
 	t.Helper()
 	if err := client.RegisterOrderedMigrationSources(sources...); err != nil {
 		t.Fatalf("register ordered migrations: %v", err)
+	}
+}
+
+func planEntryBySourceAndVersion(t *testing.T, plan *persistence.MigrationPlan, sourceName, version string) persistence.MigrationPlanEntry {
+	t.Helper()
+
+	for _, entry := range plan.Entries {
+		if entry.SourceName == sourceName && entry.OriginalVersion == version {
+			return entry
+		}
+	}
+	t.Fatalf("missing plan entry for source %q version %q", sourceName, version)
+	return persistence.MigrationPlanEntry{}
+}
+
+func assertStablePlanEntry(t *testing.T, entry persistence.MigrationPlanEntry, sourceKey string, order int, dependsOn []string) {
+	t.Helper()
+
+	if entry.IdentityMode != persistence.OrderedMigrationIdentitySourceStable {
+		t.Fatalf("entry %q identity mode = %s, want source-stable", entry.SyntheticName, entry.IdentityMode.String())
+	}
+	if entry.SourceKey != sourceKey {
+		t.Fatalf("entry %q source key = %q, want %q", entry.SyntheticName, entry.SourceKey, sourceKey)
+	}
+	if entry.SourceOrder != order {
+		t.Fatalf("entry %q source order = %d, want %d", entry.SyntheticName, entry.SourceOrder, order)
+	}
+	if !equalSlices(entry.SourceDependsOn, dependsOn) {
+		t.Fatalf("entry %q dependencies = %v, want %v", entry.SyntheticName, entry.SourceDependsOn, dependsOn)
 	}
 }
 
