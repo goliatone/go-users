@@ -321,15 +321,15 @@ func TestProfileStandaloneBackfillsLegacyPositionalMarkers(t *testing.T) {
 	}
 	legacySources := orderedProfileSources(profileSources)
 	registerOrderedSources(t, client, legacySources)
-	if err := client.Migrate(ctx); err != nil {
+	if err = client.Migrate(ctx); err != nil {
 		t.Fatalf("legacy positional migrate: %v", err)
 	}
 
 	stable := persistence.NewMigrations()
-	if err := stable.RegisterOrderedMigrationSources(migrations.StableOrderedSources(profileSources)...); err != nil {
+	if err = stable.RegisterOrderedMigrationSources(migrations.StableOrderedSources(profileSources)...); err != nil {
 		t.Fatalf("register stable sources: %v", err)
 	}
-	if err := stable.BackfillStableOrderedMigrationMarkers(ctx, client.DB(), legacyOrderedProfileSourcesForBackfill(profileSources)); err != nil {
+	if err = stable.BackfillStableOrderedMigrationMarkers(ctx, client.DB(), legacyOrderedProfileSourcesForBackfill(profileSources)); err != nil {
 		t.Fatalf("backfill stable markers: %v", err)
 	}
 
