@@ -16,6 +16,7 @@ const (
 	DataKeyObjectType      = "object_type"
 	DataKeyObjectID        = "object_id"
 	DataKeyObjectDeleted   = "object_deleted"
+	DataKeyActionDisplay   = "action_display"
 	DataKeySessionID       = "session_id"
 	DataKeyEnrichedAt      = "enriched_at"
 	DataKeyEnricherVersion = "enricher_version"
@@ -26,11 +27,12 @@ const DefaultEnricherVersion = "v1"
 
 // ResolveContext provides request-scoped data used by resolvers.
 type ResolveContext struct {
-	TenantID uuid.UUID
-	ActorID  uuid.UUID
-	Verb     string
-	Source   string
-	Metadata map[string]any
+	TenantID       uuid.UUID
+	OrganizationID uuid.UUID
+	ActorID        uuid.UUID
+	Verb           string
+	Source         string
+	Metadata       map[string]any
 }
 
 // ActorInfo defines enrichment details for an actor.

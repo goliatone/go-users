@@ -324,19 +324,19 @@ func (c *Command) enrichBatch(ctx context.Context, records []types.ActivityRecor
 	if err := ctx.Err(); err != nil {
 		return stats, err
 	}
-	groups := groupRecordsByTenant(records)
-	for tenantID, batch := range groups {
+	groups := groupRecordsByScope(records)
+	for scope, batch := range groups {
 		if err := ctx.Err(); err != nil {
 			return stats, err
 		}
-		actorInfo, err := c.resolveActors(ctx, tenantID, batch)
+		actorInfo, err := c.resolveActors(ctx, scope, batch)
 		if err != nil {
-			c.logger.Error("activity enrichment actor resolver failed", err, "tenant_id", tenantID, "records", len(batch))
+			c.logger.Error("activity enrichment actor resolver failed", err, "tenant_id", scope.TenantID, "organization_id", scope.OrganizationID, "records", len(batch))
 			actorInfo = nil
 		}
-		objectInfo, err := c.resolveObjects(ctx, tenantID, batch)
+		objectInfo, err := c.resolveObjects(ctx, scope, batch)
 		if err != nil {
-			c.logger.Error("activity enrichment object resolver failed", err, "tenant_id", tenantID, "records", len(batch))
+			c.logger.Error("activity enrichment object resolver failed", err, "tenant_id", scope.TenantID, "organization_id", scope.OrganizationID, "records", len(batch))
 			objectInfo = nil
 		}
 		for _, record := range batch {
@@ -373,16 +373,24 @@ func (c *Command) enrichBatch(ctx context.Context, records []types.ActivityRecor
 	return stats, nil
 }
 
-func groupRecordsByTenant(records []types.ActivityRecord) map[uuid.UUID][]types.ActivityRecord {
-	groups := make(map[uuid.UUID][]types.ActivityRecord)
+type resolverScope struct {
+	TenantID       uuid.UUID
+	OrganizationID uuid.UUID
+}
+
+func groupRecordsByScope(records []types.ActivityRecord) map[resolverScope][]types.ActivityRecord {
+	groups := make(map[resolverScope][]types.ActivityRecord)
 	for _, record := range records {
-		tenantID := record.TenantID
-		groups[tenantID] = append(groups[tenantID], record)
+		scope := resolverScope{
+			TenantID:       record.TenantID,
+			OrganizationID: record.OrgID,
+		}
+		groups[scope] = append(groups[scope], record)
 	}
 	return groups
 }
 
-func (c *Command) resolveActors(ctx context.Context, tenantID uuid.UUID, records []types.ActivityRecord) (map[uuid.UUID]activity.ActorInfo, error) {
+func (c *Command) resolveActors(ctx context.Context, scope resolverScope, records []types.ActivityRecord) (map[uuid.UUID]activity.ActorInfo, error) {
 	if c.actorResolver == nil {
 		return nil, nil
 	}
@@ -390,11 +398,11 @@ func (c *Command) resolveActors(ctx context.Context, tenantID uuid.UUID, records
 	if len(ids) == 0 {
 		return nil, nil
 	}
-	meta := activity.ResolveContext{TenantID: tenantID}
+	meta := activity.ResolveContext{TenantID: scope.TenantID, OrganizationID: scope.OrganizationID}
 	return c.actorResolver.ResolveActors(ctx, ids, meta)
 }
 
-func (c *Command) resolveObjects(ctx context.Context, tenantID uuid.UUID, records []types.ActivityRecord) (map[string]map[string]activity.ObjectInfo, error) {
+func (c *Command) resolveObjects(ctx context.Context, scope resolverScope, records []types.ActivityRecord) (map[string]map[string]activity.ObjectInfo, error) {
 	if c.objectResolver == nil {
 		return nil, nil
 	}
@@ -410,7 +418,7 @@ func (c *Command) resolveObjects(ctx context.Context, tenantID uuid.UUID, record
 		}
 		byType[objectType] = append(byType[objectType], objectID)
 	}
-	meta := activity.ResolveContext{TenantID: tenantID}
+	meta := activity.ResolveContext{TenantID: scope.TenantID, OrganizationID: scope.OrganizationID}
 	resolved := make(map[string]map[string]activity.ObjectInfo, len(byType))
 	for objectType, ids := range byType {
 		unique := uniqueStrings(ids)

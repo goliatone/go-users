@@ -278,6 +278,32 @@ func TestCommand_ConcurrentRunsDoNotOverwriteExistingKeys(t *testing.T) {
 	require.Len(t, store.actorDisplayHistory, 1)
 }
 
+func TestCommand_ResolverCallsAreGroupedByTenantAndOrganization(t *testing.T) {
+	tenantID := uuid.New()
+	orgA := uuid.New()
+	orgB := uuid.New()
+	actorID := uuid.New()
+	records := []types.ActivityRecord{
+		{ID: uuid.New(), TenantID: tenantID, OrgID: orgA, ActorID: actorID, ObjectType: "user", ObjectID: "same"},
+		{ID: uuid.New(), TenantID: tenantID, OrgID: orgB, ActorID: actorID, ObjectType: "user", ObjectID: "same"},
+	}
+	actors := &scopeCaptureActorResolver{}
+	objects := &scopeCaptureObjectResolver{}
+	cmd := New(Config{
+		EnrichmentQuery: &stubEnrichmentQuery{pages: []activity.ActivityEnrichmentPage{{Records: records}}},
+		EnrichmentStore: &recordingEnrichmentStore{},
+		ActorResolver:   actors,
+		ObjectResolver:  objects,
+	})
+
+	require.NoError(t, cmd.Execute(context.Background(), Input{}))
+	require.ElementsMatch(t, []activity.ResolveContext{
+		{TenantID: tenantID, OrganizationID: orgA},
+		{TenantID: tenantID, OrganizationID: orgB},
+	}, actors.calls)
+	require.ElementsMatch(t, actors.calls, objects.calls)
+}
+
 type stubEnrichmentQuery struct {
 	mu      sync.Mutex
 	updates int
@@ -301,6 +327,24 @@ func (q *stubEnrichmentQuery) ListActivityForEnrichment(ctx context.Context, fil
 type mapActorResolver struct {
 	data map[uuid.UUID]activity.ActorInfo
 	err  error
+}
+
+type scopeCaptureActorResolver struct {
+	calls []activity.ResolveContext
+}
+
+func (r *scopeCaptureActorResolver) ResolveActors(_ context.Context, _ []uuid.UUID, meta activity.ResolveContext) (map[uuid.UUID]activity.ActorInfo, error) {
+	r.calls = append(r.calls, meta)
+	return nil, nil
+}
+
+type scopeCaptureObjectResolver struct {
+	calls []activity.ResolveContext
+}
+
+func (r *scopeCaptureObjectResolver) ResolveObjects(_ context.Context, _ string, _ []string, meta activity.ResolveContext) (map[string]activity.ObjectInfo, error) {
+	r.calls = append(r.calls, meta)
+	return nil, nil
 }
 
 func (r mapActorResolver) ResolveActors(ctx context.Context, ids []uuid.UUID, meta activity.ResolveContext) (map[uuid.UUID]activity.ActorInfo, error) {
