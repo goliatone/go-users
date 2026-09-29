@@ -3,6 +3,7 @@ package activity
 import (
 	"context"
 	"errors"
+	"maps"
 	"strings"
 	"unicode"
 
@@ -138,9 +139,7 @@ func copyPolicyValue(value any) any {
 		return out
 	case map[string]string:
 		out := make(map[string]string, len(value))
-		for key, item := range value {
-			out[key] = item
-		}
+		maps.Copy(out, value)
 		return out
 	case []string:
 		return append([]string(nil), value...)
