@@ -63,6 +63,58 @@ if err := svc.ActivitySink.Log(ctx, rec); err != nil {
 
 `Log` fills `ID`/`OccurredAt` when missing and persists to the `user_activity` table created by migration `000003_user_activity.sql`.
 
+## Host-owned record policy and authentication events
+
+`RecordPolicy` is an opt-in boundary for audit disclosure. Its zero configuration
+removes metadata and IP; it does not change `DefaultMasker` or access-policy
+behavior. Supply the same policy to ordinary writes, hooks, transactional writes
+and reads. The metadata callback owns the application's allowlist/redaction.
+
+```go
+policy := activity.NewRecordPolicy(activity.RecordPolicyConfig{
+    DataSanitizer: func(record types.ActivityRecord) map[string]any {
+        // Return only the host's approved metadata. Do not forward arbitrary input.
+        outcome, _ := record.Data["outcome"].(string)
+        return map[string]any{"outcome": outcome}
+    },
+    RetainFailedLoginIdentifier: true, // explicit disclosure decision
+})
+sink := activity.SanitizingSink{Next: store, Policy: policy}
+hooks = policy.SanitizeHooks(hooks) // only AfterActivity is decorated
+
+// adapter/goauth imports as goauth; no identity lookup is performed.
+authSink, err := goauth.NewActivitySink(goauth.ActivitySinkConfig{
+    Sink: sink,
+    Scope: types.ScopeFilter{TenantID: tenantID, OrgID: orgID},
+    AnonymousActorID: authenticationGatewayID,
+    RetainFailedLoginIdentifier: true,
+})
+if err != nil { return err }
+authenticator.WithActivitySink(authSink)
+```
+
+The adapter requires nonzero tenant, organization and anonymous-actor UUIDs. It
+maps known event IDs and canonical actions, outcome, target and status fields,
+without copying arbitrary event metadata or provider errors. Identifier capture
+is disabled by default. Enabling it on both boundaries preserves only
+`attempted_identifier` for `auth.login.failure` in `authentication`: string input,
+controls/format characters removed, trimmed, case preserved and at most 254
+Unicode code points. Render it as escaped, **unverified attempted input**.
+
+For a transaction, call `policy.Sanitize(record)` before mapping to `LogEntry`
+and invoking `CreateTx` on the caller's transaction; the policy never starts or
+commits a transaction. For reads, call `policy.Sanitize(record)` after access and
+scope enforcement. A separate read policy may use `SanitizeRecord` as its base
+callback while enabling the same identifier exception. Callbacks receive detached
+JSON metadata; returned data is detached again before forwarding. Nil policies
+fail closed; missing sink destinations return errors and downstream errors
+propagate. No retries or deduplication are added.
+
+These helpers do not authorize readers. Hosts must retain trusted scope and
+permission checks, lifecycle/logger redaction, response cache policy and their
+own retention decision. Repository methods remain persistence-only and do not
+implicitly sanitize arbitrary direct writes.
+
 ## Queries
 
 ```go
