@@ -18,7 +18,8 @@ type RepositoryOptions struct {
 	CacheIdentifierFields []string
 }
 
-// WithCache toggles the repository cache decorator.
+// WithCache toggles the repository cache decorator. Reads using SelectCriteria,
+// including ListPreferences, bypass caching to preserve captured scope/key values.
 func WithCache(enabled bool) RepositoryOption {
 	return func(opts *RepositoryOptions) {
 		if opts == nil {

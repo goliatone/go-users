@@ -21,6 +21,11 @@ type ActivitySinkConfig struct {
 	RetainFailedLoginIdentifier bool
 }
 
+func (config ActivitySinkConfig) valid() bool {
+	return config.Sink != nil && config.Scope.TenantID != uuid.Nil &&
+		config.Scope.OrgID != uuid.Nil && config.AnonymousActorID != uuid.Nil
+}
+
 // ActivitySink adapts go-auth observations without identity lookups or copying
 // arbitrary event metadata. The host owns read authorization and retention.
 type ActivitySink struct{ config ActivitySinkConfig }
@@ -28,14 +33,14 @@ type ActivitySink struct{ config ActivitySinkConfig }
 var _ auth.ActivitySink = (*ActivitySink)(nil)
 
 func NewActivitySink(config ActivitySinkConfig) (*ActivitySink, error) {
-	if config.Sink == nil || config.Scope.TenantID == uuid.Nil || config.Scope.OrgID == uuid.Nil || config.AnonymousActorID == uuid.Nil {
+	if !config.valid() {
 		return nil, fmt.Errorf("goauth: Activity sink, exact scope and anonymous actor are required")
 	}
 	return &ActivitySink{config: config}, nil
 }
 
 func (sink *ActivitySink) Record(ctx context.Context, event auth.ActivityEvent) error {
-	if sink == nil || sink.config.Sink == nil || sink.config.Scope.TenantID == uuid.Nil || sink.config.Scope.OrgID == uuid.Nil || sink.config.AnonymousActorID == uuid.Nil {
+	if sink == nil || !sink.config.valid() {
 		return fmt.Errorf("authentication Activity sink is not ready")
 	}
 	verb := strings.TrimSpace(string(event.EventType))

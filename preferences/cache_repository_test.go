@@ -43,7 +43,7 @@ func TestPreferenceRepository_CacheDoesNotDoubleWrap(t *testing.T) {
 	require.Same(t, cached, stored)
 }
 
-func TestPreferenceRepository_ListPreferencesUsesCache(t *testing.T) {
+func TestPreferenceRepository_ListPreferencesBypassesCacheForCriteria(t *testing.T) {
 	ctx := context.Background()
 	db := newTestDB(t)
 	applyDDL(t, db)
@@ -77,14 +77,27 @@ func TestPreferenceRepository_ListPreferencesUsesCache(t *testing.T) {
 		Level: types.PreferenceLevelUser,
 	}
 
-	_, err = repo.ListPreferences(ctx, filter)
-	require.NoError(t, err)
-	_, err = repo.ListPreferences(ctx, filter)
-	require.NoError(t, err)
-	require.Equal(t, 1, spy.listCalls)
+	for range 2 {
+		rows, listErr := repo.ListPreferences(ctx, filter)
+		require.NoError(t, listErr)
+		require.Len(t, rows, 1)
+		require.Equal(t, "dark", rows[0].Value["mode"])
+	}
+	// Function-valued criteria deliberately bypass the cache: captured scope
+	// and key values cannot be identified by a closure's code pointer.
+	require.Equal(t, 2, spy.listCalls)
+	for _, other := range []types.PreferenceFilter{
+		{UserID: uuid.New(), Scope: filter.Scope, Level: filter.Level},
+		{UserID: userID, Scope: types.ScopeFilter{TenantID: uuid.New()}, Level: filter.Level},
+		{UserID: userID, Scope: filter.Scope, Level: filter.Level, Keys: []string{"locale"}},
+	} {
+		rows, listErr := repo.ListPreferences(ctx, other)
+		require.NoError(t, listErr)
+		require.Empty(t, rows)
+	}
 }
 
-func TestPreferenceRepository_UpsertInvalidatesCache(t *testing.T) {
+func TestPreferenceRepository_UpsertVisibleWithCacheEnabled(t *testing.T) {
 	ctx := context.Background()
 	db := newTestDB(t)
 	applyDDL(t, db)
@@ -134,12 +147,14 @@ func TestPreferenceRepository_UpsertInvalidatesCache(t *testing.T) {
 	require.NoError(t, err)
 
 	spy.listCalls = 0
-	_, err = repo.ListPreferences(ctx, filter)
+	rows, err := repo.ListPreferences(ctx, filter)
 	require.NoError(t, err)
 	require.Equal(t, 1, spy.listCalls)
+	require.Len(t, rows, 1)
+	require.Equal(t, "light", rows[0].Value["mode"])
 }
 
-func TestPreferenceRepository_DeleteInvalidatesCache(t *testing.T) {
+func TestPreferenceRepository_DeleteVisibleWithCacheEnabled(t *testing.T) {
 	ctx := context.Background()
 	db := newTestDB(t)
 	applyDDL(t, db)
@@ -179,9 +194,10 @@ func TestPreferenceRepository_DeleteInvalidatesCache(t *testing.T) {
 	require.NoError(t, repo.DeletePreference(ctx, userID, types.ScopeFilter{TenantID: tenantID}, types.PreferenceLevelUser, "theme"))
 
 	spy.listCalls = 0
-	_, err = repo.ListPreferences(ctx, filter)
+	rows, err := repo.ListPreferences(ctx, filter)
 	require.NoError(t, err)
 	require.Equal(t, 1, spy.listCalls)
+	require.Empty(t, rows)
 }
 
 type spyRecordRepository struct {
