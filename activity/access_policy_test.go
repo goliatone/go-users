@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/goliatone/go-auth"
+	"github.com/goliatone/go-masker"
 	"github.com/goliatone/go-users/pkg/types"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -180,4 +181,19 @@ func TestDefaultAccessPolicySanitizeSupportAllExposure(t *testing.T) {
 	require.Len(t, out, 1)
 	require.NotNil(t, out[0].Data)
 	require.Equal(t, "abcd1234", out[0].Data["token"])
+}
+
+func TestDefaultMaskerFullyRedactsCredentialsAtEveryLength(t *testing.T) {
+	for _, key := range []string{"token", "AccessToken", "refresh_token", "sessionId", "password", "api_key"} {
+		for _, value := range []string{"x", "abcd1234", "long-token-with-visible-prefix-and-suffix", "界界界界界界界界"} {
+			t.Run(key+"/"+value, func(t *testing.T) {
+				record := types.ActivityRecord{Data: map[string]any{key: value}}
+				out := SanitizeRecord(DefaultMasker(), record)
+				require.Equal(t, masker.RedactedValue, out.Data[key])
+				require.Equal(t, value, record.Data[key])
+			})
+		}
+	}
+	require.NotSame(t, masker.Default, DefaultMasker())
+	require.ErrorIs(t, DefaultMasker().RegisterMaskField("token", "preserveEnds(4,4)"), masker.ErrFrozen)
 }

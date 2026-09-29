@@ -105,8 +105,8 @@ func TestRecordPolicyTransactionalPersistence(t *testing.T) {
 	require.NoError(t, err)
 	policy := NewRecordPolicy(RecordPolicyConfig{RetainFailedLoginIdentifier: true})
 	for _, rollback := range []bool{true, false} {
-		tx, err := db.BeginTx(context.Background(), nil)
-		require.NoError(t, err)
+		tx, beginErr := db.BeginTx(context.Background(), nil)
+		require.NoError(t, beginErr)
 		record := policy.Sanitize(types.ActivityRecord{ID: uuid.New(), ActorID: uuid.New(), Verb: LoginFailureVerb, Channel: AuthenticationChannel, Data: map[string]any{DataKeyAttemptedIdentifier: " user\n", "password": "secret"}})
 		_, err = repo.CreateTx(context.Background(), tx, &LogEntry{ID: record.ID, ActorID: record.ActorID, Verb: record.Verb, Channel: record.Channel, Data: record.Data})
 		require.NoError(t, err)

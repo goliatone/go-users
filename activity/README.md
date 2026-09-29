@@ -154,8 +154,10 @@ feed, _ := feedQuery.Query(ctx, types.ActivityFilter{
 ```
 
 Defaults treat `system_admin`/`superadmin` as superadmins and `tenant_admin`/`admin`/`org_admin`
-as admins; you can override with `WithRoleAliases`. Sanitization uses go-masker defaults and
-redacts IPs for non-superadmins by default.
+as admins; you can override with `WithRoleAliases`. Sanitization uses an independent frozen go-masker security profile: credentials
+and session IDs are fully redacted at every length, actor email is hashed, and
+IPs are removed for non-superadmins. Customize masking with `WithPolicyMasker`;
+changing the global `masker.Default` no longer changes Activity disclosure.
 
 ## Optional cursor pagination
 

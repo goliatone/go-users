@@ -13,17 +13,24 @@ type SanitizerConfig struct {
 	Masker *masker.Masker
 }
 
-var defaultMaskerOnce sync.Once
+var defaultActivityMasker = sync.OnceValue(func() *masker.Masker {
+	mask, err := masker.NewSecure(
+		masker.WithMaskField("actor_email", "hash"),
+		masker.WithMaskField("session_id", masker.MaskTypeRedact),
+		masker.WithMaskField("sessionId", masker.MaskTypeRedact),
+	)
+	if err != nil {
+		// SanitizeRecord fails closed when no masker is available.
+		return nil
+	}
+	return mask
+})
 
-// DefaultMasker returns a configured masker instance with the default denylist.
+// DefaultMasker returns an independent, frozen Activity masker. Credentials and
+// session identifiers are fully redacted regardless of length; host changes to
+// the package-global compatibility masker cannot weaken this boundary.
 func DefaultMasker() *masker.Masker {
-	defaultMaskerOnce.Do(func() {
-		if masker.Default == nil {
-			return
-		}
-		registerDefaultMaskFields(masker.Default)
-	})
-	return masker.Default
+	return defaultActivityMasker()
 }
 
 // SanitizeRecord masks sensitive values in the activity record data payload.
@@ -65,30 +72,6 @@ func SanitizeRecords(mask *masker.Masker, records []types.ActivityRecord) []type
 		out = append(out, SanitizeRecord(mask, record))
 	}
 	return out
-}
-
-func registerDefaultMaskFields(mask *masker.Masker) {
-	if mask == nil {
-		return
-	}
-	mask.RegisterMaskField("Secret", "filled4")
-	mask.RegisterMaskField("secret", "filled4")
-	mask.RegisterMaskField("Password", "filled4")
-	mask.RegisterMaskField("password", "filled4")
-	mask.RegisterMaskField("Token", "preserveEnds(4,4)")
-	mask.RegisterMaskField("token", "preserveEnds(4,4)")
-	mask.RegisterMaskField("ApiKey", "filled32")
-	mask.RegisterMaskField("api_key", "filled32")
-	mask.RegisterMaskField("AccessToken", "preserveEnds(4,4)")
-	mask.RegisterMaskField("access_token", "preserveEnds(4,4)")
-	mask.RegisterMaskField("RefreshToken", "preserveEnds(4,4)")
-	mask.RegisterMaskField("refresh_token", "preserveEnds(4,4)")
-	mask.RegisterMaskField("Authorization", "filled32")
-	mask.RegisterMaskField("authorization", "filled32")
-	mask.RegisterMaskField("actor_email", "hash")
-	mask.RegisterMaskField("actorEmail", "hash")
-	mask.RegisterMaskField("session_id", "preserveEnds(4,4)")
-	mask.RegisterMaskField("sessionId", "preserveEnds(4,4)")
 }
 
 func cloneStringMap(src map[string]any) map[string]any {
