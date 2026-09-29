@@ -3,7 +3,7 @@ module github.com/goliatone/go-users
 go 1.26.0
 
 require (
-	github.com/goliatone/go-auth v0.45.0
+	github.com/goliatone/go-auth v0.45.1
 	github.com/goliatone/go-command v0.24.2
 	github.com/goliatone/go-crud v0.25.0
 	github.com/goliatone/go-errors v0.12.0
@@ -59,7 +59,7 @@ require (
 	github.com/goliatone/go-logger v0.10.1 // indirect
 	github.com/goliatone/go-print v0.4.1 // indirect
 	github.com/goliatone/go-slug v0.1.0 // indirect
-	github.com/goliatone/hashid v0.2.2 // indirect
+	github.com/goliatone/hashid v0.2.3 // indirect
 	github.com/goodsign/monday v1.0.2 // indirect
 	github.com/google/cel-go v0.26.1 // indirect
 	github.com/google/pprof v0.0.0-20251208000136-3d256cb9ff16 // indirect

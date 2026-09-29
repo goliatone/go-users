@@ -6,7 +6,7 @@ replace github.com/goliatone/go-users => ../..
 
 require (
 	github.com/gofiber/fiber/v2 v2.52.12
-	github.com/goliatone/go-auth v0.45.0
+	github.com/goliatone/go-auth v0.45.1
 	github.com/goliatone/go-composite-fs v0.3.0
 	github.com/goliatone/go-config v0.14.0
 	github.com/goliatone/go-crud v0.25.0
@@ -65,7 +65,7 @@ require (
 	github.com/goliatone/go-options v0.7.2 // indirect
 	github.com/goliatone/go-repository-cache v0.7.2 // indirect
 	github.com/goliatone/go-slug v0.1.0 // indirect
-	github.com/goliatone/hashid v0.2.2 // indirect
+	github.com/goliatone/hashid v0.2.3 // indirect
 	github.com/goodsign/monday v1.0.2 // indirect
 	github.com/google/cel-go v0.26.1 // indirect
 	github.com/google/pprof v0.0.0-20251208000136-3d256cb9ff16 // indirect
