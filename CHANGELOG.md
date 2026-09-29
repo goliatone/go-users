@@ -1,5 +1,28 @@
 # Changelog
 
+# [0.26.0](https://github.com/goliatone/go-users/compare/v0.25.0...v0.26.0) - (2026-09-29)
+
+## <!-- 1 -->🐛 Bug Fixes
+
+- Sanitizer ([19a4d19](https://github.com/goliatone/go-users/commit/19a4d1989f3064c266a65f48dfcfeee3b2c47cc4))  - (goliatone)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.26.0 ([5c7560a](https://github.com/goliatone/go-users/commit/5c7560a1ccbeca6c4aae71fac8a848a1a15fcb45))  - (goliatone)
+
+## <!-- 16 -->➕ Add
+
+- Host owned record policy and auth events ([3659480](https://github.com/goliatone/go-users/commit/36594802275e0b4a7b1743938e0bd48ed95d125e))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.25.0 ([9a3f408](https://github.com/goliatone/go-users/commit/9a3f4082363f265fe1248da8e0d5d2a0258ead43))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Code quality ([70e5663](https://github.com/goliatone/go-users/commit/70e5663db3b193a104315b90f2caf01e6e129711))  - (goliatone)
+- Update deps ([03cc4b7](https://github.com/goliatone/go-users/commit/03cc4b739c663117003aa1848476c1c4f3436e75))  - (goliatone)
+
 # [0.25.0](https://github.com/goliatone/go-users/compare/v0.24.1...v0.25.0) - (2026-08-12)
 
 ## <!-- 13 -->📦 Bumps
