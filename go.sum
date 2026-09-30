@@ -107,8 +107,8 @@ github.com/goliatone/go-repository-bun v0.16.1 h1:nTYn+MwwvhX4o2MuBYiM8aDYpO++2X
 github.com/goliatone/go-repository-bun v0.16.1/go.mod h1:bOFyQOGKyPJX+tkd7A7DhASqcPMvwdhDq41AmWujFqs=
 github.com/goliatone/go-repository-cache v0.7.2 h1:0ELiUAEUlvtY1SGd4/AO5DDFxPmuGLt82z9o10qCFGg=
 github.com/goliatone/go-repository-cache v0.7.2/go.mod h1:Reoa1cuC15Ad8ff1QnRFuJ1Vqm7hbv+aoopk2J2nuMw=
-github.com/goliatone/go-router v0.61.3 h1:9OnBVkg2BN1gf24yDEK3BU9S67RZjL+8P2zPGXdKDak=
-github.com/goliatone/go-router v0.61.3/go.mod h1:bcAifjTvKciFA6M6RtHcMAJ+mfuT//yxs/aLE3NHwDk=
+github.com/goliatone/go-router v0.62.1 h1:O3v3leWG5S2xyBXR6bCzVa+2o2POK/Qp1eqW1n3pSvY=
+github.com/goliatone/go-router v0.62.1/go.mod h1:3nA13XBi1gDVyIRKPXU7ZWhOdbKGnizoe85IXh0ybMM=
 github.com/goliatone/go-slug v0.1.0 h1:0APBcu2X9MWF2t6X3LN55XfQ47zf4FUzDmXYJ1YraAk=
 github.com/goliatone/go-slug v0.1.0/go.mod h1:8lXx322OHfQQzdrwikY2uqhQVmH3IVNGiVxn9kPmX1w=
 github.com/goliatone/go-urlkit v0.7.0 h1:wc2JR4xLnft7Vne4LbNw/oLQdFHQkuIgoEU0Hi7NczI=
@@ -125,8 +125,8 @@ github.com/google/pprof v0.0.0-20251208000136-3d256cb9ff16 h1:ptucaU8cwiAc+/jqDb
 github.com/google/pprof v0.0.0-20251208000136-3d256cb9ff16/go.mod h1:67FPmZWbr+KDT/VlpWtw6sO9XSjpJmLuHpoLmWiTGgY=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
-github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
+github.com/gorilla/websocket v1.5.4-0.20240701034025-d67f41855da4 h1:PYKzliEgITjLJoJqbV90S0YRaG8LNAsICH6fp6MApC0=
+github.com/gorilla/websocket v1.5.4-0.20240701034025-d67f41855da4/go.mod h1:r4w70xmWCQKmi1ONH4KIaBptdivuRPyosB9RmPlGEwA=
 github.com/hexops/gotextdiff v1.0.3 h1:gitA9+qJrrTCsiCl7+kh75nPqQt1cx4ZkudSTLoUqJM=
 github.com/hexops/gotextdiff v1.0.3/go.mod h1:pSWU5MAI3yDq+fZBTazCSJysOMbxWL1BSow5/V2vxeg=
 github.com/jinzhu/inflection v1.0.0 h1:K317FqzuhWc8YvSVlFMCCUb36O/S9MCKRDI7QkRKD/E=
