@@ -84,10 +84,10 @@ All queries follow a consistent pattern:
 
 ```go
 // 1. Construct filter/input with required Actor
-filter := types.SomeFilter{
+filter := types.UserInventoryFilter{
     Actor: types.ActorRef{
         ID:    actorID,
-        Roles: []string{"admin"},
+        Type: "admin",
     },
     Scope: types.ScopeFilter{
         TenantID: tenantID,
@@ -96,13 +96,13 @@ filter := types.SomeFilter{
 }
 
 // 2. Execute query
-result, err := svc.Queries().SomeQuery.Query(ctx, filter)
+result, err := svc.Queries().UserInventory.Query(ctx, filter)
 if err != nil {
     return err
 }
 
 // 3. Process result
-for _, item := range result.Items {
+for _, item := range result.Users {
     // ...
 }
 ```
@@ -984,10 +984,10 @@ types.ErrMissingPreferenceResolver   // PreferenceResolver not configured
 
 // Validation errors
 types.ErrActorRequired               // Actor.ID is required
-query.errRoleIDRequired              // RoleID required for detail query
+// Role-detail queries also validate RoleID internally.
 
 // Authorization errors (from scope guard)
-types.ErrUnauthorized                // Actor not authorized for action
+types.ErrUnauthorizedScope                // Actor not authorized for action
 ```
 
 Error handling example:
@@ -999,7 +999,7 @@ func handleQuery(ctx context.Context, svc *service.Service, filter types.UserInv
         switch {
         case errors.Is(err, types.ErrActorRequired):
             return nil, fmt.Errorf("authentication required")
-        case errors.Is(err, types.ErrUnauthorized):
+        case errors.Is(err, types.ErrUnauthorizedScope):
             return nil, fmt.Errorf("access denied")
         case errors.Is(err, types.ErrMissingInventoryRepository):
             return nil, fmt.Errorf("service unavailable")

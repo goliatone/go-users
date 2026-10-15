@@ -311,6 +311,9 @@ type scopeValues struct {
 }
 
 func scopeIDs(level types.PreferenceLevel, userID uuid.UUID, scope types.ScopeFilter) (scopeValues, error) {
+	if err := scope.RequireTenantOrg(); err != nil {
+		return scopeValues{}, err
+	}
 	switch level {
 	case types.PreferenceLevelUser:
 		if userID == uuid.Nil {

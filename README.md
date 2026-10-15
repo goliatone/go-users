@@ -9,13 +9,22 @@
 - `query`: inventory, role, assignment, profile, preference, and activity read models.
 - `preferences`: resolver helpers for scoped preference trees.
 - `scope`: guard, policies, and resolver utilities.
-- `registry`: Bun helpers for registering SQL migrations and schema metadata.
+- `registry`: Bun-backed role catalogs and exact scoped role grants.
+- `groups`: optional flat Groups, independent memberships, strict live authorization and transaction-ordered management.
 - `activity`: Bun repository, ActivitySink helpers, and fixtures for audit logging (see `activity/README.md`).
+- `adapter/goauth`: go-auth identity repositories and an explicit authentication-event audit bridge.
+- `crudguard` and `crudsvc`: scoped CRUD policy and service adapters; business rules stay in commands/services.
+- `migrations`: standalone/combined migration profiles and stable ordered source registration.
 - `docs` and `examples`: runnable references for transports, guards, and schema feeds.
+
+The root module is `github.com/goliatone/go-users`. `examples/web` is a separate
+module; the domain packages do not mount HTTP routes. Token/cookie and provider
+session mechanics belong to go-auth, while go-users owns application user,
+role, preference, profile and activity workflows.
 
 ## Prerequisites
 
-- Go 1.24+.
+- Go 1.26.0 or newer, as required by `go.mod`.
 - A repository implementation for each interface located in `pkg/types`.
 - Access to a SQL database when using the bundled migrations (PostgreSQL or SQLite).
 
@@ -74,7 +83,9 @@ func buildService(deps Dependencies) *service.Service {
 }
 ```
 
-Check `service.Service.Ready` or `HealthCheck` before wiring transports.
+Call `svc.Ready()` or `svc.HealthCheck(ctx)` before wiring transports. These
+checks validate configured dependencies; they do not ping the database or apply
+migrations. Verify database connectivity and schema separately.
 
 ## Commands
 
@@ -82,10 +93,12 @@ Check `service.Service.Ready` or `HealthCheck` before wiring transports.
 - `UserInvite` and `UserPasswordReset`: invite token and reset token workflows.
 - `CreateRole`, `UpdateRole`, `DeleteRole`: custom role CRUD with registry notifications.
 - `AssignRole` and `UnassignRole`: "actor-to-role" assignments, with guard checks.
-- `ActivityLog`: structured audit trails stored through the configured repository or sink.
-- `ProfileUpsert`, `PreferenceUpsert`, `PreferenceDelete`: profile and scoped preference management.
+- `LogActivity`: structured audit trails through the configured sink and activity hooks.
+- `UserCreate`, `UserUpdate`, `UserBootstrapPassword`, and `BulkUserImport`: host-driven user creation, update, bootstrap and import workflows.
+- `UserRegistrationRequest`, `UserTokenValidate`, `UserTokenConsume`, `UserPasswordResetRequest`, and `UserPasswordResetConfirm`: registration/secure-link request and token lifecycle handlers.
+- `ProfileUpsert`, `PreferenceUpsert`, `PreferenceDelete`, `PreferenceUpsertMany`, `PreferenceDeleteMany`: profile and scoped preference management.
 
-Every command runs through the scope guard before invoking repositories. Hooks fire after each command so transports can sync email, analytics, or caches.
+Domain commands and queries share the scope/authorization contracts where applicable. Hooks follow their command-specific mutation contracts; the low-level activity command relies on a trusted caller and configured sink rather than running a scope guard.
 
 ## Feature gates
 
@@ -136,11 +149,33 @@ When the local `go-auth` user provider reads this metadata, expired temporary pa
 
 Queries also rely on the guard to derive the effective scope passed to repositories.
 
+## Activity policy and auth boundary
+
+`ActivitySink()` is a service method. Use `svc.Commands().LogActivity` for the
+activity command and hook path, or `svc.ActivitySink().Log(...)` for direct
+sink access. `LogActivity` itself is not a scope/authorization guard; authenticate
+callers and supply trusted scope before invoking it.
+
+`activity.RecordPolicy` is an opt-in host disclosure boundary. Its zero config
+removes metadata and IP. Wrap writes with `activity.SanitizingSink`, decorate
+`AfterActivity` with `policy.SanitizeHooks`, and apply `policy.Sanitize(record)`
+to transactional writes and authorized reads. Direct Bun repository operations
+remain persistence-only and do not sanitize or authorize arbitrary input.
+
+`adapter/goauth.NewActivitySink` bridges authentication events without identity
+lookups. Configure nonzero trusted tenant/org and anonymous-actor UUIDs. Ordinary
+producer metadata is not copied. Failed-login `attempted_identifier` retention
+is disabled by default and requires opt-in in both the adapter and record policy;
+it is bounded, unverified display data, not actor identity.
+
+See [activity package wiring](activity/README.md#host-owned-record-policy-and-authentication-events)
+and [activity guide](docs/GUIDE_ACTIVITY.md#host-owned-record-policy-and-authentication-events).
+
 ## Scope guard
 
 - Provide a `types.ScopeResolver` that understands tenant, workspace, or organization hints carried in the request.
 - Provide a `types.AuthorizationPolicy` that asserts whether the actor can operate in the requested scope.
-- Call `service.ScopeGuard()` when building HTTP or job adapters so the same guard instance drives controllers.
+- Call `svc.ScopeGuard()` when building HTTP or job adapters so the same guard instance drives controllers.
 - The guard runs before go-crud controllers inside `crudguard.Adapter` (see `examples/web`).
 
 More details live in `docs/MULTITENANCY.md` and `docs/WORKSPACES.md`.
@@ -331,7 +366,7 @@ record, err = activity.BuildRecordFromUUID(adminID,
 if err != nil {
     return err
 }
-if err := svc.ActivitySink.Log(ctx, record); err != nil {
+if err := svc.ActivitySink().Log(ctx, record); err != nil {
     return err
 }
 ```

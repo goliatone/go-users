@@ -48,6 +48,9 @@ func NewResolver(cfg ResolverConfig) (*Resolver, error) {
 
 // Resolve builds the effective preference snapshot for the supplied scope chain.
 func (r *Resolver) Resolve(ctx context.Context, input ResolveInput) (types.PreferenceSnapshot, error) {
+	if err := input.Scope.RequireTenantOrg(); err != nil {
+		return types.PreferenceSnapshot{}, err
+	}
 	outputMode, err := normalizeOutputMode(input.OutputMode)
 	if err != nil {
 		return types.PreferenceSnapshot{}, err

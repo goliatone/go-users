@@ -1,5 +1,8 @@
 # Profiles & Preferences Guide
 
+The built-in stores support tenant/org scope and existing system→tenant→org→user preference layers. Nonempty `ScopeFilter.Labels` return `types.ErrUnsupportedScopeLabels` for profile reads/writes, preference reads/writes/deletes and resolution. Group-specific records require host storage; labels never silently select a shared row.
+
+
 This guide covers managing user profiles and scoped preferences in `go-users`. Learn how to store rich user data and implement hierarchical settings that cascade across system, tenant, organization, and user levels.
 
 ## Table of Contents

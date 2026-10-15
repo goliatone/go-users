@@ -29,6 +29,18 @@ type ScopeFilter struct {
 	Labels   map[string]uuid.UUID
 }
 
+// ErrUnsupportedScopeLabels means an API supports only tenant/org scope.
+var ErrUnsupportedScopeLabels = errors.New("go-users: scope labels are not supported by this operation")
+
+// RequireTenantOrg rejects dimensions that a tenant/org-only store cannot
+// preserve. Empty label maps retain legacy behavior.
+func (s ScopeFilter) RequireTenantOrg() error {
+	if len(s.Labels) != 0 {
+		return ErrUnsupportedScopeLabels
+	}
+	return nil
+}
+
 // Clone returns a copy of the scope filter with labels detached from the
 // original map reference so callers can mutate safely.
 func (s ScopeFilter) Clone() ScopeFilter {
@@ -44,16 +56,17 @@ func (s ScopeFilter) Clone() ScopeFilter {
 }
 
 // WithLabel returns a cloned scope filter with the provided label set. Keys are
-// normalized to lower-case so lookups stay consistent across transports.
+// trimmed and normalized to lower-case so lookups stay consistent across transports.
 func (s ScopeFilter) WithLabel(key string, id uuid.UUID) ScopeFilter {
-	if strings.TrimSpace(key) == "" || id == uuid.Nil {
+	key = strings.ToLower(strings.TrimSpace(key))
+	if key == "" || id == uuid.Nil {
 		return s
 	}
 	clone := s.Clone()
 	if clone.Labels == nil {
 		clone.Labels = make(map[string]uuid.UUID)
 	}
-	clone.Labels[strings.ToLower(key)] = id
+	clone.Labels[key] = id
 	return clone
 }
 
@@ -64,6 +77,31 @@ func (s ScopeFilter) Label(key string) uuid.UUID {
 		return uuid.Nil
 	}
 	return s.Labels[strings.ToLower(strings.TrimSpace(key))]
+}
+
+// ErrInvalidScopeLabels indicates an invalid label key, identifier or conflicting
+// aliases in a scope supplied as a map.
+var ErrInvalidScopeLabels = errors.New("go-users: invalid scope labels")
+
+// NormalizeLabels returns a detached scope with canonical label keys. Conflicting
+// aliases are rejected instead of letting map iteration order decide ownership.
+func (s ScopeFilter) NormalizeLabels() (ScopeFilter, error) {
+	clone := ScopeFilter{TenantID: s.TenantID, OrgID: s.OrgID}
+	if len(s.Labels) == 0 {
+		return clone, nil
+	}
+	clone.Labels = make(map[string]uuid.UUID, len(s.Labels))
+	for key, id := range s.Labels {
+		key = strings.ToLower(strings.TrimSpace(key))
+		if key == "" || id == uuid.Nil {
+			return ScopeFilter{}, ErrInvalidScopeLabels
+		}
+		if previous, ok := clone.Labels[key]; ok && previous != id {
+			return ScopeFilter{}, ErrInvalidScopeLabels
+		}
+		clone.Labels[key] = id
+	}
+	return clone, nil
 }
 
 // Pagination supports query pagination across admin panels.
@@ -136,6 +174,8 @@ type ActivityRecord struct {
 	IP         string
 	TenantID   uuid.UUID
 	OrgID      uuid.UUID
+	// Labels is the complete canonical arbitrary scope, independent of metadata.
+	Labels map[string]uuid.UUID
 	Data       map[string]any
 	OccurredAt time.Time
 }

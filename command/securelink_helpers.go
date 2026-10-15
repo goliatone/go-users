@@ -23,7 +23,10 @@ const (
 
 const secureLinkSourceDefault = "go-users"
 
-func buildSecureLinkPayload(action string, user *types.AuthUser, scope types.ScopeFilter, jti string, issuedAt, expiresAt time.Time, source string) types.SecureLinkPayload {
+func buildSecureLinkPayload(action string, user *types.AuthUser, scope types.ScopeFilter, jti string, issuedAt, expiresAt time.Time, source string) (types.SecureLinkPayload, error) {
+	if err := scope.RequireTenantOrg(); err != nil {
+		return nil, err
+	}
 	payload := types.SecureLinkPayload{
 		"action": action,
 		"jti":    strings.TrimSpace(jti),
@@ -51,7 +54,16 @@ func buildSecureLinkPayload(action string, user *types.AuthUser, scope types.Sco
 	if strings.TrimSpace(source) != "" {
 		payload["source"] = strings.TrimSpace(source)
 	}
-	return payload
+	return payload, nil
+}
+
+// scope_labels is reserved for a future durable link-scope contract. Accepting
+// it today would silently restore a broader tenant/org-only scope.
+func validateSecureLinkScope(payload types.SecureLinkPayload) error {
+	if _, present := payload["scope_labels"]; present {
+		return types.ErrUnsupportedScopeLabels
+	}
+	return nil
 }
 
 func tokenMetadata(jti string, issuedAt, expiresAt time.Time, actor types.ActorRef, scope types.ScopeFilter) map[string]any {

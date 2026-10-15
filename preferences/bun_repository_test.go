@@ -257,3 +257,46 @@ func splitStatements(sql string) []string {
 	}
 	return statements
 }
+
+func TestPreferenceLabelsRejectedAtEveryLevel(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+	applyDDL(t, db)
+	repo, err := NewRepository(RepositoryConfig{DB: db})
+	require.NoError(t, err)
+	user := uuid.New()
+	base := types.ScopeFilter{TenantID: uuid.New(), OrgID: uuid.New()}
+	levels := []types.PreferenceLevel{types.PreferenceLevelSystem, types.PreferenceLevelTenant, types.PreferenceLevelOrg, types.PreferenceLevelUser}
+	for _, level := range levels {
+		record := types.PreferenceRecord{UserID: user, Scope: base, Level: level, Key: "theme", Value: map[string]any{"name": "legacy"}}
+		_, err = repo.UpsertPreference(ctx, record)
+		require.NoError(t, err)
+		for range 2 {
+			labeled := base.WithLabel("group_id", uuid.New())
+			record.Scope = labeled
+			record.Value = map[string]any{"name": "must not overwrite"}
+			_, err = repo.UpsertPreference(ctx, record)
+			require.ErrorIs(t, err, types.ErrUnsupportedScopeLabels)
+			_, err = repo.ListPreferences(ctx, types.PreferenceFilter{UserID: user, Scope: labeled, Level: level})
+			require.ErrorIs(t, err, types.ErrUnsupportedScopeLabels)
+			require.ErrorIs(t, repo.DeletePreference(ctx, user, labeled, level, "theme"), types.ErrUnsupportedScopeLabels)
+			saved, bulkErr := repo.UpsertManyPreferences(ctx, []types.PreferenceRecord{record}, types.PreferenceBulkModeBestEffort)
+			require.ErrorIs(t, bulkErr, types.ErrUnsupportedScopeLabels)
+			require.Empty(t, saved)
+			require.ErrorIs(t, repo.DeleteManyPreferences(ctx, user, labeled, level, []string{"theme"}, types.PreferenceBulkModeBestEffort), types.ErrUnsupportedScopeLabels)
+		}
+		rows, err := repo.ListPreferences(ctx, types.PreferenceFilter{UserID: user, Scope: base, Level: level})
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+		require.Equal(t, "legacy", rows[0].Value["name"])
+		require.Equal(t, 1, rows[0].Version)
+	}
+	resolver, err := NewResolver(ResolverConfig{Repository: repo})
+	require.NoError(t, err)
+	_, err = resolver.Resolve(ctx, ResolveInput{UserID: user, Scope: base.WithLabel("group_id", uuid.New())})
+	require.ErrorIs(t, err, types.ErrUnsupportedScopeLabels)
+	snapshot, err := resolver.Resolve(ctx, ResolveInput{UserID: user, Scope: base, IncludeVersions: true})
+	require.NoError(t, err)
+	require.NotEmpty(t, snapshot.Traces)
+	require.NotEmpty(t, snapshot.EffectiveVersions)
+}

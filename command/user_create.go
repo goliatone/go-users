@@ -98,7 +98,7 @@ func (c *UserCreateCommand) Execute(ctx context.Context, input UserCreateInput) 
 	}
 
 	record := buildUserCreatedActivityRecord(created, input.Actor, scopeFilter, c.clock, false)
-	logActivity(ctx, c.sink, record)
+	logActivity(ctx, c.sink, record, c.logger)
 	emitActivityHook(ctx, c.hooks, record)
 
 	if input.Result != nil && created != nil {

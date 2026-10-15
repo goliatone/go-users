@@ -6,7 +6,7 @@ replace github.com/goliatone/go-users => ../..
 
 require (
 	github.com/gofiber/fiber/v2 v2.52.13
-	github.com/goliatone/go-auth v0.45.1
+	github.com/goliatone/go-auth v0.45.2
 	github.com/goliatone/go-composite-fs v0.3.0
 	github.com/goliatone/go-config v0.15.0
 	github.com/goliatone/go-crud v0.25.0

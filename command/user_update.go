@@ -124,7 +124,7 @@ func (c *UserUpdateCommand) Execute(ctx context.Context, input UserUpdateInput) 
 		},
 		OccurredAt: now(c.clock),
 	}
-	logActivity(ctx, c.sink, record)
+	logActivity(ctx, c.sink, record, c.logger)
 	emitActivityHook(ctx, c.hooks, record)
 
 	if input.Result != nil && updated != nil {

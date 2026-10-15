@@ -16,3 +16,8 @@ type (
 func New(cfg Config) *Service {
 	return service.New(cfg)
 }
+
+// NewStrict constructs the runtime with required scope resolver and policy.
+func NewStrict(cfg Config) (*Service, error) {
+	return service.NewStrict(cfg)
+}

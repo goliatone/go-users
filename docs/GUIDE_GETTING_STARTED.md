@@ -16,7 +16,7 @@ The package follows a clean architecture with commands (write operations) and qu
 
 ## Prerequisites
 
-- Go 1.24 or later
+- Go 1.26.0 or later (see `go.mod`)
 - Basic understanding of Go modules
 
 ## Installation

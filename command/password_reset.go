@@ -127,7 +127,7 @@ func (c *UserPasswordResetCommand) Execute(ctx context.Context, input UserPasswo
 		Data:       data,
 		OccurredAt: now(c.clock),
 	}
-	logActivity(ctx, c.sink, record)
+	logActivity(ctx, c.sink, record, c.logger)
 	emitActivityHook(ctx, c.hooks, record)
 	if input.Result != nil {
 		input.Result.User = c.resultUser(ctx, input.UserID, user, input.PreserveTemporaryPasswordMetadata, needsTemporaryCleanup)

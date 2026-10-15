@@ -1,6 +1,6 @@
 # Multi-Tenancy & Policy Guide
 
-Phase 6 introduces a scope guard that sits in front of every command and query. The guard performs two duties:
+The scope guard resolves and authorizes scopes on the command/query paths that invoke it. Use `users.NewStrict` for mandatory resolver/policy wiring and nonblank actions; see [strict authorization configuration](GUIDE_MULTITENANCY.md#strict-authorization-configuration). The guard performs two duties:
 
 1. **Scope resolution** – normalize/augment the caller-supplied `types.ScopeFilter` so tenant/org defaults are always filled in.
 2. **Authorization** – evaluate whether the actor is allowed to perform the requested `types.PolicyAction` within that scope.

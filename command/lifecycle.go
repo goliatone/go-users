@@ -135,7 +135,7 @@ func (c *UserLifecycleTransitionCommand) Execute(ctx context.Context, input User
 		},
 		OccurredAt: eventTime,
 	}
-	logActivity(ctx, c.activity, record)
+	logActivity(ctx, c.activity, record, c.logger)
 	emitActivityHook(ctx, c.hooks, record)
 
 	emitLifecycleHook(ctx, c.hooks, types.LifecycleEvent{

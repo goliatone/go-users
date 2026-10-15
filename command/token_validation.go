@@ -28,11 +28,17 @@ func newTokenValidator(clock types.Clock, tokens types.UserTokenRepository, mana
 }
 
 func (v tokenValidator) validate(ctx context.Context, token string, tokenType types.UserTokenType, scope types.ScopeFilter) (types.SecureLinkPayload, *types.UserToken, error) {
+	if err := scope.RequireTenantOrg(); err != nil {
+		return nil, nil, err
+	}
 	if err := v.validateInputs(token, tokenType); err != nil {
 		return nil, nil, err
 	}
 	payload, err := v.validatePayload(token)
 	if err != nil {
+		return nil, nil, err
+	}
+	if err := validateSecureLinkScope(payload); err != nil {
 		return nil, nil, err
 	}
 	jti := payloadString(payload, "jti")
@@ -212,6 +218,7 @@ type UserTokenConsumeResult struct {
 
 // UserTokenConsumeCommand validates tokens and marks them consumed.
 type UserTokenConsumeCommand struct {
+	logger    types.Logger
 	validator tokenValidator
 	tokens    types.UserTokenRepository
 	clock     types.Clock
@@ -221,6 +228,7 @@ type UserTokenConsumeCommand struct {
 
 // TokenConsumeConfig holds dependencies for consumption.
 type TokenConsumeConfig struct {
+	Logger          types.Logger
 	TokenRepository types.UserTokenRepository
 	SecureLinks     types.SecureLinkManager
 	Clock           types.Clock
@@ -233,6 +241,7 @@ type TokenConsumeConfig struct {
 func NewUserTokenConsumeCommand(cfg TokenConsumeConfig) *UserTokenConsumeCommand {
 	clock := safeClock(cfg.Clock)
 	return &UserTokenConsumeCommand{
+		logger:    safeLogger(cfg.Logger),
 		validator: newTokenValidator(clock, cfg.TokenRepository, cfg.SecureLinks, cfg.ScopeEnforcer),
 		tokens:    cfg.TokenRepository,
 		clock:     clock,
@@ -282,7 +291,7 @@ func (c *UserTokenConsumeCommand) Execute(ctx context.Context, input UserTokenCo
 		},
 		OccurredAt: usedAt,
 	}
-	logActivity(ctx, c.sink, recordActivity)
+	logActivity(ctx, c.sink, recordActivity, c.logger)
 	emitActivityHook(ctx, c.hooks, recordActivity)
 
 	if input.Result != nil {

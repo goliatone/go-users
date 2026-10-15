@@ -5,10 +5,10 @@ This guide ties together the last six phases of work. It documents how to wire
 the shipped SQL schema fits together. Use it as the canonical reference when
 integrating go-users into go-admin/go-cms.
 
-For a higher-level overview of how these components plug into the admin stack,
-cross-check [`go-admin-architecture-updated.md`](../go-admin-architecture-updated.md).
-That document illustrates the transport boundaries while this guide focuses on
-the concrete service/configuration surface area.
+For transport and service boundaries, see the maintained
+[CRUD integration guide](GUIDE_CRUD_INTEGRATION.md). This reference focuses on
+the concrete service/configuration surface; it does not replace the host's
+authentication, disclosure or migration policy.
 
 ## Service Wiring
 

@@ -166,6 +166,10 @@ func newActivityQueryDB(t *testing.T) *bun.DB {
 func applyActivityQueryDDL(t *testing.T, db *bun.DB) {
 	content, err := os.ReadFile("../data/sql/migrations/sqlite/00004_user_activity.up.sql")
 	require.NoError(t, err)
+	scopeDDL, err := os.ReadFile("../data/sql/migrations/sqlite/00011_activity_scopes.tx.up.sql")
+	require.NoError(t, err)
+	content = append(content, scopeDDL...)
+	require.NoError(t, err)
 	for _, stmt := range splitActivityStatements(string(content)) {
 		if strings.TrimSpace(stmt) == "" {
 			continue

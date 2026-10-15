@@ -152,8 +152,10 @@ CREATE TABLE user_custom_roles (
     role_id UUID NOT NULL,
     tenant_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
     org_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000',
+    scope_key TEXT NOT NULL DEFAULT '',
+    labels TEXT NOT NULL DEFAULT '{}',
     assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     assigned_by UUID NOT NULL,
-    PRIMARY KEY (user_id, role_id, tenant_id, org_id)
+    PRIMARY KEY (user_id, role_id, tenant_id, org_id, scope_key)
 );
 `

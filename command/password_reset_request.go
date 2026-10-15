@@ -122,6 +122,10 @@ func (c *UserPasswordResetRequestCommand) Execute(ctx context.Context, input Use
 		return err
 	}
 
+	if err := input.Scope.RequireTenantOrg(); err != nil {
+		return err
+	}
+
 	user, err := c.resolvePasswordResetUser(ctx, input)
 	if err != nil {
 		return err
@@ -159,7 +163,10 @@ func (c *UserPasswordResetRequestCommand) issuePasswordResetLink(user *types.Aut
 	issuedAt := now(c.clock)
 	expiresAt := issuedAt.Add(c.tokenTTL)
 	jti := c.idGen.UUID().String()
-	payload := buildSecureLinkPayload(SecureLinkActionPasswordReset, user, scope, jti, issuedAt, expiresAt, secureLinkSourceDefault)
+	payload, err := buildSecureLinkPayload(SecureLinkActionPasswordReset, user, scope, jti, issuedAt, expiresAt, secureLinkSourceDefault)
+	if err != nil {
+		return "", "", time.Time{}, time.Time{}, err
+	}
 	token, err := c.manager.Generate(c.route, payload)
 	return token, jti, issuedAt, expiresAt, err
 }
@@ -202,7 +209,7 @@ func (c *UserPasswordResetRequestCommand) emitPasswordResetRequestActivity(ctx c
 		Data:       data,
 		OccurredAt: issuedAt,
 	}
-	logActivity(ctx, c.sink, record)
+	logActivity(ctx, c.sink, record, c.logger)
 	emitActivityHook(ctx, c.hooks, record)
 }
 

@@ -103,6 +103,12 @@ type Config struct {
 	ScopeResolver                   types.ScopeResolver
 	AuthorizationPolicy             types.AuthorizationPolicy
 	FeatureGate                     featuregate.FeatureGate
+
+	// RequireScopeAuthorization enables strict guard configuration and readiness.
+	RequireScopeAuthorization bool
+	RoleGrantValidator        types.RoleGrantValidator
+	// RequireRoleGrantValidation enables mandatory candidate-grant validation.
+	RequireRoleGrantValidation bool
 }
 
 // PreferenceResolver resolves scoped preferences for queries.
@@ -136,7 +142,13 @@ func New(cfg Config) *Service {
 		}
 	}
 
-	scopeGuard := scope.Ensure(scope.NewGuard(norm.ScopeResolver, norm.AuthorizationPolicy))
+	var scopeGuard scope.Guard = scope.NewGuard(norm.ScopeResolver, norm.AuthorizationPolicy)
+	if norm.RequireScopeAuthorization {
+		// An invalid StrictGuard denies enforcement. Ready/HealthCheck expose its
+		// validation error even when callers use this compatibility constructor.
+		strict, _ := scope.NewStrictGuard(norm.ScopeResolver, norm.AuthorizationPolicy)
+		scopeGuard = strict
+	}
 
 	s := &Service{
 		cfg:            norm,
@@ -150,6 +162,20 @@ func New(cfg Config) *Service {
 	s.commands = s.buildCommands()
 	s.queries = s.buildQueries()
 	return s
+}
+
+// NewStrict validates scope authorization at startup. Other dependencies retain
+// their existing Ready/HealthCheck checks and may support partial service use.
+func NewStrict(cfg Config) (*Service, error) {
+	cfg.RequireScopeAuthorization = true
+	s := New(cfg)
+	if err := scope.ValidateStrict(s.scopeGuard); err != nil {
+		return nil, err
+	}
+	if err := s.roleAssignmentConfig().Validate(); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 func normalizeConfig(cfg Config) Config {
@@ -181,6 +207,8 @@ func (s *Service) Queries() Queries {
 // Ready reports whether the service has the required dependencies wired in.
 func (s *Service) Ready() bool {
 	return s != nil &&
+		s.roleAssignmentConfig().Validate() == nil &&
+		(!s.cfg.RequireScopeAuthorization || scope.ValidateStrict(s.scopeGuard) == nil) &&
 		s.cfg.AuthRepository != nil &&
 		s.cfg.RoleRegistry != nil &&
 		s.cfg.ActivitySink != nil &&
@@ -195,6 +223,16 @@ func (s *Service) Ready() bool {
 // be used by upstream transports (REST/gRPC/jobs). Future implementations will
 // ping the repositories/hooks; for now we just surface missing config.
 func (s *Service) HealthCheck(ctx context.Context) error {
+	if s != nil {
+		if err := s.roleAssignmentConfig().Validate(); err != nil {
+			return err
+		}
+	}
+	if s != nil && s.cfg.RequireScopeAuthorization {
+		if err := scope.ValidateStrict(s.scopeGuard); err != nil {
+			return err
+		}
+	}
 	if !s.Ready() {
 		return types.ErrServiceNotReady
 	}
@@ -345,6 +383,7 @@ func (s *Service) attachSecureLinkCommands(cmds *Commands, reset *command.UserPa
 		ScopeEnforcer:   s.cfg.TokenScopeEnforcer,
 	})
 	cmds.UserTokenConsume = command.NewUserTokenConsumeCommand(command.TokenConsumeConfig{
+		Logger:          s.cfg.Logger,
 		TokenRepository: s.cfg.UserTokenRepository,
 		SecureLinks:     s.cfg.SecureLinkManager,
 		Clock:           s.cfg.Clock,
@@ -378,8 +417,15 @@ func (s *Service) attachRoleCommands(cmds *Commands) {
 	cmds.CreateRole = command.NewCreateRoleCommand(s.cfg.RoleRegistry, s.scopeGuard)
 	cmds.UpdateRole = command.NewUpdateRoleCommand(s.cfg.RoleRegistry, s.scopeGuard)
 	cmds.DeleteRole = command.NewDeleteRoleCommand(s.cfg.RoleRegistry, s.scopeGuard)
-	cmds.AssignRole = command.NewAssignRoleCommand(s.cfg.RoleRegistry, s.scopeGuard)
-	cmds.UnassignRole = command.NewUnassignRoleCommand(s.cfg.RoleRegistry, s.scopeGuard)
+	cmds.AssignRole = command.NewAssignRoleCommandWithConfig(s.roleAssignmentConfig())
+	cmds.UnassignRole = command.NewUnassignRoleCommandWithConfig(s.roleAssignmentConfig())
+}
+
+func (s *Service) roleAssignmentConfig() command.RoleAssignmentCommandConfig {
+	return command.RoleAssignmentCommandConfig{
+		Registry: s.cfg.RoleRegistry, ScopeGuard: s.scopeGuard,
+		GrantValidator: s.cfg.RoleGrantValidator, RequireGrantValidation: s.cfg.RequireRoleGrantValidation,
+	}
 }
 
 func (s *Service) attachActivityProfilePreferenceCommands(cmds *Commands) {

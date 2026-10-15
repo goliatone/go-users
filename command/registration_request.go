@@ -121,8 +121,14 @@ func (c *UserRegistrationRequestCommand) Execute(ctx context.Context, input User
 	if err := input.Validate(); err != nil {
 		return err
 	}
+	if err := input.Scope.RequireTenantOrg(); err != nil {
+		return err
+	}
 	scope, err := c.registrationScope(ctx, input)
 	if err != nil {
+		return err
+	}
+	if err := scope.RequireTenantOrg(); err != nil {
 		return err
 	}
 	if featureErr := c.ensureRegistrationEnabled(ctx, scope); featureErr != nil {
@@ -182,7 +188,10 @@ func (c *UserRegistrationRequestCommand) issueRegistrationLink(user *types.AuthU
 	issuedAt := now(c.clock)
 	expiresAt := issuedAt.Add(c.tokenTTL)
 	jti := c.idGen.UUID().String()
-	payload := buildSecureLinkPayload(SecureLinkActionRegister, user, scope, jti, issuedAt, expiresAt, secureLinkSourceDefault)
+	payload, err := buildSecureLinkPayload(SecureLinkActionRegister, user, scope, jti, issuedAt, expiresAt, secureLinkSourceDefault)
+	if err != nil {
+		return "", "", time.Time{}, time.Time{}, err
+	}
 	token, err := c.manager.Generate(c.route, payload)
 	return token, jti, issuedAt, expiresAt, err
 }
@@ -232,7 +241,7 @@ func (c *UserRegistrationRequestCommand) emitRegistrationActivity(ctx context.Co
 		},
 		OccurredAt: issuedAt,
 	}
-	logActivity(ctx, c.sink, record)
+	logActivity(ctx, c.sink, record, c.logger)
 	emitActivityHook(ctx, c.hooks, record)
 }
 

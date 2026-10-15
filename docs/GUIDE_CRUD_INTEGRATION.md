@@ -138,7 +138,7 @@ policyMap := map[crud.CrudOperation]types.PolicyAction{
     crud.OpList:   types.PolicyActionUsersRead,
     crud.OpCreate: types.PolicyActionUsersWrite,
     crud.OpUpdate: types.PolicyActionUsersWrite,
-    crud.OpDelete: types.PolicyActionUsersDelete,  // Separate delete permission
+    crud.OpDelete: types.PolicyAction("users:delete"), // Host-defined; authorize this action explicitly
 }
 ```
 
@@ -193,6 +193,30 @@ func BodyScopeExtractor(ctx crud.Context, actor *auth.ActorContext) (types.Scope
 ```
 
 ---
+
+## Strict Guard and Action Configuration
+
+Pair a strict service guard with the adapter's explicit strict mode:
+
+```go
+adapter, err := crudguard.NewAdapter(crudguard.Config{
+    Guard:                     svc.ScopeGuard(), // svc was built with users.NewStrict
+    RequireScopeAuthorization: true,
+    PolicyMap: crudguard.DefaultPolicyMap(
+        types.PolicyActionUsersRead,
+        types.PolicyActionUsersWrite,
+    ),
+})
+if err != nil {
+    return err
+}
+```
+
+Strict adapter construction requires `scope.ValidateStrict` to succeed. A nonnil `NopGuard` or custom guard wrapper does not satisfy that contract. Every declared map entry must have a nonblank operation and action; a nonempty fallback must also be nonblank. An invalid entry is rejected even when a fallback is configured. Configuration failures retain `SCOPE_ENFORCEMENT_FAILED` or `SCOPE_POLICY_MISSING` with the internal error category/code; wrapped strict guard/action causes remain available through `errors.Is`.
+
+`DefaultPolicyMap` covers all eight standard CRUD operations. A partial map declares only its supported operations: absent operations fail with `SCOPE_POLICY_MISSING` at enforcement unless an explicit fallback supplies their action. Blank operations always fail in strict mode, including with a fallback. The adapter copies the map at startup so caller mutations cannot invalidate checked actions. Explicit per-route bypass remains available and skips the guard; select it only for routes that intentionally require no authorization.
+
+Leaving `RequireScopeAuthorization` unset preserves existing adapter validation and fallback behavior. The service and adapter each require their own opt-in. Strict wiring validates dependencies and actions; application policies still enforce resource ownership and current scoped grants.
 
 ## Scope Enforcement in CRUD Operations
 
@@ -635,22 +659,23 @@ func sanitizeUser(user *auth.User) *auth.User {
 Ensure actor context is set before CRUD operations:
 
 ```go
-func AuthMiddleware(authService auth.Service) fiber.Handler {
+func AuthMiddleware(validator auth.TokenValidator) fiber.Handler {
     return func(c *fiber.Ctx) error {
         // Extract token from header
-        token := c.Get("Authorization")
+        token := strings.TrimPrefix(c.Get("Authorization"), "Bearer ")
         if token == "" {
             return c.Status(401).JSON(fiber.Map{"error": "unauthorized"})
         }
 
         // Validate and get actor context
-        actorCtx, err := authService.ValidateToken(c.Context(), token)
+        claims, err := validator.Validate(token)
         if err != nil {
             return c.Status(401).JSON(fiber.Map{"error": "invalid token"})
         }
 
         // Store in context for crudguard
-        ctx := authctx.WithActorContext(c.Context(), actorCtx)
+        actorCtx := auth.ActorContextFromClaims(claims)
+        ctx := auth.WithActorContext(c.UserContext(), actorCtx)
         c.SetUserContext(ctx)
 
         return c.Next()
@@ -658,36 +683,17 @@ func AuthMiddleware(authService auth.Service) fiber.Handler {
 }
 
 // Apply to protected routes
-api := app.Group("/api/v1", AuthMiddleware(authService))
+api := app.Group("/api/v1", AuthMiddleware(validator))
 ```
 
-### Scope Injection
+### Host Scope Hints
 
-For multi-tenant apps, inject scope from JWT claims:
-
-```go
-func ScopeMiddleware() fiber.Handler {
-    return func(c *fiber.Ctx) error {
-        actorCtx := authctx.FromContext(c.UserContext())
-        if actorCtx == nil {
-            return c.Next()
-        }
-
-        // Extract scope from claims
-        claims := actorCtx.Claims()
-        scope := types.ScopeFilter{
-            TenantID: claims.TenantID,
-            OrgID:    claims.OrgID,
-        }
-
-        // Store resolved scope
-        ctx := authctx.WithScope(c.UserContext(), scope)
-        c.SetUserContext(ctx)
-
-        return c.Next()
-    }
-}
-```
+`crudguard.DefaultScopeExtractor` already calls
+`authctx.ScopeFromActorContext(actor)`, parsing the actor's tenant/organization
+strings into `types.ScopeFilter` UUIDs. Supply a custom `crudguard.ScopeExtractor`
+when a route also accepts scope hints. The guard must authorize the requested
+scope; a query parameter does not establish trusted scope. There is no
+`authctx.WithScope` or `ActorContext.Claims()` API.
 
 ---
 
@@ -870,7 +876,7 @@ func main() {
     })
 
     // Protected routes
-    api := app.Group("/api/v1", AuthMiddleware(authService))
+    api := app.Group("/api/v1", AuthMiddleware(validator))
 
     // Register controllers
     userCtrl := fibercrud.NewController(userService, fibercrud.Config{ResourceName: "users"})

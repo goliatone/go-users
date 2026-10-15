@@ -117,3 +117,27 @@ func splitStatements(sql string) []string {
 	}
 	return statements
 }
+
+func TestRepositoryRejectsLabelsWithoutOverwritingProfile(t *testing.T) {
+	ctx := context.Background()
+	db := newTestDB(t)
+	applyDDL(t, db)
+	repo, err := NewRepository(RepositoryConfig{DB: db})
+	require.NoError(t, err)
+	user, tenant := uuid.New(), uuid.New()
+	base := types.UserProfile{UserID: user, Scope: types.ScopeFilter{TenantID: tenant}, DisplayName: "legacy"}
+	_, err = repo.UpsertProfile(ctx, base)
+	require.NoError(t, err)
+	for range 2 {
+		labeled := base
+		labeled.Scope = base.Scope.WithLabel("group_id", uuid.New())
+		labeled.DisplayName = "must not overwrite"
+		_, err = repo.UpsertProfile(ctx, labeled)
+		require.ErrorIs(t, err, types.ErrUnsupportedScopeLabels)
+		_, err = repo.GetProfile(ctx, user, labeled.Scope)
+		require.ErrorIs(t, err, types.ErrUnsupportedScopeLabels)
+	}
+	got, err := repo.GetProfile(ctx, user, base.Scope)
+	require.NoError(t, err)
+	require.Equal(t, "legacy", got.DisplayName)
+}

@@ -9,6 +9,7 @@ import (
 	"github.com/goliatone/go-users/pkg/types"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/uptrace/bun"
 )
 
 type policyCaptureSink struct {
@@ -120,4 +121,37 @@ func TestRecordPolicyTransactionalPersistence(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, page.Records, 1)
 	require.Equal(t, map[string]any{DataKeyAttemptedIdentifier: "user"}, page.Records[0].Data)
+}
+
+func TestLogTxSanitizesAfterEnrichment(t *testing.T) {
+	ctx := context.Background()
+	db := newTestActivityDB(t)
+	applyActivityDDL(t, db)
+	repo, err := NewRepository(RepositoryConfig{DB: db, Enricher: EnricherFunc(func(_ context.Context, record types.ActivityRecord) (types.ActivityRecord, error) {
+		record.Data = map[string]any{"operation_id": "trusted-operation", "token": "private"}
+		record.IP = "private"
+		return record, nil
+	})})
+	require.NoError(t, err)
+	require.Error(t, repo.LogTx(ctx, bun.Tx{}, types.ActivityRecord{Verb: "changed"}, nil))
+	for _, policy := range []*RecordPolicy{nil, NewRecordPolicy(RecordPolicyConfig{DataSanitizer: func(record types.ActivityRecord) map[string]any {
+		return map[string]any{"operation_id": record.Data["operation_id"]}
+	}})} {
+		require.NoError(t, db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+			return repo.LogTx(ctx, tx, types.ActivityRecord{Verb: "changed"}, policy)
+		}))
+	}
+	page, err := repo.ListActivity(ctx, types.ActivityFilter{})
+	require.NoError(t, err)
+	require.Len(t, page.Records, 2)
+	retained := 0
+	for _, record := range page.Records {
+		require.Empty(t, record.IP)
+		require.NotContains(t, record.Data, "token")
+		if len(record.Data) != 0 {
+			require.Equal(t, map[string]any{"operation_id": "trusted-operation"}, record.Data)
+			retained++
+		}
+	}
+	require.Equal(t, 1, retained)
 }

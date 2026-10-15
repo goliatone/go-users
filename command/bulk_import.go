@@ -163,7 +163,7 @@ func (c *BulkUserImportCommand) executeDryRun(ctx context.Context, input BulkUse
 	}
 
 	record := buildUserCreatedActivityRecord(user, input.Actor, scopeFilter, c.create.clock, true)
-	logActivity(ctx, c.create.sink, record)
+	logActivity(ctx, c.create.sink, record, c.create.logger)
 	emitActivityHook(ctx, c.create.hooks, record)
 
 	result.Status = status

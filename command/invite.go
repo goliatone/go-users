@@ -124,8 +124,14 @@ func (c *UserInviteCommand) Execute(ctx context.Context, input UserInviteInput) 
 	if err := input.Validate(); err != nil {
 		return err
 	}
+	if err := input.Scope.RequireTenantOrg(); err != nil {
+		return err
+	}
 	scope, err := c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionUsersWrite, uuid.Nil)
 	if err != nil {
+		return err
+	}
+	if err := scope.RequireTenantOrg(); err != nil {
 		return err
 	}
 	if enabled, featureErr := featureEnabled(ctx, c.featureGate, featureUsersInvite, scope, uuid.Nil); featureErr != nil {
@@ -184,7 +190,10 @@ func (c *UserInviteCommand) issueInviteLink(user *types.AuthUser, scope types.Sc
 	issuedAt := now(c.clock)
 	expiresAt := issuedAt.Add(c.tokenTTL)
 	jti := c.idGen.UUID().String()
-	payload := buildSecureLinkPayload(SecureLinkActionInvite, user, scope, jti, issuedAt, expiresAt, secureLinkSourceDefault)
+	payload, err := buildSecureLinkPayload(SecureLinkActionInvite, user, scope, jti, issuedAt, expiresAt, secureLinkSourceDefault)
+	if err != nil {
+		return "", "", time.Time{}, time.Time{}, err
+	}
 	token, err := c.manager.Generate(c.route, payload)
 	return token, jti, issuedAt, expiresAt, err
 }
@@ -231,7 +240,7 @@ func (c *UserInviteCommand) emitInviteActivity(ctx context.Context, user *types.
 		},
 		OccurredAt: issuedAt,
 	}
-	logActivity(ctx, c.sink, record)
+	logActivity(ctx, c.sink, record, c.logger)
 	emitActivityHook(ctx, c.hooks, record)
 }
 

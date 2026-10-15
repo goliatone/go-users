@@ -2,6 +2,14 @@
 
 Phase 4 ships the first-class activity sink and query surfaces so go-admin/go-cms can render audit feeds, lifecycle breakdowns, and other widgets without duplicating storage concerns.
 
+## Exact arbitrary scope and native Groups
+
+Migration 00011 adds canonical `ActivityRecord.Labels`, persisted separately from metadata with a complete-scope key. Feed, statistics and `Repository.ListActivityCursor` apply full label identity in SQL before count/limit/cursor operations. Labeled filters also match exact tenant/org dimensions. Legacy unlabeled filters exclude labeled rows; existing legacy rows remain unlabeled and never enter Group feeds. Invalid labels fail rather than widening a query. These are persistence APIs; callers must authorize read scope.
+
+`goauth.ActivitySinkConfig.ScopeProjector` optionally resolves and validates trusted current context for each auth event. Supply a Group-only scope through this callback after native authorization (for example `Service.Guard().Enforce`). Projector failures prevent persistence. Static legacy tenant/org configuration remains supported; arbitrary event metadata never selects scope. The projector owns context validation, including actor identity and Group access.
+
+`activity.RoleEventMapper` maps catalog creation events and exact grant/revoke events without dropping scope. Compose it through `UsersActivityHook`; legacy registry hooks remain best effort. Native Group lifecycle/member/role mutations instead insert redacted activity with the mutation in one transaction and roll back on audit failure. `RecordPolicy` preserves detached canonical labels while sanitizing metadata/IP.
+
 ## DI Contract
 
 - The Activity sink interface lives in `pkg/types` as `ActivitySink` with the minimal method `Log(ctx, ActivityRecord) error`. Keep implementations limited to this contract so hosts can swap sinks (Bun, in-memory, streaming) without breaking changes.
@@ -156,7 +164,7 @@ svc := users.New(cfg)
 
 actor := auth.ActorContext{ActorID: adminID.String(), TenantID: tenantID.String()}
 rec, _ := activity.BuildRecordFromActor(&actor, "settings.updated", "settings", "global", map[string]any{"path": "feature.flags"}, activity.WithChannel("settings"))
-_ = svc.ActivitySink.Log(ctx, rec)
+_ = svc.ActivitySink().Log(ctx, rec)
 ```
 
 Module examples (verbs/objects align with the conventions above):

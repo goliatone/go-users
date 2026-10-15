@@ -77,7 +77,9 @@ func WithForceTransition() TransitionOption {
 
 // AuthRepository abstracts whichever upstream user repository go-users sits on.
 // Implementations typically wrap go-auth's Users repository, but any Bun-backed
-// store that honors these semantics can be injected.
+// store that honors these semantics can be injected. ID-only methods do not
+// establish custom scope ownership; hosts must enforce that boundary in their
+// policies and repository predicates.
 type AuthRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*AuthUser, error)
 	GetByIdentifier(ctx context.Context, identifier string) (*AuthUser, error)

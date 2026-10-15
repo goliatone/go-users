@@ -104,11 +104,16 @@ func emitLifecycleHook(ctx context.Context, hooks types.Hooks, event types.Lifec
 	hooks.AfterLifecycle(ctx, event)
 }
 
-func logActivity(ctx context.Context, sink types.ActivitySink, record types.ActivityRecord) {
+// logActivity preserves legacy best-effort writes. Required audit belongs in
+// the host mutation transaction; returning a post-write error cannot undo it.
+func logActivity(ctx context.Context, sink types.ActivitySink, record types.ActivityRecord, logger types.Logger) {
 	if sink == nil {
 		return
 	}
-	_ = sink.Log(ctx, record)
+	if err := sink.Log(ctx, record); err != nil {
+		// Do not disclose raw metadata, IP or submitted credentials to logs.
+		safeLogger(logger).Error("go-users: best-effort activity persistence failed", err, "verb", record.Verb, "object_type", record.ObjectType)
+	}
 }
 
 func emitActivityHook(ctx context.Context, hooks types.Hooks, record types.ActivityRecord) {

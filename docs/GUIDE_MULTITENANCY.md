@@ -2,6 +2,16 @@
 
 This guide covers implementing multi-tenant user management in `go-users`, including scope filters, scope resolvers, authorization policies, and the scope guard system.
 
+## Optional native Groups
+
+The `groups` subpackage provides flat Groups with no tenant/org parent. Apply migrations 00010–00012 before enabling it. `groups.NewStrict(groups.Config{DB: db, Resolver: resolver, Policy: policy, CatalogScope: catalog, Actions: actions})` requires explicit resolver and policy dependencies. The host policy grants bootstrap creation authority and remains an additional restriction for every native decision; the built-in allow-all policy is rejected.
+
+`Service.Create` creates no membership or permission. Provision initial manager membership and an exact grant through trusted deployment SQL/registry in one transaction; principals are opaque UUIDs and need no auth-user row. Routine mutations use `SetMember`, `SetRole`, `SetActive` or `NewManageCommand`. Assignments reuse existing role definitions from the configured catalog. A manager can delegate only permissions currently held in the same Group and allowed by the host policy. Removing membership destroys that Group's grants; rejoining creates none.
+
+`Service.Guard()` returns a built-in strict guard for existing commands/queries. It reads Group state, membership and exact role grants on each decision. Unknown actions/Groups, archived Groups, scope rewriting and global-role fallback deny. Declare resource action names in `Config.Actions`; membership alone never permits them. `Discover` returns active Groups with membership and an effective `groups:read` grant.
+
+For writes requiring revocation ordering, use `Service.WithAuthorized(ctx, actor, groups.Scope(groupID), action, targetID, callback)` and perform all protected SQL through the callback's `bun.Tx`. Managed grant/member/state changes acquire the same Group lock. A write already holding the lock finishes before revoke; a revoke that acquires it first prevents the write callback. The callback must not recursively invoke the service or perform external side effects. Direct SQL/registry writes remain trusted infrastructure and must follow this locking protocol. Hosts still enforce resource ownership and list predicates; this API does not add Group support to profile, preference or secure-link stores.
+
 ## Overview
 
 The multi-tenancy system provides:
@@ -9,7 +19,7 @@ The multi-tenancy system provides:
 - **Scope filters** with tenant, organization, and custom label support
 - **Scope resolvers** that normalize and augment scope from actor context
 - **Authorization policies** that enforce access control per action
-- **Scope guard** that combines resolution and authorization for all operations
+- **Scope guard** that combines resolution and authorization for guarded operations
 - **Label-based hierarchies** for workspaces, teams, projects, etc.
 
 ## Architecture
@@ -38,6 +48,57 @@ The multi-tenancy system provides:
 │              (receives resolved scope)                      │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+## Strict Authorization Configuration
+
+Use `users.NewStrict` (also available as `service.NewStrict`) when scope authorization is mandatory:
+
+```go
+svc, err := users.NewStrict(users.Config{
+    // ...repositories, sinks, hooks...
+    ScopeResolver:       resolver,
+    AuthorizationPolicy: policy,
+})
+if err != nil {
+    return err
+}
+if err := svc.HealthCheck(ctx); err != nil {
+    return err
+}
+```
+
+Strict startup requires both dependencies and rejects nil interfaces, typed nil pointers and nil function adapters. `NewStrict` validates authorization wiring; `Ready`/`HealthCheck` retain the existing repository readiness checks. With `users.New`, set `Config.RequireScopeAuthorization = true` for the same guard semantics: invalid wiring makes `Ready` false, `HealthCheck` returns the dependency error, and guarded commands/queries deny even when readiness is ignored.
+
+For standalone command/query composition, use `scope.NewStrictGuard(resolver, policy)` and check its error. On failure it returns a guard that denies enforcement; zero/nil `*scope.StrictGuard` values also deny. `scope.ValidateStrict` checks this built-in contract and rejects `NopGuard`, legacy guards and arbitrary custom wrappers. It does not prove that the supplied policy's access rules are adequate; explicitly selecting `AllowAllAuthorizationPolicy` still allows every nonblank action.
+
+Strict enforcement rejects empty or whitespace-only actions with `scope.ErrPolicyActionRequired` before invoking dependencies. Nonblank actions resolve scope, then evaluate policy; either error stops the guarded operation. Dependency errors support `errors.Is` with `scope.ErrScopeResolverRequired` and `scope.ErrAuthorizationPolicyRequired`.
+
+Legacy `users.New` with the flag unset, `scope.NewGuard`, `scope.Ensure(nil)` and `scope.NopGuard` keep their permissive defaults, including skipping policy for an empty action. A nonnil guard alone is not evidence of strict authorization. Strict mode applies to paths that invoke the guard; direct repository access, activity logging and token validation have their own contracts. Authentication, resource ownership, current membership, permission freshness and transaction ordering remain host responsibilities.
+
+## Host-Owned Resource and Membership Checks
+
+Strict guard wiring requires a resolver/policy and a nonblank action. It cannot discover application-owned Groups, memberships or target ownership. `AuthRepository` has ID-only operations, and `AuthUser` has no canonical Group ownership field. A policy that merely authorizes scope A can still permit an A-scoped command against a B-owned ID.
+
+| Protected path | Host responsibility |
+| --- | --- |
+| Direct reads, updates and archive/delete | Interpret `PolicyCheck.TargetID` for its action and verify authoritative ownership before access. Enforce ID plus Group predicates at the repository boundary as well. Return a denial for unknown/foreign targets without disclosing them. |
+| Creation | Validate supplied data and attach trusted ownership in the host application service and transaction. `TargetID == uuid.Nil` is not ownership proof; deny generic creation for Group-protected flows until that boundary exists. Client metadata is not trusted ownership. |
+| Lists, counts and exports | Apply the authorized Group predicate in the repository before counts, pagination and export iteration. Filtering returned rows cannot repair leaked totals or skipped pages. Built-in repositories do not universally implement arbitrary labels. |
+| Bulk commands and jobs | Reuse the protected application command for each target. Bulk lifecycle uses the single-target guard and retains partial-success semantics; all-or-nothing behavior requires a separate transactional contract. Background callers receive no policy exemption. |
+| Current state | Read authoritative account status, Group status, membership and explicit grants on each protected decision. Deny inactive/unknown state and dependency failures. Membership alone is not permission; rejoining must not recreate revoked grants. |
+| Grant/revoke | Use `RoleGrantValidator` for target-principal eligibility and delegation rules; generic `PolicyCheck.TargetID` identifies the role rather than the target principal. |
+
+Compose the live-state and ownership checks in the host `AuthorizationPolicy` used by `users.NewStrict`. Use existing account-state/freshness mechanisms and host Group/membership stores, and keep permission evaluation separate from membership. A stale session/claim snapshot cannot establish current membership or an active grant. The grant validator should independently check the target principal's eligibility in the resolved assignment scope.
+
+The public integration fixtures in `service/ownership_test.go` and `service/live_authorization_test.go` demonstrate unsafe partial composition and the safe policy/repository boundary, including transport-free commands, mixed batches, paginated totals and subsequent denial after state changes. These are in-memory host fixtures; they do not establish production SQL ownership predicates, PostgreSQL revocation ordering or a built-in Groups schema. Authorization-to-mutation ordering still requires a host transaction/locking contract.
+
+## Scoped Permissions and Legacy Claim Fallback
+
+For Group-protected operations, evaluate explicit permission strings from current scoped grants inside the configured `AuthorizationPolicy`. The [scoped go-auth adapter](AUTH_PROVIDER.md#scoped-permission-resolution-with-go-auth) can cache those strings using complete authorized scope and authoritative version. The host maps each `PolicyAction` to its required permission and returns `types.ErrUnauthorizedScope` when absent; resolver failures also deny. Keep live membership/state and target-ownership checks in that path before permission-cache access.
+
+`JWTClaims.CanRead/CanEdit/CanCreate/CanDelete` retain their existing global-role fallback when a resource mapping is absent. They do not evaluate go-users custom permission strings. Do not use them as fallback after a scoped denial, and do not implicitly merge a global admin claim into Group permissions. `NewStrict` validates wiring/actions; it does not select a scoped permission evaluator automatically.
+
+If cross-Group administrators are required, select the exception through authoritative host policy, independently of the claim role. Test its account/Group eligibility, target boundary, approval and revocation, and advance the same authorization version when the exception changes. The SQLite-backed public service regressions in `service/scoped_permissions_test.go` cover A editor/B reader isolation, an unassigned B denying despite a global admin claim, grant revocation within a warmed request cache, and a separately approved/revoked administrative exception. The legacy claim helper remains unchanged in those tests.
 
 ## Scope Filter Structure
 
@@ -494,16 +555,16 @@ func listUsersHandler(w http.ResponseWriter, r *http.Request) {
 
 ## Working with Labels
 
-Labels extend the basic tenant/org hierarchy for custom dimensions.
+Labels carry custom dimensions only where the concrete API supports them. See [Workspace capability boundaries](WORKSPACES.md#capability-boundaries). Activity persists and filters exact labels after migration 00011; profiles, preferences and secure links reject nonempty labels. Role catalogs use tenant/org; assignments persist exact complete scopes after migration 00010.
 
 ### Workspace Example
 
 ```go
-// Create workspace-scoped role
+// Create a shared tenant catalog definition
 err := svc.Commands().CreateRole.Execute(ctx, command.CreateRoleInput{
     Name:        "Workspace Editor",
     Permissions: []string{"content.read", "content.write"},
-    Scope:       types.ScopeFilter{TenantID: tenantID}.WithLabel("workspace", workspaceID),
+    Scope:       types.ScopeFilter{TenantID: tenantID},
     Actor:       actor,
     Result:      role,
 })
@@ -516,10 +577,12 @@ err = svc.Commands().AssignRole.Execute(ctx, command.AssignRoleInput{
     Actor:  actor,
 })
 
-// Query workspace activity
+// After the host authorizes this canonical Group object, query its feed.
 feed, err := svc.Queries().ActivityFeed.Query(ctx, types.ActivityFilter{
-    Actor: actor,
-    Scope: types.ScopeFilter{TenantID: tenantID}.WithLabel("workspace", workspaceID),
+    Actor:      actor,
+    Scope:      types.ScopeFilter{TenantID: tenantID},
+    ObjectType: "group",
+    ObjectID:   authorizedGroupID.String(),
 })
 ```
 
@@ -701,3 +764,49 @@ func TestWithMockGuard(t *testing.T) {
 - **[GUIDE_ACTIVITY](GUIDE_ACTIVITY.md)**: Tenant-scoped activity queries
 - **[GUIDE_PROFILES_PREFERENCES](GUIDE_PROFILES_PREFERENCES.md)**: Scoped preferences
 - **[GUIDE_CRUD_INTEGRATION](GUIDE_CRUD_INTEGRATION.md)**: HTTP middleware patterns
+
+## Transaction ordering, audit and publication
+
+Ordinary commands authorize before separate repository calls. A strict guard
+alone does not serialize a later write with revocation. The supported host
+composition uses the existing `auth.AuthorizationVersionStore` transaction
+boundary and `auth.AuthorizationVersionWriter`:
+
+1. Lock authoritative actor, target and Group state in a consistent order before
+   policy reads. Every revocation, disablement and permission/catalog writer must
+   follow the same protocol. Locking an unrelated version row is insufficient.
+2. Bind `roleRegistry.WithTx(tx)` and policy/validator reads to that same Bun
+   transaction. Execute the typed role command against the bound registry.
+   Transaction-bound registries suppress `AfterRoleChange`; the original
+   registry retains its existing notifications. Do not reuse bound registries
+   after the transaction or concurrently.
+3. Persist required audit with `activityRepo.LogTx(ctx, tx, record, policy)` and
+   propagate errors. This applies `RecordPolicy` after enrichment; nil policy
+   drops metadata/IP. Advance all affected authorization versions and enqueue
+   required publication in a durable host outbox in the same transaction.
+4. Commit, then publish. `AuthorizationVersionWriter` reports `Committed` and
+   `Published` separately. A publication error after commit must not be described
+   as rollback. Retry delivery from the outbox; consumers deduplicate using the
+   operation ID. Bind that ID to an immutable request and deduplicate mutations
+   inside the transaction. Do not retry arbitrary commands blindly.
+
+The ordering rule permits a write that takes the shared lock first to finish;
+revocation waits and then removes access. A write following committed revocation
+must read the revoked state and deny. This does not cancel in-flight writes.
+
+`service/authorization_transaction_test.go` implements a host SQL fixture using
+these public APIs and the pinned go-auth version contract. Barrier tests on
+SQLite and PostgreSQL reproduce the unsafe interleaving, verify both lock
+orderings, audit/version rollback, idempotent mutation retries and outbox
+recovery. `registry/scope_migration_test.go` checks transaction-bound catalog and
+grant operations, duplicate grants and hook suppression. These establish a
+composition contract; go-users does not install a host Group/version/outbox
+schema. A distributed authorization store needs an equivalent atomic protocol;
+a remote callback or cache invalidation hook cannot join a Bun transaction.
+
+Legacy lifecycle, user, link and token commands retain best-effort Activity
+sinks. Persistence failures call the configured Logger's Error method with event
+verb/object type and the sink error; default NopLogger remains silent. Their
+post-write hooks are notifications. Configuring a failing sink as “required”
+does not add rollback. Required lifecycle audit needs a host service whose auth
+repository mutation, audit and version writes all use the same transaction.

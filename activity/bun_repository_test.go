@@ -161,6 +161,10 @@ func newTestActivityDB(t *testing.T) *bun.DB {
 func applyActivityDDL(t *testing.T, db *bun.DB) {
 	content, err := os.ReadFile("../data/sql/migrations/sqlite/00004_user_activity.up.sql")
 	require.NoError(t, err)
+	scopeDDL, err := os.ReadFile("../data/sql/migrations/sqlite/00011_activity_scopes.tx.up.sql")
+	require.NoError(t, err)
+	content = append(content, scopeDDL...)
+	require.NoError(t, err)
 	for _, stmt := range splitStatements(string(content)) {
 		if strings.TrimSpace(stmt) == "" {
 			continue
@@ -191,4 +195,42 @@ func splitStatements(sql string) []string {
 		statements = append(statements, builder.String())
 	}
 	return statements
+}
+
+// Metadata labels are not durable activity ownership. Never widen a labeled request to
+// all activity in the tenant, even when metadata claims the requested Group.
+func TestRepositoryIgnoresMetadataAsScopeOwnership(t *testing.T) {
+	ctx := context.Background()
+	db := newTestActivityDB(t)
+	applyActivityDDL(t, db)
+	store, err := NewRepository(RepositoryConfig{DB: db})
+	require.NoError(t, err)
+	tenant, a, b := uuid.New(), uuid.New(), uuid.New()
+	for _, group := range []uuid.UUID{a, b} {
+		require.NoError(t, store.Log(ctx, types.ActivityRecord{TenantID: tenant, Verb: "changed", ObjectType: "group", ObjectID: group.String(), Data: map[string]any{"group_id": a.String()}}))
+	}
+	for _, group := range []uuid.UUID{a, b} {
+		scoped := types.ScopeFilter{TenantID: tenant}.WithLabel("group_id", group)
+		page, err := store.ListActivity(ctx, types.ActivityFilter{Scope: scoped})
+		require.NoError(t, err)
+		require.Empty(t, page.Records)
+		stats, err := store.ActivityStats(ctx, types.ActivityStatsFilter{Scope: scoped})
+		require.NoError(t, err)
+		require.Zero(t, stats.Total)
+	}
+	// A host may authorize a canonical Group object and select its own feed.
+	page, err := store.ListActivity(ctx, types.ActivityFilter{Scope: types.ScopeFilter{TenantID: tenant}, ObjectType: "group", ObjectID: a.String(), Pagination: types.Pagination{Limit: 1}})
+	require.NoError(t, err)
+	require.Equal(t, 1, page.Total)
+	require.Len(t, page.Records, 1)
+	require.Equal(t, a.String(), page.Records[0].ObjectID)
+	stats, err := store.ActivityStats(ctx, types.ActivityStatsFilter{Scope: types.ScopeFilter{TenantID: tenant}})
+	require.NoError(t, err)
+	require.Equal(t, 2, stats.Total)
+	// Validation precedes SQL, including stores without a stats DB.
+	empty := &Repository{}
+	_, err = empty.ListActivity(ctx, types.ActivityFilter{Scope: types.ScopeFilter{Labels: map[string]uuid.UUID{"group_id": uuid.Nil}}})
+	require.ErrorIs(t, err, types.ErrInvalidScopeLabels)
+	_, err = empty.ActivityStats(ctx, types.ActivityStatsFilter{Scope: types.ScopeFilter{Labels: map[string]uuid.UUID{"group_id": uuid.Nil}}})
+	require.ErrorIs(t, err, types.ErrInvalidScopeLabels)
 }

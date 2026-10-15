@@ -69,6 +69,9 @@ var (
 
 // GetProfile returns the profile for the supplied user within the provided scope.
 func (r *Repository) GetProfile(ctx context.Context, userID uuid.UUID, scope types.ScopeFilter) (*types.UserProfile, error) {
+	if err := scope.RequireTenantOrg(); err != nil {
+		return nil, err
+	}
 	if userID == uuid.Nil {
 		return nil, types.ErrUserIDRequired
 	}
@@ -84,6 +87,9 @@ func (r *Repository) GetProfile(ctx context.Context, userID uuid.UUID, scope typ
 
 // UpsertProfile inserts or updates the user profile based on whether it already exists.
 func (r *Repository) UpsertProfile(ctx context.Context, profile types.UserProfile) (*types.UserProfile, error) {
+	if err := profile.Scope.RequireTenantOrg(); err != nil {
+		return nil, err
+	}
 	if profile.UserID == uuid.Nil {
 		return nil, types.ErrUserIDRequired
 	}

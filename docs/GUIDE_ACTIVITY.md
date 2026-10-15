@@ -107,6 +107,21 @@ For missing/stale enrichment scans, add functional indexes:
 
 Add a GIN index on `data` for broader JSONB predicates.
 
+## Host-owned record policy and authentication events
+
+Use [the activity package recipe](../activity/README.md#host-owned-record-policy-and-authentication-events)
+for `RecordPolicy`, `SanitizingSink`, `SanitizeHooks`, transactional writes and
+read-time sanitization. Record policy controls disclosure; access policy controls
+who can read. Keep both boundaries explicit. A zero/nil record policy removes
+metadata and IP, but direct repositories remain persistence-only.
+
+For authentication events, `adapter/goauth.NewActivitySink` requires exact,
+nonzero trusted tenant/org and anonymous-actor UUIDs. It maps canonical events
+without copying arbitrary producer metadata. Failed-login identifier retention
+is opt-in at both adapter and record-policy boundaries and preserves only bounded
+unverified attempted input. Escape that text when rendering it; it is never a
+verified actor identity. The adapter adds no retries or deduplication.
+
 ## Building Activity Records
 
 ### From HTTP Requests (with go-auth)
@@ -780,3 +795,19 @@ if err != nil {
 - **[GUIDE_HOOKS](GUIDE_HOOKS.md)**: Advanced hook patterns for activity events
 - **[GUIDE_QUERIES](GUIDE_QUERIES.md)**: Query patterns for activity dashboards
 - **[GUIDE_REPOSITORIES](GUIDE_REPOSITORIES.md)**: Custom activity sink implementations
+
+## Scope and write guarantees
+
+Migration 00011 persists complete canonical labels separately from metadata.
+The Bun feed, statistics and `ListActivityCursor` compare exact scope in SQL
+before pagination/count/cursor predicates. Unlabeled reads exclude labeled rows;
+legacy rows do not enter Group feeds. Authorize scope before these persistence
+APIs; metadata is not an ownership predicate.
+
+Legacy command activity sinks are best effort. Failures reach the configured
+Logger and do not undo a successful mutation. For required audit, use
+`repo.LogTx(ctx, tx, record, policy)` inside the host's mutation/version
+transaction and propagate its error. Policy runs after enrichment; nil policy
+removes metadata and IP. See [transaction ordering](GUIDE_MULTITENANCY.md#transaction-ordering-audit-and-publication)
+for locks, rollback and durable publication. A post-write hook cannot provide
+required audit or durable invalidation.

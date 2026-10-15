@@ -23,6 +23,24 @@ This guide covers database migrations for `go-users`, including the migration ar
 
 `go-users` provides embedded SQL migrations that create the necessary database tables for user management, roles, activity logging, profiles, and preferences. The migrations support both PostgreSQL and SQLite databases through dialect-aware file organization.
 
+### Current migration registration contract
+
+Prefer `migrations.StableOrderedProfileSources(...)` with
+`RegisterOrderedMigrationSources` for new go-persistence-bun registrations.
+`ProfileCombinedWithAuth` registers go-users core only when the host already
+registers go-auth; `ProfileStandalone` registers auth bootstrap, optional auth
+extras, then core. Do not register both aggregate auth trees and standalone auth
+tracks into the same installation. Provider-session migrations remain go-auth's
+responsibility and are not implied by go-users standalone bootstrap.
+
+Stable source keys produce `ordsrc_*` markers. Existing databases that used
+positional `ord_*` markers need `BackfillStableOrderedMigrationMarkers` with the
+historical positional source list before adopting the stable graph. Preserve
+that list's ordering; do not invent it from current directory order.
+
+See [README registration example](../README.md#storage-and-migrations),
+`migrations/profile.go`, `migrations/profile_ordered.go`, and `migrations.go`.
+
 ### Key Features
 
 - **Embedded migrations** - SQL files are embedded in the Go binary using `embed.FS`
@@ -1278,3 +1296,9 @@ For more details, see:
 - [GUIDE_REPOSITORIES.md](GUIDE_REPOSITORIES.md) - Repository implementations
 - [GUIDE_TESTING.md](GUIDE_TESTING.md) - Testing strategies
 - [go-persistence-bun documentation](https://github.com/goliatone/go-persistence-bun)
+
+## Native Group rollout
+
+Apply 00010 (complete grant scopes), 00011 (activity scopes), then 00012 (optional Group/membership tables). The Group tables reference each other only; no authentication-user or tenant/org foreign key is introduced. Existing role catalogs, grants and activity rows are preserved. Native Group use is optional after migration.
+
+Upgrade all readers and writers before creating labeled grants or activity: old binaries ignore the new scope columns. Downgrade 00011 refuses to discard labeled activity; 00012 refuses to remove nonempty Group data. Stop writers and explicitly reconcile data before downgrade. Use transactional SQL and success-only migration markers (`migrate.WithMarkAppliedOnSuccess(true)`); pinned go-persistence-bun v0.17.1 removes rollback markers early, so preflight and marker recovery remain required as described for migration 00010.

@@ -31,10 +31,12 @@ type CustomRole struct {
 type RoleAssignment struct {
 	bun.BaseModel `bun:"table:user_custom_roles"`
 
-	UserID     uuid.UUID `bun:"user_id,type:uuid,pk"`
-	RoleID     uuid.UUID `bun:"role_id,type:uuid,pk"`
-	TenantID   uuid.UUID `bun:"tenant_id,type:uuid,pk"`
-	OrgID      uuid.UUID `bun:"org_id,type:uuid,pk"`
-	AssignedAt time.Time `bun:"assigned_at,notnull"`
-	AssignedBy uuid.UUID `bun:"assigned_by,type:uuid,notnull"`
+	UserID     uuid.UUID            `bun:"user_id,type:uuid,pk"`
+	RoleID     uuid.UUID            `bun:"role_id,type:uuid,pk"`
+	TenantID   uuid.UUID            `bun:"tenant_id,type:uuid,pk"`
+	OrgID      uuid.UUID            `bun:"org_id,type:uuid,pk"`
+	ScopeKey   string               `bun:"scope_key,pk,notnull"`
+	Labels     map[string]uuid.UUID `bun:"labels,type:jsonb,notnull"`
+	AssignedAt time.Time            `bun:"assigned_at,notnull"`
+	AssignedBy uuid.UUID            `bun:"assigned_by,type:uuid,notnull"`
 }

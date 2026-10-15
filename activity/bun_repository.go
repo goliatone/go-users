@@ -100,26 +100,65 @@ var (
 
 // Log persists an activity record into the database.
 func (r *Repository) Log(ctx context.Context, record types.ActivityRecord) error {
+	entry, err := r.prepareEntry(ctx, record)
+	if err != nil {
+		return err
+	}
+	_, err = r.Create(ctx, entry)
+	return err
+}
+
+// LogTx persists required audit in the caller's transaction and returns failures
+// to its owner. Disclosure policy is applied after enrichment; nil policy drops
+// metadata and IP. Callers must propagate this error to roll back; legacy command
+// Activity sinks remain best effort and cannot make a mutation transactional.
+func (r *Repository) LogTx(ctx context.Context, tx bun.Tx, record types.ActivityRecord, policy *RecordPolicy) error {
+	if tx.Tx == nil {
+		return errors.New("activity: a live transaction is required")
+	}
+	entry, err := r.prepareEntry(ctx, record)
+	if err != nil {
+		return err
+	}
+	entry = toLogEntry(policy.Sanitize(toActivityRecord(entry)))
+	_, err = r.CreateTx(ctx, tx, entry)
+	return err
+}
+
+func (r *Repository) prepareEntry(ctx context.Context, record types.ActivityRecord) (*LogEntry, error) {
+	if _, _, err := types.CanonicalScope(types.ScopeFilter{Labels: record.Labels}); err != nil {
+		return nil, err
+	}
 	if r.enricher != nil {
 		enriched, err := applyEnricher(ctx, r.enricher, r.enrichmentErrorHandler, record)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		record = enriched
 	}
+	scope, key, err := types.CanonicalScope(types.ScopeFilter{TenantID: record.TenantID, OrgID: record.OrgID, Labels: record.Labels})
+	if err != nil {
+		return nil, err
+	}
+	record.Labels = scope.Labels
 	entry := toLogEntry(record)
+	entry.ScopeKey = key
 	if entry.ID == uuid.Nil {
 		entry.ID = r.idGen.UUID()
 	}
 	if entry.CreatedAt.IsZero() {
 		entry.CreatedAt = r.clock.Now()
 	}
-	_, err := r.Create(ctx, entry)
-	return err
+	return entry, nil
 }
 
 // ListActivity returns a paginated feed filtered by the supplied criteria.
 func (r *Repository) ListActivity(ctx context.Context, filter types.ActivityFilter) (types.ActivityPage, error) {
+	normalized, _, err := types.CanonicalScope(filter.Scope)
+	if err != nil {
+		return types.ActivityPage{}, err
+	}
+	filter.Scope = normalized
 	pagination := normalizePagination(filter.Pagination, 50, 200)
 	criteria := []repository.SelectCriteria{
 		func(q *bun.SelectQuery) *bun.SelectQuery {
@@ -148,6 +187,11 @@ func (r *Repository) ListActivity(ctx context.Context, filter types.ActivityFilt
 
 // ActivityStats aggregates counts grouped by verb.
 func (r *Repository) ActivityStats(ctx context.Context, filter types.ActivityStatsFilter) (types.ActivityStats, error) {
+	normalized, _, err := types.CanonicalScope(filter.Scope)
+	if err != nil {
+		return types.ActivityStats{}, err
+	}
+	filter.Scope = normalized
 	stats := types.ActivityStats{
 		ByVerb: make(map[string]int),
 	}
@@ -193,6 +237,14 @@ func applyActivityFilter(q *bun.SelectQuery, filter types.ActivityFilter) *bun.S
 }
 
 func applyActivityScopeFilter(q *bun.SelectQuery, scope types.ScopeFilter) *bun.SelectQuery {
+	normalized, key, err := types.CanonicalScope(scope)
+	if err != nil {
+		return q.Where("1 = 0")
+	}
+	q = q.Where("scope_key = ?", key)
+	if key != "" {
+		return q.Where("tenant_id = ? AND org_id = ?", normalized.TenantID, normalized.OrgID)
+	}
 	if scope.TenantID != uuid.Nil {
 		q = q.Where("tenant_id = ?", scope.TenantID)
 	}
@@ -251,12 +303,7 @@ func applyActivityTimeFilter(q *bun.SelectQuery, since, until *time.Time) *bun.S
 }
 
 func applyActivityStatsFilter(q *bun.SelectQuery, filter types.ActivityStatsFilter) *bun.SelectQuery {
-	if filter.Scope.TenantID != uuid.Nil {
-		q = q.Where("tenant_id = ?", filter.Scope.TenantID)
-	}
-	if filter.Scope.OrgID != uuid.Nil {
-		q = q.Where("org_id = ?", filter.Scope.OrgID)
-	}
+	q = applyActivityScopeFilter(q, filter.Scope)
 	if filter.UserID != uuid.Nil && filter.ActorID != uuid.Nil {
 		q = q.Where("(user_id = ? OR actor_id = ?)", filter.UserID, filter.ActorID)
 	} else {
@@ -357,6 +404,8 @@ func toLogEntry(record types.ActivityRecord) *LogEntry {
 		ActorID:    record.ActorID,
 		TenantID:   record.TenantID,
 		OrgID:      record.OrgID,
+		Labels:     maps.Clone(record.Labels),
+		ScopeKey:   activityScopeKey(record),
 		Verb:       record.Verb,
 		ObjectType: record.ObjectType,
 		ObjectID:   record.ObjectID,
@@ -377,6 +426,7 @@ func toActivityRecord(entry *LogEntry) types.ActivityRecord {
 		ActorID:    entry.ActorID,
 		TenantID:   entry.TenantID,
 		OrgID:      entry.OrgID,
+		Labels:     maps.Clone(entry.Labels),
 		Verb:       entry.Verb,
 		ObjectType: entry.ObjectType,
 		ObjectID:   entry.ObjectID,
@@ -418,4 +468,34 @@ func normalizePagination(p types.Pagination, def, max int) types.Pagination {
 		p.Offset = 0
 	}
 	return p
+}
+
+func activityScopeKey(record types.ActivityRecord) string {
+	_, key, _ := types.CanonicalScope(types.ScopeFilter{Labels: record.Labels})
+	return key
+}
+
+// ListActivityCursor applies exact scope and cursor predicates before SQL limit.
+// It is a persistence API; callers must authorize the filter scope first.
+func (r *Repository) ListActivityCursor(ctx context.Context, filter types.ActivityFilter, cursor *ActivityCursor) ([]types.ActivityRecord, error) {
+	if r.db == nil {
+		return nil, errors.New("activity: cursor requires bun DB")
+	}
+	normalized, _, err := types.CanonicalScope(filter.Scope)
+	if err != nil {
+		return nil, err
+	}
+	filter.Scope = normalized
+	var rows []*LogEntry
+	q := applyActivityFilter(r.db.NewSelect().Model(&rows), filter)
+	p := normalizePagination(filter.Pagination, 50, 200)
+	err = ApplyCursorPagination(q, cursor, p.Limit).Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	records := make([]types.ActivityRecord, 0, len(rows))
+	for _, row := range rows {
+		records = append(records, toActivityRecord(row))
+	}
+	return records, nil
 }

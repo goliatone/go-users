@@ -91,6 +91,9 @@ func (c *UserPasswordResetConfirmCommand) Execute(ctx context.Context, input Use
 		return err
 	}
 
+	if err := input.Scope.RequireTenantOrg(); err != nil {
+		return err
+	}
 	payload, jti, record, expiresAt, err := c.resolveResetToken(ctx, input.Token)
 	if err != nil {
 		return err
@@ -190,6 +193,9 @@ func (c *UserPasswordResetConfirmCommand) resolveResetToken(ctx context.Context,
 		return nil, "", nil, time.Time{}, err
 	}
 	payload := types.SecureLinkPayload(payloadMap)
+	if err := validateSecureLinkScope(payload); err != nil {
+		return nil, "", nil, time.Time{}, err
+	}
 	jti := payloadString(payload, "jti")
 	if jti == "" {
 		return nil, "", nil, time.Time{}, ErrTokenJTIRequired

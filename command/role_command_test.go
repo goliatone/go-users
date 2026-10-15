@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/goliatone/go-users/pkg/types"
@@ -82,4 +83,76 @@ func (f *fakeRoleRegistry) GetRole(context.Context, uuid.UUID, types.ScopeFilter
 
 func (f *fakeRoleRegistry) ListAssignments(context.Context, types.RoleAssignmentFilter) ([]types.RoleAssignment, error) {
 	return nil, nil
+}
+
+func TestGrantValidationRejectsInvalidCatalogResultsBeforeMutation(t *testing.T) {
+	lookupErr := errors.New("catalog unavailable")
+	roleID := uuid.New()
+	tenant := uuid.New()
+	scope := types.ScopeFilter{TenantID: tenant}.WithLabel("group", uuid.New())
+	for _, tc := range []struct {
+		name string
+		role *types.RoleDefinition
+		err  error
+	}{
+		{name: "missing definition"},
+		{name: "wrong ID", role: &types.RoleDefinition{ID: uuid.New(), Scope: types.ScopeFilter{TenantID: tenant}}},
+		{name: "wrong catalog", role: &types.RoleDefinition{ID: roleID}},
+		{name: "labeled catalog", role: &types.RoleDefinition{ID: roleID, Scope: scope}},
+		{name: "lookup failure", err: lookupErr},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &candidateRegistry{role: tc.role, lookupErr: tc.err}
+			cfg := RoleAssignmentCommandConfig{Registry: repo, RequireGrantValidation: true, GrantValidator: types.RoleGrantValidatorFunc(func(context.Context, types.RoleGrantCheck) error {
+				t.Fatal("invalid definition reached validator")
+				return nil
+			})}
+			input := AssignRoleInput{UserID: uuid.New(), RoleID: roleID, Scope: scope, Actor: types.ActorRef{ID: uuid.New()}}
+			err := NewAssignRoleCommandWithConfig(cfg).Execute(context.Background(), input)
+			want := types.ErrInvalidRoleGrantDefinition
+			if tc.err != nil {
+				want = lookupErr
+			}
+			require.ErrorIs(t, err, want)
+			require.Empty(t, repo.lookupScope.Labels)
+			require.Equal(t, tenant, repo.lookupScope.TenantID)
+			require.Zero(t, repo.writes)
+		})
+	}
+}
+
+func TestGrantValidationPreservesGenericPolicyDenial(t *testing.T) {
+	repo := &candidateRegistry{}
+	guard := scope.NewGuard(nil, types.AuthorizationPolicyFunc(func(context.Context, types.PolicyCheck) error { return types.ErrUnauthorizedScope }))
+	cfg := RoleAssignmentCommandConfig{Registry: repo, ScopeGuard: guard, GrantValidator: types.RoleGrantValidatorFunc(func(context.Context, types.RoleGrantCheck) error {
+		t.Fatal("scope denial must precede candidate validation")
+		return nil
+	})}
+	input := AssignRoleInput{UserID: uuid.New(), RoleID: uuid.New(), Actor: types.ActorRef{ID: uuid.New()}}
+	require.ErrorIs(t, NewAssignRoleCommandWithConfig(cfg).Execute(context.Background(), input), types.ErrUnauthorizedScope)
+	require.ErrorIs(t, NewUnassignRoleCommandWithConfig(cfg).Execute(context.Background(), UnassignRoleInput(input)), types.ErrUnauthorizedScope)
+	require.Zero(t, repo.lookups)
+	require.Zero(t, repo.writes)
+}
+
+type candidateRegistry struct {
+	fakeRoleRegistry
+	role            *types.RoleDefinition
+	lookupErr       error
+	lookupScope     types.ScopeFilter
+	lookups, writes int
+}
+
+func (r *candidateRegistry) GetRole(_ context.Context, _ uuid.UUID, scope types.ScopeFilter) (*types.RoleDefinition, error) {
+	r.lookups++
+	r.lookupScope = scope
+	return r.role, r.lookupErr
+}
+func (r *candidateRegistry) AssignRole(context.Context, uuid.UUID, uuid.UUID, types.ScopeFilter, uuid.UUID) error {
+	r.writes++
+	return nil
+}
+func (r *candidateRegistry) UnassignRole(context.Context, uuid.UUID, uuid.UUID, types.ScopeFilter, uuid.UUID) error {
+	r.writes++
+	return nil
 }

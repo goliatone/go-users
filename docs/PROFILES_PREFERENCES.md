@@ -1,5 +1,8 @@
 # Profiles & Preferences
 
+The built-in stores support tenant/org scope and existing system→tenant→org→user preference layers. Nonempty `ScopeFilter.Labels` return `types.ErrUnsupportedScopeLabels` for profile reads/writes, preference reads/writes/deletes and resolution. Group-specific records require host storage; labels never silently select a shared row.
+
+
 Phase 5 introduces the profile and preference workflows that downstream panels (go-admin/go-cms) rely on for richer user data and scoped settings.
 
 ## Schema Recap

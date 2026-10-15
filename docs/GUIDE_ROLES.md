@@ -220,6 +220,37 @@ Deleting a role also removes all associated assignments.
 
 ## Role Assignments
 
+With the Bun registry, role definitions use global/tenant/org catalogs and reject custom scope labels. Assignments support exact custom labels after migration `00010_role_assignment_scopes.tx.up.sql`: the same tenant/org role definition can be assigned independently to Group A and Group B. Pass the complete labeled scope to assignment reads and revocation; an unlabeled query selects only unlabeled grants. When loading the definition itself, use its tenant/org catalog scope. See [Role Registry Extension Guide](ROLE_REGISTRY.md#catalog-and-assignment-scopes) for validation and rollout requirements.
+
+### Validate the Complete Candidate Grant
+
+A generic scope policy sees the role ID as `PolicyCheck.TargetID`. To evaluate the target principal and candidate permissions before assignment or revocation, configure the optional `types.RoleGrantValidator`:
+
+```go
+svc, err := users.NewStrict(users.Config{
+    // ...repositories, sinks, hooks...
+    ScopeResolver:             resolver,
+    AuthorizationPolicy:       policy,
+    RequireRoleGrantValidation: true,
+    RoleGrantValidator: types.RoleGrantValidatorFunc(func(ctx context.Context, check types.RoleGrantCheck) error {
+        // Host policy checks delegation, current target eligibility and permissions.
+        return authorizeGrant(ctx, check.Actor, check.Assignment.UserID,
+            check.Assignment.Scope, check.Role, check.Operation)
+    }),
+})
+if err != nil {
+    return err
+}
+```
+
+The check includes `RoleGrantAssign` or `RoleGrantRevoke`, actor, target principal/role IDs, the complete resolved assignment scope, and a role definition loaded through the configured registry from its tenant/org catalog. Permissions, scope labels and top-level metadata are copied for the check; treat all candidate data as read-only. Assignment timestamps are populated only by persistence, not this candidate check. Validators can deny prohibited targets, self-escalation and roles/permissions outside the actor's delegation rights. They must define their own revocation rules rather than assuming grant and revoke rights are identical.
+
+Generic scope authorization runs first; a denial prevents candidate lookup/validation. Role lookup failures, invalid definitions, invalid label maps and validator errors prevent the grant mutation. Assignment labels are normalized and retained for validation; catalog lookup uses tenant/org without those labels. Validation does not alter unrelated scoped grants.
+
+`RequireRoleGrantValidation` rejects missing/typed nil validators through strict startup, readiness and health checks; configured commands also deny when readiness is ignored. It is independent of `RequireScopeAuthorization`: `NewStrict` does not require a grant validator unless this flag is selected. Existing two-argument command constructors retain their prior contract. For standalone composition use `NewAssignRoleCommandWithConfig` / `NewUnassignRoleCommandWithConfig` and `command.RoleAssignmentCommandConfig{Registry: reg, ScopeGuard: guard, GrantValidator: validator, RequireGrantValidation: true}`.
+
+The configured registry supplies the role snapshot. Hosts must provide current membership/permission data and define transaction/freshness semantics; this check does not make role lookup, authorization and persistence atomic.
+
 ### Assigning a Role to a User
 
 ```go

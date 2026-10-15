@@ -3,6 +3,7 @@ package crudguard
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	auth "github.com/goliatone/go-auth"
 	"github.com/goliatone/go-crud"
@@ -32,6 +33,9 @@ type Config struct {
 	PolicyMap      map[crud.CrudOperation]types.PolicyAction
 	ScopeExtractor ScopeExtractor
 	FallbackAction types.PolicyAction
+
+	// RequireScopeAuthorization rejects permissive or unvalidated guards.
+	RequireScopeAuthorization bool
 }
 
 // Adapter turns go-crud operations into scope guard enforcement calls.
@@ -41,6 +45,7 @@ type Adapter struct {
 	scopeExtractor ScopeExtractor
 	policyMap      map[crud.CrudOperation]types.PolicyAction
 	fallbackAction types.PolicyAction
+	strict         bool
 }
 
 // GuardInput captures per-request parameters supplied by transports.
@@ -76,6 +81,16 @@ func DefaultScopeExtractor(_ crud.Context, actor *auth.ActorContext) (types.Scop
 
 // NewAdapter constructs a Guard adapter and validates the supplied config.
 func NewAdapter(cfg Config) (*Adapter, error) {
+	if cfg.RequireScopeAuthorization {
+		if err := scope.ValidateStrict(cfg.Guard); err != nil {
+			return nil, goerrors.Wrap(err, goerrors.CategoryInternal, "go-users: strict scope guard configuration failed").
+				WithCode(goerrors.CodeInternal).
+				WithTextCode(textCodeScopeEnforcementFail)
+		}
+		if err := validateStrictPolicyMap(cfg); err != nil {
+			return nil, err
+		}
+	}
 	if cfg.Guard == nil {
 		return nil, goerrors.New("go-users: scope guard is required", goerrors.CategoryInternal).
 			WithCode(goerrors.CodeInternal).
@@ -103,6 +118,7 @@ func NewAdapter(cfg Config) (*Adapter, error) {
 		scopeExtractor: scopeExtractor,
 		policyMap:      clonePolicyMap(cfg.PolicyMap),
 		fallbackAction: cfg.FallbackAction,
+		strict:         cfg.RequireScopeAuthorization,
 	}, nil
 }
 
@@ -159,15 +175,41 @@ func (a *Adapter) Enforce(in GuardInput) (GuardResult, error) {
 }
 
 func (a *Adapter) actionForOperation(op crud.CrudOperation) (types.PolicyAction, error) {
+	if a.strict && strings.TrimSpace(string(op)) == "" {
+		return "", missingPolicyAction(op)
+	}
 	if act, ok := a.policyMap[op]; ok && act != "" {
 		return act, nil
 	}
 	if a.fallbackAction != "" {
 		return a.fallbackAction, nil
 	}
-	return "", goerrors.New(fmt.Sprintf("go-users: no policy action configured for %s", op), goerrors.CategoryInternal).
+	return "", missingPolicyAction(op)
+}
+
+func missingPolicyAction(op crud.CrudOperation) error {
+	return goerrors.New(fmt.Sprintf("go-users: no policy action configured for %s", op), goerrors.CategoryInternal).
 		WithCode(goerrors.CodeInternal).
 		WithTextCode(textCodeMissingPolicy)
+}
+
+func validateStrictPolicyMap(cfg Config) error {
+	if cfg.FallbackAction != "" && strings.TrimSpace(string(cfg.FallbackAction)) == "" {
+		return goerrors.Wrap(scope.ErrPolicyActionRequired, goerrors.CategoryInternal, "go-users: fallback policy action must not be blank").
+			WithCode(goerrors.CodeInternal).
+			WithTextCode(textCodeMissingPolicy)
+	}
+	for operation, action := range cfg.PolicyMap {
+		if strings.TrimSpace(string(operation)) == "" {
+			return missingPolicyAction(operation)
+		}
+		if strings.TrimSpace(string(action)) == "" {
+			return goerrors.Wrap(scope.ErrPolicyActionRequired, goerrors.CategoryInternal, fmt.Sprintf("go-users: policy action for %s must not be blank", operation)).
+				WithCode(goerrors.CodeInternal).
+				WithTextCode(textCodeMissingPolicy)
+		}
+	}
+	return nil
 }
 
 func mergeScopeFilters(base, override types.ScopeFilter) types.ScopeFilter {

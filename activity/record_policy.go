@@ -72,7 +72,9 @@ func (p *RecordPolicy) Sanitize(record types.ActivityRecord) types.ActivityRecor
 	if config.RetainFailedLoginIdentifier && record.Verb == LoginFailureVerb && record.Channel == AuthenticationChannel {
 		identifier = SanitizeAttemptedIdentifier(record.Data[DataKeyAttemptedIdentifier])
 	}
+	record.Labels = maps.Clone(record.Labels)
 	input := record
+	input.Labels = maps.Clone(record.Labels)
 	record.Data = nil
 	if config.DataSanitizer != nil {
 		input.Data = copyPolicyData(input.Data)

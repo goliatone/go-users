@@ -12,6 +12,11 @@ import (
 	"github.com/uptrace/bun"
 )
 
+// ErrUnsupportedRoleScope indicates that a custom label was supplied to a role
+// catalog operation. Definitions use tenant/org namespaces; labels belong on
+// assignments to those definitions.
+var ErrUnsupportedRoleScope = errors.New("bun role registry: role definitions do not support scope labels")
+
 // RoleRegistryConfig configures the Bun-backed role registry.
 type RoleRegistryConfig struct {
 	DB          *bun.DB
@@ -25,13 +30,14 @@ type RoleRegistryConfig struct {
 
 // RoleRegistry persists custom roles and assignments using Bun repositories.
 type RoleRegistry struct {
-	db          *bun.DB
-	roles       repository.Repository[*CustomRole]
-	assignments repository.Repository[*RoleAssignment]
-	clock       types.Clock
-	hooks       types.Hooks
-	logger      types.Logger
-	idGen       types.IDGenerator
+	transactional bool
+	db            *bun.DB
+	roles         repository.Repository[*CustomRole]
+	assignments   repository.Repository[*RoleAssignment]
+	clock         types.Clock
+	hooks         types.Hooks
+	logger        types.Logger
+	idGen         types.IDGenerator
 }
 
 // NewRoleRegistry constructs the default registry. Either DB or both repositories
@@ -107,6 +113,9 @@ func setCustomRoleID(role *CustomRole, id uuid.UUID) {
 
 // CreateRole inserts a custom role scoped to the provided tenant/org.
 func (r *RoleRegistry) CreateRole(ctx context.Context, input types.RoleMutation) (*types.RoleDefinition, error) {
+	if len(input.Scope.Labels) > 0 {
+		return nil, ErrUnsupportedRoleScope
+	}
 	name := normalizeRoleName(input.Name)
 	if name == "" {
 		return nil, errors.New("role name required")
@@ -146,6 +155,9 @@ func (r *RoleRegistry) CreateRole(ctx context.Context, input types.RoleMutation)
 
 // UpdateRole updates mutable fields on a custom role.
 func (r *RoleRegistry) UpdateRole(ctx context.Context, id uuid.UUID, input types.RoleMutation) (*types.RoleDefinition, error) {
+	if len(input.Scope.Labels) > 0 {
+		return nil, ErrUnsupportedRoleScope
+	}
 	role, err := r.roles.GetByID(ctx, id.String(), scopeSelectCriteria(input.Scope))
 	if err != nil {
 		return nil, err
@@ -186,6 +198,9 @@ func (r *RoleRegistry) UpdateRole(ctx context.Context, id uuid.UUID, input types
 
 // DeleteRole removes a custom role (unless marked as system).
 func (r *RoleRegistry) DeleteRole(ctx context.Context, id uuid.UUID, scope types.ScopeFilter, actor uuid.UUID) error {
+	if len(scope.Labels) > 0 {
+		return ErrUnsupportedRoleScope
+	}
 	role, err := r.roles.GetByID(ctx, id.String(), scopeSelectCriteria(scope))
 	if err != nil {
 		return err
@@ -207,9 +222,25 @@ func (r *RoleRegistry) DeleteRole(ctx context.Context, id uuid.UUID, scope types
 	return nil
 }
 
-// AssignRole creates a user->role assignment scoped to tenant/org.
+// AssignRole creates a user->role assignment scoped to tenant/org and exact labels.
 func (r *RoleRegistry) AssignRole(ctx context.Context, userID, roleID uuid.UUID, scope types.ScopeFilter, actor uuid.UUID) error {
-	_, err := r.roles.GetByID(ctx, roleID.String(), scopeSelectCriteria(scope))
+	return r.AssignRoleFromCatalog(ctx, types.ScopedRoleGrant{UserID: userID, RoleID: roleID, Scope: scope, CatalogScope: types.ScopeFilter{TenantID: scope.TenantID, OrgID: scope.OrgID}, ActorID: actor})
+}
+
+var _ types.ExactScopeRoleRegistry = (*RoleRegistry)(nil)
+
+// AssignRoleFromCatalog reuses a catalog definition in an independent exact scope.
+func (r *RoleRegistry) AssignRoleFromCatalog(ctx context.Context, grant types.ScopedRoleGrant) error {
+	if len(grant.CatalogScope.Labels) > 0 {
+		return ErrUnsupportedRoleScope
+	}
+	userID, roleID, scope, actor := grant.UserID, grant.RoleID, grant.Scope, grant.ActorID
+
+	scope, key, err := assignmentScope(scope)
+	if err != nil {
+		return err
+	}
+	_, err = r.roles.GetByID(ctx, roleID.String(), scopeSelectCriteria(grant.CatalogScope))
 	if err != nil {
 		return err
 	}
@@ -218,10 +249,19 @@ func (r *RoleRegistry) AssignRole(ctx context.Context, userID, roleID uuid.UUID,
 		RoleID:     roleID,
 		TenantID:   scopeUUID(scope.TenantID),
 		OrgID:      scopeUUID(scope.OrgID),
+		ScopeKey:   key,
+		Labels:     scope.Labels,
 		AssignedAt: r.clock.Now(),
 		AssignedBy: actor,
 	}
-	_, err = r.assignments.Create(ctx, assignment)
+	var criteria []repository.InsertCriteria
+	if r.transactional {
+		// A duplicate INSERT must not abort the surrounding PostgreSQL transaction.
+		criteria = append(criteria, func(q *bun.InsertQuery) *bun.InsertQuery {
+			return q.On("CONFLICT (user_id, role_id, tenant_id, org_id, scope_key) DO NOTHING")
+		})
+	}
+	_, err = r.assignments.Create(ctx, assignment, criteria...)
 	if err != nil {
 		if repository.IsDuplicatedKey(err) {
 			return nil
@@ -241,10 +281,14 @@ func (r *RoleRegistry) AssignRole(ctx context.Context, userID, roleID uuid.UUID,
 
 // UnassignRole removes an existing user->role assignment.
 func (r *RoleRegistry) UnassignRole(ctx context.Context, userID, roleID uuid.UUID, scope types.ScopeFilter, actor uuid.UUID) error {
-	err := r.assignments.DeleteWhere(ctx,
+	scope, key, err := assignmentScope(scope)
+	if err != nil {
+		return err
+	}
+	err = r.assignments.DeleteWhere(ctx,
 		func(q *bun.DeleteQuery) *bun.DeleteQuery {
-			return q.Where("user_id = ? AND role_id = ? AND tenant_id = ? AND org_id = ?",
-				userID, roleID, scopeUUID(scope.TenantID), scopeUUID(scope.OrgID))
+			return q.Where("user_id = ? AND role_id = ? AND tenant_id = ? AND org_id = ? AND scope_key = ?",
+				userID, roleID, scopeUUID(scope.TenantID), scopeUUID(scope.OrgID), key)
 		},
 	)
 	if err != nil {
@@ -263,6 +307,9 @@ func (r *RoleRegistry) UnassignRole(ctx context.Context, userID, roleID uuid.UUI
 
 // ListRoles returns paginated roles filtered by scope/keyword.
 func (r *RoleRegistry) ListRoles(ctx context.Context, filter types.RoleFilter) (types.RolePage, error) {
+	if len(filter.Scope.Labels) > 0 {
+		return types.RolePage{}, ErrUnsupportedRoleScope
+	}
 	pagination := normalizePagination(filter.Pagination, 50, 200)
 	criteria := []repository.SelectCriteria{
 		scopeSelectCriteria(filter.Scope),
@@ -306,6 +353,9 @@ func (r *RoleRegistry) ListRoles(ctx context.Context, filter types.RoleFilter) (
 
 // GetRole returns a single role matching the scope constraints.
 func (r *RoleRegistry) GetRole(ctx context.Context, id uuid.UUID, scope types.ScopeFilter) (*types.RoleDefinition, error) {
+	if len(scope.Labels) > 0 {
+		return nil, ErrUnsupportedRoleScope
+	}
 	role, err := r.roles.GetByID(ctx, id.String(), scopeSelectCriteria(scope))
 	if err != nil {
 		return nil, err
@@ -315,9 +365,13 @@ func (r *RoleRegistry) GetRole(ctx context.Context, id uuid.UUID, scope types.Sc
 
 // ListAssignments returns assignments filtered by scope/user/role.
 func (r *RoleRegistry) ListAssignments(ctx context.Context, filter types.RoleAssignmentFilter) ([]types.RoleAssignment, error) {
+	scope, key, err := assignmentScope(filter.Scope)
+	if err != nil {
+		return nil, err
+	}
 	criteria := []repository.SelectCriteria{
 		func(q *bun.SelectQuery) *bun.SelectQuery {
-			q = q.Where("tenant_id = ? AND org_id = ?", scopeUUID(filter.Scope.TenantID), scopeUUID(filter.Scope.OrgID))
+			q = q.Where("tenant_id = ? AND org_id = ? AND scope_key = ?", scopeUUID(scope.TenantID), scopeUUID(scope.OrgID), key)
 			if filter.UserID != uuid.Nil {
 				q = q.Where("user_id = ?", filter.UserID)
 			}
@@ -350,12 +404,17 @@ func (r *RoleRegistry) ListAssignments(ctx context.Context, filter types.RoleAss
 			Scope: types.ScopeFilter{
 				TenantID: record.TenantID,
 				OrgID:    record.OrgID,
+				Labels:   maps.Clone(record.Labels),
 			},
 			AssignedAt: record.AssignedAt,
 			AssignedBy: record.AssignedBy,
 		})
 	}
 	return assignments, nil
+}
+
+func assignmentScope(scope types.ScopeFilter) (types.ScopeFilter, string, error) {
+	return types.CanonicalScope(scope)
 }
 
 func (r *RoleRegistry) loadRoleNames(ctx context.Context, assignments []*RoleAssignment) (map[uuid.UUID]string, error) {

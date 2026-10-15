@@ -56,7 +56,7 @@ svc := users.New(users.Config{
     // other dependencies...
 })
 
-if err := svc.ActivitySink.Log(ctx, rec); err != nil {
+if err := svc.ActivitySink().Log(ctx, rec); err != nil {
     return err
 }
 ```
@@ -101,9 +101,11 @@ is disabled by default. Enabling it on both boundaries preserves only
 controls/format characters removed, trimmed, case preserved and at most 254
 Unicode code points. Render it as escaped, **unverified attempted input**.
 
-For a transaction, call `policy.Sanitize(record)` before mapping to `LogEntry`
-and invoking `CreateTx` on the caller's transaction; the policy never starts or
-commits a transaction. For reads, call `policy.Sanitize(record)` after access and
+For required transactional audit, call `repo.LogTx(ctx, tx, record, policy)`
+and propagate its error to the mutation transaction owner. Policy runs after
+enrichment; nil policy drops metadata/IP. The method never starts or commits
+a transaction. Direct `CreateTx` remains available for caller-managed mapping
+and disclosure policy. For reads, call `policy.Sanitize(record)` after access and
 scope enforcement. A separate read policy may use `SanitizeRecord` as its base
 callback while enabling the same identifier exception. Callbacks receive detached
 JSON metadata; returned data is detached again before forwarding. Nil policies
@@ -177,3 +179,7 @@ query := activity.ApplyCursorPagination(db.NewSelect().Model(&rows), cursor, 50)
 - Metadata: flat, JSON-serializable keys; include counts and scope hints when relevant.
 
 See `docs/ACTIVITY.md` for deeper guidance, indexes, and schema details.
+
+Legacy command sinks are best effort; failures reach the configured Logger.
+Required audit, version advancement and durable publication belong in the
+[host transaction](../docs/GUIDE_MULTITENANCY.md#transaction-ordering-audit-and-publication).
