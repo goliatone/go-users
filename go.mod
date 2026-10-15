@@ -3,9 +3,9 @@ module github.com/goliatone/go-users
 go 1.26.0
 
 require (
-	github.com/goliatone/go-auth v0.45.2
-	github.com/goliatone/go-command v0.24.2
-	github.com/goliatone/go-crud v0.25.0
+	github.com/goliatone/go-auth v0.45.3
+	github.com/goliatone/go-command v0.24.3
+	github.com/goliatone/go-crud v0.26.0
 	github.com/goliatone/go-errors v0.12.0
 	github.com/goliatone/go-featuregate v0.6.1
 	github.com/goliatone/go-i18n v0.5.0
