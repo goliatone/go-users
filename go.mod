@@ -5,16 +5,16 @@ go 1.26.0
 require (
 	github.com/goliatone/go-auth v0.45.3
 	github.com/goliatone/go-command v0.24.3
-	github.com/goliatone/go-crud v0.26.0
+	github.com/goliatone/go-crud v0.26.1
 	github.com/goliatone/go-errors v0.12.0
 	github.com/goliatone/go-featuregate v0.6.1
 	github.com/goliatone/go-i18n v0.5.0
 	github.com/goliatone/go-masker v0.2.0
 	github.com/goliatone/go-options v0.7.2
 	github.com/goliatone/go-persistence-bun v0.17.1
-	github.com/goliatone/go-repository-bun v0.16.1
+	github.com/goliatone/go-repository-bun v0.16.2
 	github.com/goliatone/go-repository-cache v0.7.2
-	github.com/goliatone/go-router v0.62.3
+	github.com/goliatone/go-router v0.62.4
 	github.com/goliatone/go-urlkit v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9

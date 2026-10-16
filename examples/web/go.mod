@@ -9,14 +9,14 @@ require (
 	github.com/goliatone/go-auth v0.45.3
 	github.com/goliatone/go-composite-fs v0.3.0
 	github.com/goliatone/go-config v0.15.0
-	github.com/goliatone/go-crud v0.26.0
+	github.com/goliatone/go-crud v0.26.1
 	github.com/goliatone/go-errors v0.12.0
 	github.com/goliatone/go-logger v0.10.1
 	github.com/goliatone/go-persistence-bun v0.17.1
 	github.com/goliatone/go-print v0.4.1
-	github.com/goliatone/go-repository-bun v0.16.1
-	github.com/goliatone/go-router v0.62.3
-	github.com/goliatone/go-users v0.27.0
+	github.com/goliatone/go-repository-bun v0.16.2
+	github.com/goliatone/go-router v0.62.4
+	github.com/goliatone/go-users v0.27.1
 	github.com/google/uuid v1.6.0
 	github.com/uptrace/bun v1.2.18
 	github.com/uptrace/bun/dialect/sqlitedialect v1.2.18
