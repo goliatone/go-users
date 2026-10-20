@@ -15,8 +15,8 @@ require (
 	github.com/goliatone/go-persistence-bun v0.17.1
 	github.com/goliatone/go-print v0.4.1
 	github.com/goliatone/go-repository-bun v0.16.2
-	github.com/goliatone/go-router v0.62.4
-	github.com/goliatone/go-users v0.27.1
+	github.com/goliatone/go-router v0.62.5
+	github.com/goliatone/go-users v0.27.2
 	github.com/google/uuid v1.6.0
 	github.com/uptrace/bun v1.2.18
 	github.com/uptrace/bun/dialect/sqlitedialect v1.2.18
@@ -63,7 +63,7 @@ require (
 	github.com/goliatone/go-i18n v0.5.0 // indirect
 	github.com/goliatone/go-masker v0.2.0 // indirect
 	github.com/goliatone/go-options v0.7.2 // indirect
-	github.com/goliatone/go-repository-cache v0.7.2 // indirect
+	github.com/goliatone/go-repository-cache v0.7.3 // indirect
 	github.com/goliatone/go-slug v0.1.0 // indirect
 	github.com/goliatone/hashid v0.2.3 // indirect
 	github.com/goodsign/monday v1.0.2 // indirect

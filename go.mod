@@ -7,14 +7,15 @@ require (
 	github.com/goliatone/go-command v0.24.3
 	github.com/goliatone/go-crud v0.26.1
 	github.com/goliatone/go-errors v0.12.0
+	github.com/goliatone/go-export v0.11.0
 	github.com/goliatone/go-featuregate v0.6.1
 	github.com/goliatone/go-i18n v0.5.0
 	github.com/goliatone/go-masker v0.2.0
 	github.com/goliatone/go-options v0.7.2
 	github.com/goliatone/go-persistence-bun v0.17.1
 	github.com/goliatone/go-repository-bun v0.16.2
-	github.com/goliatone/go-repository-cache v0.7.2
-	github.com/goliatone/go-router v0.62.4
+	github.com/goliatone/go-repository-cache v0.7.3
+	github.com/goliatone/go-router v0.62.5
 	github.com/goliatone/go-urlkit v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
@@ -73,8 +74,11 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.19 // indirect
+	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/puzpuzpuz/xsync/v3 v3.5.1 // indirect
+	github.com/richardlehane/mscfb v1.0.4 // indirect
+	github.com/richardlehane/msoleps v1.0.3 // indirect
 	github.com/savsgio/gotils v0.0.0-20250924091648-bce9a52d7761 // indirect
 	github.com/showa-93/go-mask v0.6.2 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
@@ -88,6 +92,9 @@ require (
 	github.com/viccon/sturdyc v1.1.5 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
+	github.com/xuri/efp v0.0.0-20231025114914-d1ff6096ae53 // indirect
+	github.com/xuri/excelize/v2 v2.8.1 // indirect
+	github.com/xuri/nfp v0.0.0-20230919160717-d98342af3f05 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.42.0 // indirect
 	go.opentelemetry.io/otel/metric v1.42.0 // indirect
