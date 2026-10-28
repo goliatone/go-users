@@ -1,5 +1,19 @@
 # Changelog
 
+# [0.27.4](https://github.com/goliatone/go-users/compare/v0.27.3...v0.27.4) - (2026-10-28)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.27.4 ([e7e7801](https://github.com/goliatone/go-users/commit/e7e7801ca6c4564a62f612542e6c1b65374f0f48))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.27.3 ([91bd1af](https://github.com/goliatone/go-users/commit/91bd1afd2e994e4a534e224d0f467aeb631de1cb))  - (goliatone)
+
+## <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Update deps ([f9fe51b](https://github.com/goliatone/go-users/commit/f9fe51bea2076e869b9e109c5d5226dec894b35d))  - (goliatone)
+
 # [0.27.3](https://github.com/goliatone/go-users/compare/v0.27.2...v0.27.3) - (2026-10-20)
 
 ## <!-- 13 -->📦 Bumps
