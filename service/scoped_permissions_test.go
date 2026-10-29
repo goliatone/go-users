@@ -51,8 +51,8 @@ func newScopedPolicyFixture(t *testing.T) *scopedPolicyFixture {
 			if !ok || check.Actor.ID.String() != principal.ApplicationSubject() {
 				return goauth.ScopedPermissionsRequest{}, types.ErrUnauthorizedScope
 			}
-			account, err := h.GetByID(ctx, check.Actor.ID)
-			if err != nil || account == nil || account.Status != types.LifecycleStateActive {
+			account, accountErr := h.GetByID(ctx, check.Actor.ID)
+			if accountErr != nil || account == nil || account.Status != types.LifecycleStateActive {
 				return goauth.ScopedPermissionsRequest{}, types.ErrUnauthorizedScope
 			}
 			group := check.Scope.Label("group")
@@ -62,9 +62,9 @@ func newScopedPolicyFixture(t *testing.T) *scopedPolicyFixture {
 			if check.TargetID != uuid.Nil && h.owners[check.TargetID] != group {
 				return goauth.ScopedPermissionsRequest{}, types.ErrUnauthorizedScope
 			}
-			version, err := f.versions.CurrentAuthorizationVersion(ctx, principal.ApplicationSubject(), "")
-			if err != nil {
-				return goauth.ScopedPermissionsRequest{}, err
+			version, accountErr := f.versions.CurrentAuthorizationVersion(ctx, principal.ApplicationSubject(), "")
+			if accountErr != nil {
+				return goauth.ScopedPermissionsRequest{}, accountErr
 			}
 			return goauth.ScopedPermissionsRequest{Current: auth.CurrentPermissionsRequest{Principal: principal, Version: version.Version, Role: "member"}, Scope: check.Scope}, nil
 		},
@@ -73,15 +73,15 @@ func newScopedPolicyFixture(t *testing.T) *scopedPolicyFixture {
 			if !ok {
 				return nil, types.ErrUnauthorizedScope
 			}
-			assignments, err := f.registry.ListAssignments(ctx, types.RoleAssignmentFilter{UserID: h.actor.ID, Scope: request.Scope})
-			if err != nil {
-				return nil, err
+			assignments, listErr := f.registry.ListAssignments(ctx, types.RoleAssignmentFilter{UserID: h.actor.ID, Scope: request.Scope})
+			if listErr != nil {
+				return nil, listErr
 			}
 			var permissions []string
 			for _, assignment := range assignments {
-				role, err := f.registry.GetRole(ctx, assignment.RoleID, types.ScopeFilter{TenantID: request.Scope.TenantID, OrgID: request.Scope.OrgID})
-				if err != nil {
-					return nil, err
+				role, roleErr := f.registry.GetRole(ctx, assignment.RoleID, types.ScopeFilter{TenantID: request.Scope.TenantID, OrgID: request.Scope.OrgID})
+				if roleErr != nil {
+					return nil, roleErr
 				}
 				permissions = append(permissions, role.Permissions...)
 			}
@@ -98,9 +98,9 @@ func newScopedPolicyFixture(t *testing.T) *scopedPolicyFixture {
 	cfg.AuthRepository, cfg.InventoryRepository = h, h
 	cfg.RoleRegistry = f.registry
 	cfg.AuthorizationPolicy = types.AuthorizationPolicyFunc(func(ctx context.Context, check types.PolicyCheck) error {
-		permissions, err := resolver.ResolvePermissions(context.WithValue(ctx, scopedPolicyCheckKey{}, check))
-		if err != nil {
-			return err
+		permissions, resolveErr := resolver.ResolvePermissions(context.WithValue(ctx, scopedPolicyCheckKey{}, check))
+		if resolveErr != nil {
+			return resolveErr
 		}
 		if !slices.Contains(permissions, string(check.Action)) {
 			return types.ErrUnauthorizedScope

@@ -38,8 +38,8 @@ func (v tokenValidator) validate(ctx context.Context, token string, tokenType ty
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := validateSecureLinkScope(payload); err != nil {
-		return nil, nil, err
+	if scopeErr := validateSecureLinkScope(payload); scopeErr != nil {
+		return nil, nil, scopeErr
 	}
 	jti := payloadString(payload, "jti")
 	if jti == "" {

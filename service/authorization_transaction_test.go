@@ -183,8 +183,8 @@ func newSQLAuthorizationHost(t *testing.T, dialect string) *sqlAuthorizationHost
 		_, err = admin.Exec("CREATE SCHEMA " + schema)
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			_, err := admin.Exec("DROP SCHEMA " + schema + " CASCADE")
-			require.NoError(t, err)
+			_, dropErr := admin.Exec("DROP SCHEMA " + schema + " CASCADE")
+			require.NoError(t, dropErr)
 			require.NoError(t, admin.Close())
 		})
 		raw, err := sql.Open("postgres", dsn+" search_path="+schema)
@@ -443,8 +443,8 @@ func TestHostRequiredAuditAndPublication(t *testing.T) {
 			delivered := map[string]bool{}
 			recoverPublisher := auth.AuthorizationVersionPublisherFunc(func(ctx context.Context, event auth.AuthorizationVersionEvent) error {
 				delivered[event.OperationID] = true
-				_, err := h.db.ExecContext(ctx, "UPDATE host_outbox SET published = TRUE WHERE subject = ? AND tenant = ? AND operation = ?", event.ApplicationSubject, event.TenantID, event.OperationID)
-				return err
+				_, publishErr := h.db.ExecContext(ctx, "UPDATE host_outbox SET published = TRUE WHERE subject = ? AND tenant = ? AND operation = ?", event.ApplicationSubject, event.TenantID, event.OperationID)
+				return publishErr
 			})
 			for _, row := range pending {
 				event := auth.AuthorizationVersionEvent{OperationID: row.Operation, ApplicationSubject: row.Subject, TenantID: row.Tenant, Version: strconv.Itoa(row.Version)}

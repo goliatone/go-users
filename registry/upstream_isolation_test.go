@@ -51,8 +51,8 @@ func TestExplicitCatalogAndTransactionRollback(t *testing.T) {
 		expected := errors.New("rollback")
 		err = db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 			bound := r.BindTx(tx)
-			if err := bound.UnassignRole(ctx, user, role.ID, a, actor); err != nil {
-				return err
+			if revokeErr := bound.UnassignRole(ctx, user, role.ID, a, actor); revokeErr != nil {
+				return revokeErr
 			}
 			return expected
 		})

@@ -211,11 +211,11 @@ func TestRepositoryIgnoresMetadataAsScopeOwnership(t *testing.T) {
 	}
 	for _, group := range []uuid.UUID{a, b} {
 		scoped := types.ScopeFilter{TenantID: tenant}.WithLabel("group_id", group)
-		page, err := store.ListActivity(ctx, types.ActivityFilter{Scope: scoped})
-		require.NoError(t, err)
+		page, queryErr := store.ListActivity(ctx, types.ActivityFilter{Scope: scoped})
+		require.NoError(t, queryErr)
 		require.Empty(t, page.Records)
-		stats, err := store.ActivityStats(ctx, types.ActivityStatsFilter{Scope: scoped})
-		require.NoError(t, err)
+		stats, queryErr := store.ActivityStats(ctx, types.ActivityStatsFilter{Scope: scoped})
+		require.NoError(t, queryErr)
 		require.Zero(t, stats.Total)
 	}
 	// A host may authorize a canonical Group object and select its own feed.

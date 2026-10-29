@@ -142,7 +142,7 @@ func New(cfg Config) *Service {
 		}
 	}
 
-	var scopeGuard scope.Guard = scope.NewGuard(norm.ScopeResolver, norm.AuthorizationPolicy)
+	scopeGuard := scope.NewGuard(norm.ScopeResolver, norm.AuthorizationPolicy)
 	if norm.RequireScopeAuthorization {
 		// An invalid StrictGuard denies enforcement. Ready/HealthCheck expose its
 		// validation error even when callers use this compatibility constructor.

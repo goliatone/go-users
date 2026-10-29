@@ -128,8 +128,8 @@ func (c *UserRegistrationRequestCommand) Execute(ctx context.Context, input User
 	if err != nil {
 		return err
 	}
-	if err := scope.RequireTenantOrg(); err != nil {
-		return err
+	if scopeErr := scope.RequireTenantOrg(); scopeErr != nil {
+		return scopeErr
 	}
 	if featureErr := c.ensureRegistrationEnabled(ctx, scope); featureErr != nil {
 		return featureErr

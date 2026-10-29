@@ -206,8 +206,8 @@ func TestNativeGroupStrictConstructionAndForgedScope(t *testing.T) {
 		}{
 			{groups.Scope(uuid.New()), resourceRead}, {groups.Scope(f.a), ""}, {groups.Scope(f.a), "unknown"}, {types.ScopeFilter{}, resourceRead}, {groups.Scope(f.a).WithLabel("other", uuid.New()), resourceRead}, {types.ScopeFilter{TenantID: uuid.New(), Labels: groups.Scope(f.a).Labels}, resourceRead},
 		} {
-			_, err := g.Enforce(ctx, f.actor, input.s, input.a, uuid.Nil)
-			require.Error(t, err)
+			_, enforceErr := g.Enforce(ctx, f.actor, input.s, input.a, uuid.Nil)
+			require.Error(t, enforceErr)
 		}
 		cfg = f.cfg
 		cfg.Resolver = types.ScopeResolverFunc(func(context.Context, types.ActorRef, types.ScopeFilter) (types.ScopeFilter, error) {
@@ -347,16 +347,16 @@ func TestNativeGroupRevocationOrdersProtectedWrites(t *testing.T) {
 					role  uuid.UUID
 				}{{manager, manage.ID}, {writer, write.ID}} {
 					now := time.Now().UTC()
-					_, err := db.NewInsert().Model(&groups.Membership{GroupID: group.ID, PrincipalID: p.actor.ID, Active: true, CreatedAt: now, UpdatedAt: now}).Exec(ctx)
-					require.NoError(t, err)
+					_, insertErr := db.NewInsert().Model(&groups.Membership{GroupID: group.ID, PrincipalID: p.actor.ID, Active: true, CreatedAt: now, UpdatedAt: now}).Exec(ctx)
+					require.NoError(t, insertErr)
 					require.NoError(t, roles.AssignRoleFromCatalog(ctx, types.ScopedRoleGrant{UserID: p.actor.ID, RoleID: p.role, Scope: groups.Scope(group.ID), ActorID: manager.ID}))
 				}
 				callbackEntered := make(chan struct{}, 1)
 				doWrite := func() error {
 					return s.WithAuthorized(ctx, writer, groups.Scope(group.ID), resourceWrite, uuid.Nil, func(ctx context.Context, tx bun.Tx) error {
 						callbackEntered <- struct{}{}
-						_, err := tx.ExecContext(ctx, "INSERT INTO resource_writes VALUES (?, ?, ?)", uuid.New(), group.ID, "opaque")
-						return err
+						_, writeErr := tx.ExecContext(ctx, "INSERT INTO resource_writes VALUES (?, ?, ?)", uuid.New(), group.ID, "opaque")
+						return writeErr
 					})
 				}
 				doRevoke := func() error { return s.SetRole(ctx, manager, group.ID, writer.ID, write.ID, false) }
@@ -382,8 +382,8 @@ func TestNativeGroupRevocationOrdersProtectedWrites(t *testing.T) {
 				}()
 				<-started
 				select {
-				case err := <-second:
-					t.Fatalf("second operation escaped transaction lock: %v", err)
+				case operationErr := <-second:
+					t.Fatalf("second operation escaped transaction lock: %v", operationErr)
 				case <-time.After(50 * time.Millisecond):
 				}
 				close(release)
@@ -431,22 +431,22 @@ func TestNativeActivitySQLScopePaginationStatsAndCursor(t *testing.T) {
 			require.NoError(t, repo.Log(ctx, types.ActivityRecord{Labels: scope.Labels, Verb: "event", OccurredAt: base.Add(time.Duration(i) * time.Second), Data: map[string]any{"opaque": true}}))
 		}
 		for _, scope := range []types.ScopeFilter{a, b, {}} {
-			page, err := repo.ListActivity(ctx, types.ActivityFilter{Scope: scope, Pagination: types.Pagination{Limit: 1, Offset: 1}})
-			require.NoError(t, err)
+			page, queryErr := repo.ListActivity(ctx, types.ActivityFilter{Scope: scope, Pagination: types.Pagination{Limit: 1, Offset: 1}})
+			require.NoError(t, queryErr)
 			require.Equal(t, 3, page.Total)
 			require.Len(t, page.Records, 1)
 			require.True(t, page.HasMore)
-			stats, err := repo.ActivityStats(ctx, types.ActivityStatsFilter{Scope: scope})
-			require.NoError(t, err)
+			stats, queryErr := repo.ActivityStats(ctx, types.ActivityStatsFilter{Scope: scope})
+			require.NoError(t, queryErr)
 			require.Equal(t, 3, stats.Total)
 			require.Equal(t, 3, stats.ByVerb["event"])
 			filter := types.ActivityFilter{Scope: scope, Pagination: types.Pagination{Limit: 2}}
-			first, err := repo.ListActivityCursor(ctx, filter, nil)
-			require.NoError(t, err)
+			first, queryErr := repo.ListActivityCursor(ctx, filter, nil)
+			require.NoError(t, queryErr)
 			require.Len(t, first, 2)
 			last := first[len(first)-1]
-			next, err := repo.ListActivityCursor(ctx, filter, &activity.ActivityCursor{OccurredAt: last.OccurredAt, ID: last.ID})
-			require.NoError(t, err)
+			next, queryErr := repo.ListActivityCursor(ctx, filter, &activity.ActivityCursor{OccurredAt: last.OccurredAt, ID: last.ID})
+			require.NoError(t, queryErr)
 			require.Len(t, next, 1)
 			for _, record := range append(first, next...) {
 				require.Equal(t, scope.Label("group"), record.Labels["group"])
@@ -549,7 +549,7 @@ func TestNativeGroupsSurviveDatabaseRestart(t *testing.T) {
 	raw, err = sql.Open("sqlite3", dsn)
 	require.NoError(t, err)
 	restarted := bun.NewDB(raw, sqlitedialect.New())
-	defer restarted.Close()
+	t.Cleanup(func() { require.NoError(t, restarted.Close()) })
 	cfg := f.cfg
 	cfg.DB = restarted
 	service, err := groups.NewStrict(cfg)
@@ -621,8 +621,8 @@ func TestTransactionActivityPreservesCompleteScope(t *testing.T) {
 		err = db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 			good := record
 			good.ID = uuid.New()
-			if err := repo.LogTx(ctx, tx, good, nil); err != nil {
-				return err
+			if logErr := repo.LogTx(ctx, tx, good, nil); logErr != nil {
+				return logErr
 			}
 			bad := record
 			bad.ID = uuid.New()

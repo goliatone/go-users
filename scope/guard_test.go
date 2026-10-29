@@ -119,8 +119,8 @@ func TestStrictGuardRejectsBlankActionBeforeDependenciesRun(t *testing.T) {
 	require.NoError(t, err)
 	requested := types.ScopeFilter{}.WithLabel("group", uuid.New())
 	for _, action := range []types.PolicyAction{"", " ", "\t\r\n"} {
-		result, err := strict.Enforce(context.Background(), types.ActorRef{ID: uuid.New()}, requested, action, uuid.New())
-		require.ErrorIs(t, err, scope.ErrPolicyActionRequired)
+		result, enforceErr := strict.Enforce(context.Background(), types.ActorRef{ID: uuid.New()}, requested, action, uuid.New())
+		require.ErrorIs(t, enforceErr, scope.ErrPolicyActionRequired)
 		require.Equal(t, types.ScopeFilter{}, result)
 	}
 	require.Zero(t, resolverCalls)

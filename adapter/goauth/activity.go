@@ -48,23 +48,9 @@ func (sink *ActivitySink) Record(ctx context.Context, event auth.ActivityEvent) 
 	if sink == nil || !sink.config.valid() {
 		return fmt.Errorf("authentication Activity sink is not ready")
 	}
-	resolved := sink.config.Scope.Clone()
-	if sink.config.ScopeProjector != nil {
-		projected, err := sink.config.ScopeProjector(ctx, event)
-		if err != nil {
-			return err
-		}
-		normalized, _, err := userstypes.CanonicalScope(projected)
-		if err != nil {
-			return err
-		}
-		// Explicit projector may supply either exact legacy context or Group-only context.
-		groupOnly := normalized.TenantID == uuid.Nil && normalized.OrgID == uuid.Nil && len(normalized.Labels) == 1 && normalized.Label("group") != uuid.Nil
-		legacy := normalized.TenantID != uuid.Nil && normalized.OrgID != uuid.Nil && len(normalized.Labels) == 0
-		if !groupOnly && !legacy {
-			return fmt.Errorf("goauth: projector returned unsupported scope")
-		}
-		resolved = normalized
+	resolved, err := sink.resolveScope(ctx, event)
+	if err != nil {
+		return err
 	}
 	verb := strings.TrimSpace(string(event.EventType))
 	if verb == "" {
@@ -121,6 +107,27 @@ func (sink *ActivitySink) Record(ctx context.Context, event auth.ActivityEvent) 
 		Data:       data,
 		OccurredAt: occurredAt,
 	})
+}
+
+func (sink *ActivitySink) resolveScope(ctx context.Context, event auth.ActivityEvent) (userstypes.ScopeFilter, error) {
+	if sink.config.ScopeProjector == nil {
+		return sink.config.Scope.Clone(), nil
+	}
+	projected, err := sink.config.ScopeProjector(ctx, event)
+	if err != nil {
+		return userstypes.ScopeFilter{}, err
+	}
+	normalized, _, err := userstypes.CanonicalScope(projected)
+	if err != nil {
+		return userstypes.ScopeFilter{}, err
+	}
+	// Explicit projectors supply either exact legacy context or Group-only context.
+	groupOnly := normalized.TenantID == uuid.Nil && normalized.OrgID == uuid.Nil && len(normalized.Labels) == 1 && normalized.Label("group") != uuid.Nil
+	legacy := normalized.TenantID != uuid.Nil && normalized.OrgID != uuid.Nil && len(normalized.Labels) == 0
+	if !groupOnly && !legacy {
+		return userstypes.ScopeFilter{}, fmt.Errorf("goauth: projector returned unsupported scope")
+	}
+	return normalized, nil
 }
 
 func parseActivityUUID(value string) uuid.UUID {

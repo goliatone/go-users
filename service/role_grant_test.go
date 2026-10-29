@@ -25,11 +25,11 @@ func grantRegistry(t *testing.T) *registry.RoleRegistry {
 	db := bun.NewDB(raw, sqlitedialect.New())
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	for _, name := range []string{"00003_custom_roles.up.sql", "00006_custom_roles_metadata.up.sql", "00007_custom_roles_order.up.sql", "00010_role_assignment_scopes.tx.up.sql"} {
-		ddl, err := users.CoreMigrationsFS.ReadFile("data/sql/migrations/sqlite/" + name)
-		require.NoError(t, err)
+		ddl, readErr := users.CoreMigrationsFS.ReadFile("data/sql/migrations/sqlite/" + name)
+		require.NoError(t, readErr)
 		require.NoError(t, db.RunInTx(context.Background(), nil, func(ctx context.Context, tx bun.Tx) error {
-			_, err := tx.ExecContext(ctx, string(ddl))
-			return err
+			_, execErr := tx.ExecContext(ctx, string(ddl))
+			return execErr
 		}))
 	}
 	r, err := registry.NewRoleRegistry(registry.RoleRegistryConfig{DB: db})

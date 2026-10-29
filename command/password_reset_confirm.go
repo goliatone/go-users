@@ -193,8 +193,8 @@ func (c *UserPasswordResetConfirmCommand) resolveResetToken(ctx context.Context,
 		return nil, "", nil, time.Time{}, err
 	}
 	payload := types.SecureLinkPayload(payloadMap)
-	if err := validateSecureLinkScope(payload); err != nil {
-		return nil, "", nil, time.Time{}, err
+	if scopeErr := validateSecureLinkScope(payload); scopeErr != nil {
+		return nil, "", nil, time.Time{}, scopeErr
 	}
 	jti := payloadString(payload, "jti")
 	if jti == "" {

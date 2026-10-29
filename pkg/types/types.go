@@ -175,7 +175,7 @@ type ActivityRecord struct {
 	TenantID   uuid.UUID
 	OrgID      uuid.UUID
 	// Labels is the complete canonical arbitrary scope, independent of metadata.
-	Labels map[string]uuid.UUID
+	Labels     map[string]uuid.UUID
 	Data       map[string]any
 	OccurredAt time.Time
 }

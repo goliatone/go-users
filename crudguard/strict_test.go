@@ -76,8 +76,8 @@ func TestStrictAdapterMappedActionsReachPolicyAndUnmappedFail(t *testing.T) {
 	ctx := newStubCrudContext(auth.WithActorContext(context.Background(), actor))
 	target := uuid.New()
 	for _, op := range []crud.CrudOperation{crud.OpRead, crud.OpList, crud.OpCreate, crud.OpCreateBatch, crud.OpUpdate, crud.OpUpdateBatch, crud.OpDelete, crud.OpDeleteBatch} {
-		_, err := adapter.Enforce(GuardInput{Context: ctx, Operation: op, TargetID: target})
-		require.ErrorIs(t, err, types.ErrUnauthorizedScope)
+		_, enforceErr := adapter.Enforce(GuardInput{Context: ctx, Operation: op, TargetID: target})
+		require.ErrorIs(t, enforceErr, types.ErrUnauthorizedScope)
 		check := checks[len(checks)-1]
 		require.Equal(t, target, check.TargetID)
 		require.Equal(t, actor.ActorID, check.Actor.ID.String())
@@ -88,9 +88,9 @@ func TestStrictAdapterMappedActionsReachPolicyAndUnmappedFail(t *testing.T) {
 		require.Equal(t, expected, check.Action)
 	}
 	for _, op := range []crud.CrudOperation{"", "\t ", "unmapped"} {
-		_, err := adapter.Enforce(GuardInput{Context: ctx, Operation: op})
+		_, enforceErr := adapter.Enforce(GuardInput{Context: ctx, Operation: op})
 		var rich *goerrors.Error
-		require.ErrorAs(t, err, &rich)
+		require.ErrorAs(t, enforceErr, &rich)
 		require.Equal(t, textCodeMissingPolicy, rich.TextCode)
 	}
 	require.Len(t, checks, 8, "unmapped operations cannot reach authorization")

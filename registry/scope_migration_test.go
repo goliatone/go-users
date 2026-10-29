@@ -42,8 +42,8 @@ func scopeDatabases(t *testing.T, run func(*testing.T, *bun.DB, string)) {
 		_, err = db.Exec("CREATE SCHEMA ?", bun.Ident(schema))
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			_, err := db.Exec("DROP SCHEMA ? CASCADE", bun.Ident(schema))
-			require.NoError(t, err)
+			_, dropErr := db.Exec("DROP SCHEMA ? CASCADE", bun.Ident(schema))
+			require.NoError(t, dropErr)
 			require.NoError(t, db.Close())
 		})
 		_, err = db.Exec("SET search_path TO ?", bun.Ident(schema))
@@ -87,8 +87,8 @@ func TestAssignmentCompleteScopePersistence(t *testing.T) {
 		roles := make([]uuid.UUID, 2)
 		actor := uuid.New()
 		for i, name := range []string{"reader", "editor"} {
-			role, err := r.CreateRole(ctx, types.RoleMutation{Name: name, Scope: catalog, ActorID: actor})
-			require.NoError(t, err)
+			role, createErr := r.CreateRole(ctx, types.RoleMutation{Name: name, Scope: catalog, ActorID: actor})
+			require.NoError(t, createErr)
 			roles[i] = role.ID
 			for _, user := range users {
 				for _, scope := range scopes {
@@ -103,8 +103,8 @@ func TestAssignmentCompleteScopePersistence(t *testing.T) {
 		r, err = NewRoleRegistry(RoleRegistryConfig{DB: db})
 		require.NoError(t, err)
 		for _, scope := range scopes {
-			grants, err := r.ListAssignments(ctx, types.RoleAssignmentFilter{Scope: scope, UserIDs: users, RoleIDs: roles})
-			require.NoError(t, err)
+			grants, listErr := r.ListAssignments(ctx, types.RoleAssignmentFilter{Scope: scope, UserIDs: users, RoleIDs: roles})
+			require.NoError(t, listErr)
 			require.Len(t, grants, 4, "full scope is exact, including unlabeled scope")
 			for _, grant := range grants {
 				require.Equal(t, scope.TenantID, grant.Scope.TenantID)
@@ -119,8 +119,8 @@ func TestAssignmentCompleteScopePersistence(t *testing.T) {
 		}
 		require.NoError(t, r.UnassignRole(ctx, users[0], roles[0], scopes[2], actor))
 		for i, scope := range scopes {
-			grants, err := r.ListAssignments(ctx, types.RoleAssignmentFilter{Scope: scope})
-			require.NoError(t, err)
+			grants, listErr := r.ListAssignments(ctx, types.RoleAssignmentFilter{Scope: scope})
+			require.NoError(t, listErr)
 			expected := 4
 			if i == 2 {
 				expected = 3
@@ -242,33 +242,33 @@ func TestTransactionRegistryRollbackAndCommit(t *testing.T) {
 		rollback := errors.New("rollback")
 		for _, commit := range []bool{false, true} {
 			err = db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-				bound, err := r.WithTx(tx)
-				if err != nil {
-					return err
+				bound, transactionErr := r.WithTx(tx)
+				if transactionErr != nil {
+					return transactionErr
 				}
-				def, err := bound.GetRole(ctx, role.ID, catalog)
-				if err != nil {
-					return err
+				def, transactionErr := bound.GetRole(ctx, role.ID, catalog)
+				if transactionErr != nil {
+					return transactionErr
 				}
 				def.Name = "updated"
-				if _, err = bound.UpdateRole(ctx, role.ID, types.RoleMutation{Name: def.Name, Scope: catalog}); err != nil {
-					return err
+				if _, transactionErr = bound.UpdateRole(ctx, role.ID, types.RoleMutation{Name: def.Name, Scope: catalog}); transactionErr != nil {
+					return transactionErr
 				}
-				if err = bound.AssignRole(ctx, user, role.ID, assigned, uuid.Nil); err != nil {
-					return err
+				if transactionErr = bound.AssignRole(ctx, user, role.ID, assigned, uuid.Nil); transactionErr != nil {
+					return transactionErr
 				}
 				// Duplicate assignment must not poison a PostgreSQL transaction.
-				if err = bound.AssignRole(ctx, user, role.ID, assigned, uuid.Nil); err != nil {
-					return err
+				if transactionErr = bound.AssignRole(ctx, user, role.ID, assigned, uuid.Nil); transactionErr != nil {
+					return transactionErr
 				}
-				rows, err := bound.ListAssignments(ctx, types.RoleAssignmentFilter{Scope: assigned, UserID: user})
-				if err != nil {
-					return err
+				rows, transactionErr := bound.ListAssignments(ctx, types.RoleAssignmentFilter{Scope: assigned, UserID: user})
+				if transactionErr != nil {
+					return transactionErr
 				}
 				require.Len(t, rows, 1)
-				roles, err := bound.ListRoles(ctx, types.RoleFilter{Scope: catalog})
-				if err != nil {
-					return err
+				roles, transactionErr := bound.ListRoles(ctx, types.RoleFilter{Scope: catalog})
+				if transactionErr != nil {
+					return transactionErr
 				}
 				require.Len(t, roles.Roles, 1)
 				require.Equal(t, 1, notifications)
@@ -282,15 +282,15 @@ func TestTransactionRegistryRollbackAndCommit(t *testing.T) {
 			} else {
 				require.ErrorIs(t, err, rollback)
 			}
-			rows, err := r.ListAssignments(ctx, types.RoleAssignmentFilter{Scope: assigned, UserID: user})
-			require.NoError(t, err)
+			rows, listErr := r.ListAssignments(ctx, types.RoleAssignmentFilter{Scope: assigned, UserID: user})
+			require.NoError(t, listErr)
 			if commit {
 				require.Len(t, rows, 1)
 			} else {
 				require.Empty(t, rows)
 			}
-			def, err := r.GetRole(ctx, role.ID, catalog)
-			require.NoError(t, err)
+			def, listErr := r.GetRole(ctx, role.ID, catalog)
+			require.NoError(t, listErr)
 			if commit {
 				require.Equal(t, "updated", def.Name)
 			} else {
@@ -298,12 +298,12 @@ func TestTransactionRegistryRollbackAndCommit(t *testing.T) {
 			}
 		}
 		err = db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-			bound, err := r.WithTx(tx)
-			if err != nil {
-				return err
+			bound, transactionErr := r.WithTx(tx)
+			if transactionErr != nil {
+				return transactionErr
 			}
-			if err = bound.UnassignRole(ctx, user, role.ID, assigned, uuid.Nil); err != nil {
-				return err
+			if transactionErr = bound.UnassignRole(ctx, user, role.ID, assigned, uuid.Nil); transactionErr != nil {
+				return transactionErr
 			}
 			return bound.DeleteRole(ctx, role.ID, catalog, uuid.Nil)
 		})

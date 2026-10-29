@@ -145,26 +145,14 @@ func (c *AssignRoleCommand) Execute(ctx context.Context, input AssignRoleInput) 
 	if c == nil || c.registry == nil {
 		return types.ErrMissingRoleRegistry
 	}
-	if c.validation.err != nil {
-		return c.validation.err
-	}
-	if err := input.Validate(); err != nil {
+	if err := c.validation.validate(input); err != nil {
 		return err
 	}
-	scope, err := c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionRolesWrite, input.RoleID)
+	resolved, err := c.validation.authorize(ctx, c.registry, c.guard, types.RoleGrantAssign, input.Actor, input.UserID, input.RoleID, input.Scope)
 	if err != nil {
 		return err
 	}
-	if c.validation.validator != nil {
-		scope, err = scope.NormalizeLabels()
-		if err != nil {
-			return err
-		}
-	}
-	if err := c.validation.enforce(ctx, c.registry, types.RoleGrantAssign, input.Actor, input.UserID, input.RoleID, scope); err != nil {
-		return err
-	}
-	return c.registry.AssignRole(ctx, input.UserID, input.RoleID, scope, input.Actor.ID)
+	return c.registry.AssignRole(ctx, input.UserID, input.RoleID, resolved, input.Actor.ID)
 }
 
 // UnassignRoleCommand removes assignments.
@@ -195,24 +183,37 @@ func (c *UnassignRoleCommand) Execute(ctx context.Context, input UnassignRoleInp
 	if c == nil || c.registry == nil {
 		return types.ErrMissingRoleRegistry
 	}
-	if c.validation.err != nil {
-		return c.validation.err
-	}
-	if err := input.Validate(); err != nil {
+	if err := c.validation.validate(input); err != nil {
 		return err
 	}
-	scope, err := c.guard.Enforce(ctx, input.Actor, input.Scope, types.PolicyActionRolesWrite, input.RoleID)
+	resolved, err := c.validation.authorize(ctx, c.registry, c.guard, types.RoleGrantRevoke, input.Actor, input.UserID, input.RoleID, input.Scope)
 	if err != nil {
 		return err
 	}
-	if c.validation.validator != nil {
-		scope, err = scope.NormalizeLabels()
+	return c.registry.UnassignRole(ctx, input.UserID, input.RoleID, resolved, input.Actor.ID)
+}
+
+func (v roleGrantValidation) authorize(ctx context.Context, registry types.RoleRegistry, guard scope.Guard, operation types.RoleGrantOperation, actor types.ActorRef, userID, roleID uuid.UUID, requested types.ScopeFilter) (types.ScopeFilter, error) {
+	resolved, err := guard.Enforce(ctx, actor, requested, types.PolicyActionRolesWrite, roleID)
+	if err != nil {
+		return types.ScopeFilter{}, err
+	}
+	if v.validator != nil {
+		resolved, err = resolved.NormalizeLabels()
 		if err != nil {
-			return err
+			return types.ScopeFilter{}, err
 		}
 	}
-	if err := c.validation.enforce(ctx, c.registry, types.RoleGrantRevoke, input.Actor, input.UserID, input.RoleID, scope); err != nil {
-		return err
+	if err := v.enforce(ctx, registry, operation, actor, userID, roleID, resolved); err != nil {
+		return types.ScopeFilter{}, err
 	}
-	return c.registry.UnassignRole(ctx, input.UserID, input.RoleID, scope, input.Actor.ID)
+	return resolved, nil
+}
+
+// validate preserves configuration errors ahead of request validation.
+func (v roleGrantValidation) validate(input interface{ Validate() error }) error {
+	if v.err != nil {
+		return v.err
+	}
+	return input.Validate()
 }

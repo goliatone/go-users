@@ -131,8 +131,8 @@ func (c *UserInviteCommand) Execute(ctx context.Context, input UserInviteInput) 
 	if err != nil {
 		return err
 	}
-	if err := scope.RequireTenantOrg(); err != nil {
-		return err
+	if scopeErr := scope.RequireTenantOrg(); scopeErr != nil {
+		return scopeErr
 	}
 	if enabled, featureErr := featureEnabled(ctx, c.featureGate, featureUsersInvite, scope, uuid.Nil); featureErr != nil {
 		return featureErr

@@ -39,22 +39,22 @@ type transactionRepository[T any] struct {
 }
 
 func (r transactionRepository[T]) Create(ctx context.Context, record T, criteria ...repository.InsertCriteria) (T, error) {
-	return r.Repository.CreateTx(ctx, r.tx, record, criteria...)
+	return r.CreateTx(ctx, r.tx, record, criteria...)
 }
 func (r transactionRepository[T]) GetByID(ctx context.Context, id string, criteria ...repository.SelectCriteria) (T, error) {
-	return r.Repository.GetByIDTx(ctx, r.tx, id, criteria...)
+	return r.GetByIDTx(ctx, r.tx, id, criteria...)
 }
 func (r transactionRepository[T]) List(ctx context.Context, criteria ...repository.SelectCriteria) ([]T, int, error) {
-	return r.Repository.ListTx(ctx, r.tx, criteria...)
+	return r.ListTx(ctx, r.tx, criteria...)
 }
 func (r transactionRepository[T]) Update(ctx context.Context, record T, criteria ...repository.UpdateCriteria) (T, error) {
-	return r.Repository.UpdateTx(ctx, r.tx, record, criteria...)
+	return r.UpdateTx(ctx, r.tx, record, criteria...)
 }
 func (r transactionRepository[T]) Delete(ctx context.Context, record T) error {
-	return r.Repository.DeleteTx(ctx, r.tx, record)
+	return r.DeleteTx(ctx, r.tx, record)
 }
 func (r transactionRepository[T]) DeleteWhere(ctx context.Context, criteria ...repository.DeleteCriteria) error {
-	return r.Repository.DeleteWhereTx(ctx, r.tx, criteria...)
+	return r.DeleteWhereTx(ctx, r.tx, criteria...)
 }
 
 // BindTx is the native Group adapter for WithTx. It returns nil for an invalid

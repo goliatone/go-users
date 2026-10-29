@@ -285,8 +285,8 @@ func TestPreferenceLabelsRejectedAtEveryLevel(t *testing.T) {
 			require.Empty(t, saved)
 			require.ErrorIs(t, repo.DeleteManyPreferences(ctx, user, labeled, level, []string{"theme"}, types.PreferenceBulkModeBestEffort), types.ErrUnsupportedScopeLabels)
 		}
-		rows, err := repo.ListPreferences(ctx, types.PreferenceFilter{UserID: user, Scope: base, Level: level})
-		require.NoError(t, err)
+		rows, listErr := repo.ListPreferences(ctx, types.PreferenceFilter{UserID: user, Scope: base, Level: level})
+		require.NoError(t, listErr)
 		require.Len(t, rows, 1)
 		require.Equal(t, "legacy", rows[0].Value["name"])
 		require.Equal(t, 1, rows[0].Version)

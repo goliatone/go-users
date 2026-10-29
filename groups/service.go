@@ -281,34 +281,30 @@ func (s *Service) SetRole(ctx context.Context, actor types.ActorRef, id, princip
 	}
 	return s.authorized(ctx, actor, Scope(id), ActionRoles, principal, func(ctx context.Context, tx bun.Tx) error {
 		r := s.roles.BindTx(tx)
-		if assign {
-			var member Membership
-			if err := tx.NewSelect().Model(&member).Where("group_id = ? AND principal_id = ? AND active = ?", id, principal, true).Scan(ctx); err != nil {
-				return ErrDenied
-			}
-			role, err := r.GetRole(ctx, roleID, s.catalog)
-			if err != nil {
-				return err
-			}
-			// Require each proposed permission under the same live lock and host policy.
-			for _, permission := range role.Permissions {
-				if err := s.check(ctx, tx, &Group{ID: id, Active: true}, actor, Scope(id), types.PolicyAction(permission), principal); err != nil {
-					return err
-				}
-			}
-			if err := r.AssignRoleFromCatalog(ctx, types.ScopedRoleGrant{UserID: principal, RoleID: roleID, CatalogScope: s.catalog, Scope: Scope(id), ActorID: actor.ID}); err != nil {
-				return err
-			}
-		} else {
+		if !assign {
 			if err := r.UnassignRole(ctx, principal, roleID, Scope(id), actor.ID); err != nil {
 				return err
 			}
+			return s.audit(ctx, tx, actor, id, "role.unassigned", principal, roleID)
 		}
-		verb := "role.assigned"
-		if !assign {
-			verb = "role.unassigned"
+		var member Membership
+		if err := tx.NewSelect().Model(&member).Where("group_id = ? AND principal_id = ? AND active = ?", id, principal, true).Scan(ctx); err != nil {
+			return ErrDenied
 		}
-		return s.audit(ctx, tx, actor, id, verb, principal, roleID)
+		role, err := r.GetRole(ctx, roleID, s.catalog)
+		if err != nil {
+			return err
+		}
+		// Require each proposed permission under the same live lock and host policy.
+		for _, permission := range role.Permissions {
+			if err := s.check(ctx, tx, &Group{ID: id, Active: true}, actor, Scope(id), types.PolicyAction(permission), principal); err != nil {
+				return err
+			}
+		}
+		if err := r.AssignRoleFromCatalog(ctx, types.ScopedRoleGrant{UserID: principal, RoleID: roleID, CatalogScope: s.catalog, Scope: Scope(id), ActorID: actor.ID}); err != nil {
+			return err
+		}
+		return s.audit(ctx, tx, actor, id, "role.assigned", principal, roleID)
 	})
 }
 
