@@ -23,6 +23,6 @@ type LogEntry struct {
 	ObjectID   string               `bun:"object_id"`
 	Channel    string               `bun:"channel"`
 	IP         string               `bun:"ip"`
-	Data       map[string]any       `bun:"data,type:jsonb"`
+	Data       map[string]any       `bun:"data,type:jsonb,json_use_number"`
 	CreatedAt  time.Time            `bun:"created_at"`
 }

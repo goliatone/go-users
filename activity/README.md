@@ -63,6 +63,29 @@ if err := svc.ActivitySink().Log(ctx, rec); err != nil {
 
 `Log` fills `ID`/`OccurredAt` when missing and persists to the `user_activity` table created by migration `000003_user_activity.sql`.
 
+## Exact JSON and trusted machine classification
+
+`LogEntry.Data` scans JSON numbers as `json.Number` in ordinary reads and
+`INSERT RETURNING`, including `LogTx`. Large integers, exact decimals and JSON
+numbers outside float64 range retain their value. Callers that previously asserted
+`float64` must handle `json.Number` and explicitly choose any lossy conversion.
+This model-level setting does not alter Bun's global JSON provider or impose new
+size/depth limits on existing rows. Access policies still sanitize the decoded data.
+
+The default PostgreSQL machine predicate treats missing JSON aliases as false;
+human rows with absent machine keys remain visible when machines are excluded.
+Existing machine actor/data aliases and SQLite legacy filtering are retained.
+
+`RepositoryConfig.MachineActivityFilter` optionally supplies a trusted host-owned
+SQL classifier. It runs only when machine activity is disabled and before limits,
+counts, cursors and statistics. Add grouped predicates to the supplied query;
+preserve its scope/channel/user constraints. Never accept SQL or the classifier
+from request input. `ExcludeMachineActivity(query, actorTypes, dataKeys)` applies
+the default metadata predicate when a host needs a legacy fallback. An example
+consumer is go-admin: receipt-associated events use their canonical actor kind,
+while rows without a receipt continue using configured metadata aliases. A nil
+hook preserves the default behavior; no database schema change is needed.
+
 ## Host-owned record policy and authentication events
 
 `RecordPolicy` is an opt-in boundary for audit disclosure. Its zero configuration

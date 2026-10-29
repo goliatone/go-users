@@ -14,13 +14,21 @@ import (
 	"github.com/uptrace/bun/dialect"
 )
 
+// MachineActivityFilter adds SQL exclusion predicates using trusted host-owned
+// classification. It is called only when machine activity is disabled, before
+// pagination/counting, for feeds, cursors and statistics. Preserve the existing
+// query predicates; use ExcludeMachineActivity for legacy rows. Never derive
+// this callback from request input. A nil callback uses the default metadata filter.
+type MachineActivityFilter func(*bun.SelectQuery, []string, []string) *bun.SelectQuery
+
 // RepositoryConfig wires the Bun-backed activity repository.
 type RepositoryConfig struct {
-	DB         *bun.DB
-	Repository repository.Repository[*LogEntry]
-	Clock      types.Clock
-	IDGen      types.IDGenerator
-	Enricher   ActivityEnricher
+	MachineActivityFilter MachineActivityFilter
+	DB                    *bun.DB
+	Repository            repository.Repository[*LogEntry]
+	Clock                 types.Clock
+	IDGen                 types.IDGenerator
+	Enricher              ActivityEnricher
 	// EnrichmentErrorHandler controls fail-fast vs best-effort behavior.
 	EnrichmentErrorHandler EnrichmentErrorHandler
 }
@@ -31,6 +39,7 @@ type activityStore interface {
 
 // Repository persists activity logs and exposes query helpers.
 type Repository struct {
+	machineActivityFilter MachineActivityFilter
 	activityStore
 	db    *bun.DB
 	clock types.Clock
@@ -80,6 +89,7 @@ func NewRepository(cfg RepositoryConfig) (*Repository, error) {
 	}
 
 	return &Repository{
+		machineActivityFilter:  cfg.MachineActivityFilter,
 		activityStore:          repo,
 		db:                     db,
 		clock:                  clock,
@@ -165,7 +175,7 @@ func (r *Repository) ListActivity(ctx context.Context, filter types.ActivityFilt
 			q = q.OrderExpr("created_at DESC").
 				Limit(pagination.Limit).
 				Offset(pagination.Offset)
-			return applyActivityFilter(q, filter)
+			return applyActivityFilter(q, filter, r.machineActivityFilter)
 		},
 	}
 
@@ -203,7 +213,7 @@ func (r *Repository) ActivityStats(ctx context.Context, filter types.ActivitySta
 		ColumnExpr("COUNT(*) AS total").
 		ColumnExpr("verb").
 		Group("verb")
-	query = applyActivityStatsFilter(query, filter)
+	query = applyActivityStatsFilter(query, filter, r.machineActivityFilter)
 
 	type row struct {
 		Verb  string `bun:"verb"`
@@ -222,12 +232,12 @@ func (r *Repository) ActivityStats(ctx context.Context, filter types.ActivitySta
 	return stats, nil
 }
 
-func applyActivityFilter(q *bun.SelectQuery, filter types.ActivityFilter) *bun.SelectQuery {
+func applyActivityFilter(q *bun.SelectQuery, filter types.ActivityFilter, classifiers ...MachineActivityFilter) *bun.SelectQuery {
 	q = applyActivityScopeFilter(q, filter.Scope)
 	q = applyActivityActorFilter(q, filter.UserID, filter.ActorID)
 	q = applyActivityObjectFilter(q, filter)
 	q = applyActivityChannelFilter(q, filter)
-	q = applyMachineActivityFilter(q, filter.MachineActivityEnabled, filter.MachineActorTypes, filter.MachineDataKeys)
+	q = applyMachineActivityFilter(q, filter.MachineActivityEnabled, filter.MachineActorTypes, filter.MachineDataKeys, classifiers...)
 	q = applyActivityTimeFilter(q, filter.Since, filter.Until)
 	if strings.TrimSpace(filter.Keyword) != "" {
 		keyword := "%" + strings.ToLower(strings.TrimSpace(filter.Keyword)) + "%"
@@ -302,7 +312,7 @@ func applyActivityTimeFilter(q *bun.SelectQuery, since, until *time.Time) *bun.S
 	return q
 }
 
-func applyActivityStatsFilter(q *bun.SelectQuery, filter types.ActivityStatsFilter) *bun.SelectQuery {
+func applyActivityStatsFilter(q *bun.SelectQuery, filter types.ActivityStatsFilter, classifiers ...MachineActivityFilter) *bun.SelectQuery {
 	q = applyActivityScopeFilter(q, filter.Scope)
 	if filter.UserID != uuid.Nil && filter.ActorID != uuid.Nil {
 		q = q.Where("(user_id = ? OR actor_id = ?)", filter.UserID, filter.ActorID)
@@ -323,13 +333,28 @@ func applyActivityStatsFilter(q *bun.SelectQuery, filter types.ActivityStatsFilt
 	if len(filter.Verbs) > 0 {
 		q = q.Where("verb IN (?)", bun.List(filter.Verbs))
 	}
-	q = applyMachineActivityFilter(q, filter.MachineActivityEnabled, filter.MachineActorTypes, filter.MachineDataKeys)
+	q = applyMachineActivityFilter(q, filter.MachineActivityEnabled, filter.MachineActorTypes, filter.MachineDataKeys, classifiers...)
 	return q
 }
 
-func applyMachineActivityFilter(q *bun.SelectQuery, enabled *bool, actorTypes, dataKeys []string) *bun.SelectQuery {
+func applyMachineActivityFilter(q *bun.SelectQuery, enabled *bool, actorTypes, dataKeys []string, classifiers ...MachineActivityFilter) *bun.SelectQuery {
 	if q == nil || enabled == nil || *enabled {
 		return q
+	}
+	actorTypes = normalizeIdentifiers(actorTypes)
+	dataKeys = normalizeIdentifiers(dataKeys)
+	if len(classifiers) > 0 && classifiers[0] != nil {
+		return classifiers[0](q, actorTypes, dataKeys)
+	}
+	return ExcludeMachineActivity(q, actorTypes, dataKeys)
+}
+
+// ExcludeMachineActivity applies the default legacy metadata exclusion predicate.
+// Hosts composing trusted identity filters may use it inside a grouped fallback
+// branch. Values are normalized and parameterized; scope remains caller-owned.
+func ExcludeMachineActivity(q *bun.SelectQuery, actorTypes, dataKeys []string) *bun.SelectQuery {
+	if q == nil {
+		return nil
 	}
 	actorTypes = normalizeIdentifiers(actorTypes)
 	dataKeys = normalizeIdentifiers(dataKeys)
@@ -365,7 +390,7 @@ func applyMachineActivityFilterPostgres(q *bun.SelectQuery, actorTypes, dataKeys
 	if len(conditions) == 0 {
 		return q
 	}
-	return q.Where("NOT ("+strings.Join(conditions, " OR ")+")", args...)
+	return q.Where("NOT COALESCE(("+strings.Join(conditions, " OR ")+"), FALSE)", args...)
 }
 
 func applyMachineActivityFilterLike(q *bun.SelectQuery, actorTypes, dataKeys []string) *bun.SelectQuery {
@@ -487,7 +512,7 @@ func (r *Repository) ListActivityCursor(ctx context.Context, filter types.Activi
 	}
 	filter.Scope = normalized
 	var rows []*LogEntry
-	q := applyActivityFilter(r.db.NewSelect().Model(&rows), filter)
+	q := applyActivityFilter(r.db.NewSelect().Model(&rows), filter, r.machineActivityFilter)
 	p := normalizePagination(filter.Pagination, 50, 200)
 	err = ApplyCursorPagination(q, cursor, p.Limit).Scan(ctx)
 	if err != nil {
