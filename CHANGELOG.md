@@ -1,5 +1,19 @@
 # Changelog
 
+# [0.27.6](https://github.com/goliatone/go-users/compare/v0.27.5...v0.27.6) - (2026-10-29)
+
+## <!-- 1 -->🐛 Bug Fixes
+
+- Activity null safe filtering, legacy metadata ([d521a91](https://github.com/goliatone/go-users/commit/d521a9106c61d11938f3e758fd498f95fb7fa4cf))  - (goliatone)
+
+## <!-- 13 -->📦 Bumps
+
+- Bump version: v0.27.6 ([20ffa0f](https://github.com/goliatone/go-users/commit/20ffa0faa217f4e9f12d453f557e33c83b01b380))  - (goliatone)
+
+## <!-- 3 -->📚 Documentation
+
+- Update changelog for v0.27.5 ([a908333](https://github.com/goliatone/go-users/commit/a9083330224b63242527a98bd1fed3008fecb84e))  - (goliatone)
+
 # [0.27.5](https://github.com/goliatone/go-users/compare/v0.27.4...v0.27.5) - (2026-10-29)
 
 ## <!-- 1 -->🐛 Bug Fixes
